@@ -66,6 +66,16 @@ async function fetchArchiveData() {
             };
         });
         renderTable(allBooks);
+
+        // — Статистика —
+        const totalCount = allBooks.length;
+        const totalBytes = allBooks.reduce((sum, b) => sum + (b.sizeRaw || 0), 0);
+        const totalGB = totalBytes / 1024 / 1024 / 1024;
+        const sizeStr = totalGB >= 1
+            ? totalGB.toFixed(2) + ' ГБ'
+            : (totalBytes / 1024 / 1024).toFixed(0) + ' МБ';
+        const statsEl = document.getElementById('lib-stats');
+        if (statsEl) statsEl.textContent = `📚 ${totalCount} файлів · 💾 ${sizeStr}`;
     } catch (err) {
         console.error('Помилка завантаження:', err);
         const body = document.getElementById('books-table-body');

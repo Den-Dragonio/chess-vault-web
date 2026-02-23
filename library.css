@@ -476,6 +476,14 @@ body.library-page {
     transform: translateY(-2px);
 }
 
+.lib-stats {
+    margin-left: auto;
+    font-size: 0.88rem;
+    color: #999;
+    font-style: italic;
+    white-space: nowrap;
+}
+
 /* Таблиця та колонки */
 .books-table {
     width: 100%;
