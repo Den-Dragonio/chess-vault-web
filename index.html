@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chess Vault</title>
+    <link rel="icon" href="img/icon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="img/icon.png">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+
+<body>
+    <div id="toast-container"></div>
+
+    <header class="main-header">
+        <nav class="nav-menu">
+            <a href="index.html">Головна</a>
+            <a href="profile.html" id="nav-my-account" style="display:none;">Мій Аккаунт</a>
+            <a href="library.html">Бібліотека</a>
+            <div class="dropdown">
+                <a class="dropbtn" id="acc-btn">Аккаунт ▾</a>
+                <div class="dropdown-content" id="acc-dropdown">
+                    <a href="#" id="login-trigger">🔑 Вхід</a>
+                    <a href="#" id="reg-trigger">📝 Реєстрація</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="main-container">
+        <div class="news-block">
+            <div class="news-section">
+                <h2>Новини</h2>
+                <div class="news-list" id="news-list-dynamic">
+                    <!-- Завантажується з Firestore -->
+                </div>
+            </div>
+        </div>
+        <div class="top-books">
+            <h3>Топ завантажень</h3>
+            <ol id="top-books-list">
+                <li>Поки порожньо...</li>
+                <li>-</li>
+                <li>-</li>
+                <li>-</li>
+                <li>-</li>
+            </ol>
+        </div>
+    </main>
+
+    <!-- Модалка: Вхід -->
+    <div class="modal-overlay" id="login-modal">
+        <div class="login-card">
+            <button class="modal-close" id="close-login">✕</button>
+            <h1>Вхід</h1>
+            <form id="auth-form" class="modal-form">
+                <input type="text" id="login-username" placeholder="Логін" required autocomplete="username">
+                <input type="password" id="login-password" placeholder="Пароль" required
+                    autocomplete="current-password">
+                <button type="submit" class="login-btn">Увійти</button>
+            </form>
+            <p id="auth-error" class="auth-error"></p>
+            <p class="switch-text">Немає аккаунту? <a href="#" id="switch-to-reg">Реєстрація</a></p>
+        </div>
+    </div>
+
+    <!-- Модалка: Реєстрація -->
+    <div class="modal-overlay" id="reg-modal">
+        <div class="login-card">
+            <button class="modal-close" id="close-reg">✕</button>
+            <h1>Реєстрація</h1>
+            <form id="signup-form" class="modal-form">
+                <input type="text" id="reg-name" placeholder="Придумай логін" required autocomplete="username">
+                <input type="password" id="reg-password" placeholder="Придумай пароль (мін. 6 символів)" required
+                    autocomplete="new-password">
+                <button type="submit" class="login-btn">Створити аккаунт</button>
+            </form>
+            <p id="reg-error" class="auth-error"></p>
+            <p class="switch-text">Вже є аккаунт? <a href="#" id="switch-to-login">Увійти</a></p>
+        </div>
+    </div>
+
+    <div id="bg-grid-container"></div>
+    <div id="giant-left" class="giant-container left"></div>
+    <div id="giant-right" class="giant-container right"></div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

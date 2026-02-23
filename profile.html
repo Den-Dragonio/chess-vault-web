@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chess Vault — Мій Аккаунт</title>
+    <link rel="icon" href="img/icon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="img/icon.png">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-init.js"></script>
+    <style>
+        body {
+            overflow-y: auto;
+        }
+
+        .profile-wrapper {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 30px;
+            padding: 100px 40px 60px;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        /* ---- КАРТКА ПРОФІЛЮ ---- */
+        .profile-card {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(25px);
+            border-radius: 28px;
+            padding: 40px 45px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.85);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
+            min-width: 300px;
+            max-width: 350px;
+            flex-shrink: 0;
+            align-self: flex-start;
+        }
+
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            background: #1a1a1a;
+            border-radius: 50%;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.2rem;
+            color: #fff;
+        }
+
+        .profile-name {
+            font-size: 1.8rem;
+            margin: 0 0 6px;
+            color: #111;
+        }
+
+        .profile-badge {
+            display: inline-block;
+            background: rgba(0, 0, 0, 0.07);
+            border-radius: 20px;
+            padding: 3px 14px;
+            font-size: 0.82rem;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .profile-reg-date {
+            font-size: 0.8rem;
+            color: #aaa;
+            margin-bottom: 20px;
+        }
+
+        .profile-stats {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .stat-value {
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #111;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: #999;
+        }
+
+        .profile-divider {
+            border: none;
+            border-top: 1px solid rgba(0, 0, 0, 0.07);
+            margin: 18px 0;
+        }
+
+        .logout-profile-btn {
+            margin-top: 16px;
+            background: #1a1a1a;
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            padding: 12px 30px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: 0.3s;
+            font-family: inherit;
+        }
+
+        .logout-profile-btn:hover {
+            background: #000;
+            transform: scale(1.03);
+        }
+
+        /* ---- БЛОК ІСТОРІЇ ---- */
+        .history-card {
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(20px);
+            border-radius: 28px;
+            padding: 35px 40px;
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.07);
+            flex-grow: 1;
+            max-width: 720px;
+            align-self: flex-start;
+        }
+
+        .history-card h2 {
+            margin: 0 0 22px;
+            font-size: 1.4rem;
+            color: #222;
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .history-table th {
+            text-align: left;
+            padding: 12px 10px;
+            color: #aaa;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .history-table td {
+            padding: 16px 10px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+            font-size: 0.95rem;
+            vertical-align: top;
+        }
+
+        .history-table tbody tr:hover td {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        .h-title {
+            font-weight: bold;
+        }
+
+        .h-author {
+            color: #666;
+            font-style: italic;
+        }
+
+        .h-date {
+            color: #aaa;
+            font-size: 0.85rem;
+            white-space: nowrap;
+        }
+
+        .history-empty {
+            text-align: center;
+            padding: 40px;
+            color: #bbb;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="toast-container"></div>
+
+    <header class="main-header">
+        <nav class="nav-menu">
+            <a href="index.html">Головна</a>
+            <a href="profile.html" id="nav-my-account">Мій Аккаунт</a>
+            <a href="library.html">Бібліотека</a>
+            <div class="dropdown">
+                <a class="dropbtn" id="acc-btn">Аккаунт ▾</a>
+                <div class="dropdown-content" id="acc-dropdown">
+                    <a href="#" id="logout-btn">🚪 Вийти</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div id="bg-grid-container"></div>
+
+    <div class="profile-wrapper">
+        <!-- Ліва картка -->
+        <div class="profile-card">
+            <div class="profile-avatar" id="profile-avatar">♟</div>
+            <h1 class="profile-name" id="profile-name">...</h1>
+            <div class="profile-badge">Учасник Chess Vault</div>
+            <div class="profile-reg-date" id="profile-reg-date">Дата реєстрації: —</div>
+
+            <div class="profile-stats">
+                <div class="stat-item">
+                    <span class="stat-value" id="stat-downloads">0</span>
+                    <span class="stat-label">Завантажень</span>
+                </div>
+            </div>
+
+            <hr class="profile-divider">
+            <button class="logout-profile-btn" id="logout-profile-btn">🚪 Вийти</button>
+        </div>
+
+        <!-- Права картка: Історія -->
+        <div class="history-card">
+            <h2>📚 Мої завантаження</h2>
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>Назва</th>
+                        <th>Автор</th>
+                        <th>Дата</th>
+                    </tr>
+                </thead>
+                <tbody id="history-body">
+                    <tr>
+                        <td colspan="3" class="history-empty">⏳ Завантаження...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Фон
+        (function () {
+            const sq = [];
+            const f = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+            const r = ['1', '2', '3', '4', '5', '6', '7', '8'];
+            for (const fi of f) for (const ri of r) sq.push(fi + ri);
+            const grid = document.getElementById('bg-grid-container');
+            const cells = [];
+            for (let i = 0; i < 100; i++) {
+                const c = document.createElement('div');
+                c.className = 'grid-cell';
+                c.innerText = sq[Math.floor(Math.random() * sq.length)];
+                const d = { el: c, x: Math.random() * 100, y: Math.random() * 250 - 150, speed: 0.008 + Math.random() * 0.01 };
+                c.style.left = d.x + 'vw'; grid.appendChild(c); cells.push(d);
+            }
+            (function anim() {
+                cells.forEach(c => {
+                    c.y += c.speed;
+                    if (c.y > 110) { c.y = -20; c.el.innerText = sq[Math.floor(Math.random() * sq.length)]; }
+                    c.el.style.top = c.y + 'vh';
+                });
+                requestAnimationFrame(anim);
+            })();
+        })();
+
+        // Авторизація та дані
+        function fmt(ts) {
+            if (!ts) return '—';
+            const d = ts.toDate ? ts.toDate() : new Date(ts);
+            return d.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) { window.location.href = 'index.html'; return; }
+
+            const name = user.displayName || user.email.split('@')[0];
+            document.getElementById('profile-name').textContent = name;
+            document.getElementById('profile-avatar').textContent = name.charAt(0).toUpperCase();
+            document.getElementById('acc-btn').textContent = `👤 ${name} ▾`;
+
+            // Дата реєстрації
+            const created = user.metadata.creationTime;
+            if (created) {
+                const d = new Date(created);
+                document.getElementById('profile-reg-date').textContent =
+                    'Зареєстровано: ' + d.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            }
+
+            // Виходи
+            document.getElementById('logout-profile-btn').onclick = async () => { await auth.signOut(); window.location.href = 'index.html'; };
+            document.getElementById('logout-btn').onclick = async (e) => { e.preventDefault(); await auth.signOut(); window.location.href = 'index.html'; };
+
+            // Історія завантажень
+            try {
+                const snap = await db
+                    .collection('user_downloads').doc(user.uid)
+                    .collection('history').orderBy('downloadedAt', 'desc').get();
+
+                document.getElementById('stat-downloads').textContent = snap.size;
+                const tbody = document.getElementById('history-body');
+
+                if (snap.empty) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="history-empty">📭 Ви ще нічого не завантажували</td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = snap.docs.map(d => {
+                    const data = d.data();
+                    return `<tr>
+                    <td class="h-title">${data.title || '—'}</td>
+                    <td class="h-author">${data.author || '—'}</td>
+                    <td class="h-date">${fmt(data.downloadedAt)}</td>
+                </tr>`;
+                }).join('');
+            } catch (e) {
+                document.getElementById('history-body').innerHTML =
+                    `<tr><td colspan="3" class="history-empty">❌ Помилка завантаження${e.code === 'permission-denied' ? ': перевірте правила Firestore' : ''}</td></tr>`;
+                console.error(e);
+            }
+        });
+    </script>
+</body>
+
+</html>

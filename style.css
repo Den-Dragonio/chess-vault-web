@@ -1,0 +1,464 @@
+/* --- ГЛОБАЛЬНІ НАЛАШТУВАННЯ --- */
+* {
+    font-family: "Marker Felt Thin", "Marker Felt", "Permanent Marker", cursive !important;
+    box-sizing: border-box;
+}
+
+input,
+input::placeholder,
+button {
+    font-family: inherit !important;
+}
+
+body,
+html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #ffffff;
+}
+
+/* --- ГОЛОВНИЙ КОНТЕНТ --- */
+.main-container {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 120px;
+    gap: 40px;
+    pointer-events: none;
+}
+
+.news-block,
+.top-books {
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(15px);
+    border-radius: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    padding: 30px;
+    pointer-events: all;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+.news-block {
+    width: 520px;
+    min-height: 520px;
+    text-align: center;
+}
+
+.top-books {
+    width: 320px;
+}
+
+.top-books ol {
+    padding-left: 20px;
+    line-height: 1.7;
+}
+
+.top-count {
+    font-size: 0.78rem;
+    color: #aaa;
+    margin-left: 4px;
+}
+
+.news-item {
+    background: rgba(255, 255, 255, 0.5);
+    padding: 15px;
+    border-radius: 15px;
+    margin-top: 20px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.news-item-download {
+    background: rgba(235, 248, 240, 0.6);
+    border-color: rgba(0, 150, 80, 0.1);
+    font-size: 0.92rem;
+    padding: 10px 15px;
+    margin-top: 10px;
+}
+
+.news-date {
+    display: block;
+    font-size: 0.78rem;
+    color: #aaa;
+    margin-bottom: 4px;
+}
+
+.news-list {
+    max-height: 420px;
+    overflow-y: auto;
+    padding-right: 4px;
+    text-align: left;
+}
+
+.news-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.news-list::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+/* --- ХЕДЕР --- */
+.main-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 70px;
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(10px);
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.nav-menu {
+    display: flex;
+    gap: 50px;
+    align-items: center;
+}
+
+.nav-menu a,
+.dropbtn {
+    text-decoration: none;
+    color: #444;
+    font-size: 1.3rem;
+    transition: 0.3s;
+    cursor: pointer;
+}
+
+.nav-menu a:hover {
+    transform: scale(1.1);
+    color: #000;
+}
+
+.dropdown {
+    position: relative;
+    padding-bottom: 15px;
+    margin-bottom: -15px;
+}
+
+.dropdown-content {
+    opacity: 0;
+    visibility: hidden;
+    position: absolute;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: blur(15px);
+    min-width: 220px;
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+    border: 1px solid rgba(0, 0, 0, 0.07);
+    z-index: 200;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.dropdown:hover .dropdown-content {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+}
+
+.dropdown-content a {
+    display: block;
+    padding: 14px 24px;
+    text-align: left;
+    font-size: 1.15rem;
+    color: #333;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    transition: 0.2s;
+    white-space: nowrap;
+}
+
+.dropdown-content a:hover {
+    background: #1a1a1a;
+    color: #ffffff;
+    padding-left: 30px;
+}
+
+.dropdown-content a:last-child {
+    border-bottom: none;
+}
+
+/* Помилка авторизації */
+.auth-error {
+    margin-top: 12px;
+    font-size: 0.88rem;
+    color: #c0392b;
+    min-height: 1.2em;
+    text-align: center;
+}
+
+/* --- МОДАЛКИ --- */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.25);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(16px);
+}
+
+.login-card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(30px);
+    border-radius: 30px;
+    padding: 50px 45px 40px;
+    width: 380px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    animation: modalPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes modalPop {
+    from {
+        opacity: 0;
+        transform: scale(0.88) translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.login-card h1 {
+    margin: 0 0 10px;
+    font-size: 2rem;
+    color: #111;
+    letter-spacing: 1px;
+}
+
+.modal-close {
+    position: absolute;
+    top: 18px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.06);
+    border: none;
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    font-size: 1rem;
+    cursor: pointer;
+    color: #555;
+    transition: 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-close:hover {
+    background: #1a1a1a;
+    color: #fff;
+    transform: rotate(90deg);
+}
+
+.modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 28px;
+}
+
+.switch-text {
+    margin-top: 22px;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.switch-text a {
+    color: #1a1a1a;
+    font-weight: bold;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+    transition: 0.2s;
+}
+
+.switch-text a:hover {
+    border-color: #000;
+}
+
+input {
+    width: 100%;
+    padding: 15px 18px;
+    border-radius: 14px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.85);
+    font-size: 1rem;
+    outline: none;
+    transition: 0.25s;
+}
+
+input:focus {
+    border-color: rgba(0, 0, 0, 0.25);
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.login-btn {
+    width: 100%;
+    padding: 16px;
+    background: #1a1a1a;
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: 0.3s;
+    letter-spacing: 0.5px;
+}
+
+.login-btn:hover {
+    background: #000;
+    transform: scale(1.02);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* --- TOAST ПОВІДОМЛЕННЯ --- */
+#toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.toast {
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 15px 25px;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+    animation: slideIn 0.5s ease forwards;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* --- ФОН ТА ГІГАНТИ --- */
+#bg-grid-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.grid-cell {
+    position: absolute;
+    font-size: 1rem;
+    color: rgba(0, 0, 0, 0.1);
+    will-change: transform, top;
+}
+
+.giant-container {
+    position: fixed;
+    z-index: 1;
+    opacity: 0.7;
+    pointer-events: none;
+    height: 82vh;
+}
+
+.left {
+    bottom: -12vh;
+    left: -6vw;
+    transform-origin: bottom right;
+}
+
+.right {
+    bottom: -12vh;
+    right: -6vw;
+    transform-origin: bottom left;
+}
+
+@keyframes fallInwardLeft {
+    0% {
+        transform: rotate(0deg);
+        opacity: 0.7;
+    }
+
+    70% {
+        opacity: 0;
+    }
+
+    100% {
+        transform: rotate(90deg) translateY(40vh);
+        opacity: 0;
+    }
+}
+
+@keyframes fallInwardRight {
+    0% {
+        transform: rotate(0deg);
+        opacity: 0.7;
+    }
+
+    70% {
+        opacity: 0;
+    }
+
+    100% {
+        transform: rotate(-90deg) translateY(40vh);
+        opacity: 0;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(15vh);
+    }
+
+    to {
+        opacity: 0.7;
+        transform: translateY(0);
+    }
+}
+
+.state-appear {
+    animation: slideUp 3.5s ease-out forwards;
+}
+
+.state-fall-left {
+    animation: fallInwardLeft 4.5s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.state-fall-right {
+    animation: fallInwardRight 4.5s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.flipped {
+    transform: scaleX(-1) !important;
+}

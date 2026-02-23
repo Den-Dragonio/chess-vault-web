@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chess Vault - Бібліотека</title>
+    <link rel="icon" href="img/icon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="img/icon.png">
+    <link rel="stylesheet" href="library.css">
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+
+<body class="library-page">
+    <header class="main-header">
+        <nav class="nav-menu">
+            <a href="index.html">Головна</a>
+            <a href="profile.html" id="nav-my-account" style="display:none;">Мій Аккаунт</a>
+            <a href="library.html" class="active-link">Бібліотека</a>
+            <div class="dropdown">
+                <a class="dropbtn" id="acc-btn">Аккаунт ▾</a>
+                <div class="dropdown-content" id="acc-dropdown">
+                    <a href="#" id="login-trigger">🔑 Вхід</a>
+                    <a href="#" id="reg-trigger">📝 Реєстрація</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div id="bg-grid-container"></div>
+
+    <main class="library-main-container narrower">
+        <div class="search-box">
+            <input type="text" id="lib-search-input" placeholder="Шукати за автором, назвою або роком...">
+        </div>
+
+        <div class="sort-controls">
+            <span class="sort-label">Упорядкувати:</span>
+            <button class="sort-btn" onclick="sortBooks('author')">🔤 Автор</button>
+            <button class="sort-btn" onclick="sortBooks('year')">📅 Дата</button>
+            <button class="sort-btn" onclick="sortBooks('sizeRaw')">⚖️ Розмір</button>
+        </div>
+
+        <!-- Блок зі списком літератури -->
+        <div class="books-list-block">
+            <div class="table-area">
+                <table class="books-table">
+                    <thead>
+                        <tr>
+                            <th>Автор</th>
+                            <th>Назва книги</th>
+                            <th>Рік</th>
+                            <th>Вид</th>
+                            <th>Вага</th>
+                            <th>Дія</th>
+                        </tr>
+                    </thead>
+                    <tbody id="books-table-body">
+                        <tr>
+                            <td colspan="6" class="loading-row">⏳ Завантаження бібліотеки...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script src="auth-shared.js"></script>
+    <script src="library.js"></script>
+</body>
+
+</html>
