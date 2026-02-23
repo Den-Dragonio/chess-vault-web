@@ -626,3 +626,353 @@ input:focus {
         padding: 22px 14px;
     }
 }
+
+/* ==============================================
+   🌙 ТЕМНА ТЕМА
+   Джерело: prefers-color-scheme: dark
+   АБО клас html.dark (час: 20:00 – 07:00)
+   ============================================== */
+
+/* --- Спільні правила для обох сценаріїв --- */
+@media (prefers-color-scheme: dark) {
+    body {
+        --dm: 1;
+    }
+}
+
+/* Щоб не дублювати блоки — використовуємо :where() трюк:
+   правила нижче написані ДВІЧІ: для @media та для html.dark */
+
+/* ====== via @media ====== */
+@media (prefers-color-scheme: dark) {
+
+    body,
+    html {
+        background: #0d0d14;
+        color: #d8d8e4;
+    }
+
+    .main-header {
+        background: rgba(12, 12, 20, 0.75);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .nav-menu a,
+    .dropbtn {
+        color: #c8c8d8;
+    }
+
+    .nav-menu a:hover {
+        color: #fff;
+    }
+
+    .dropdown-content {
+        background: rgba(18, 18, 28, 0.97);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .dropdown-content a {
+        color: #c8c8d8;
+    }
+
+    .dropdown-content a:hover {
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff;
+    }
+
+    .news-block,
+    .top-books {
+        background: rgba(18, 18, 30, 0.75);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .news-item {
+        background: rgba(28, 28, 44, 0.8);
+        border-color: rgba(255, 255, 255, 0.06);
+    }
+
+    .news-item-download {
+        background: rgba(12, 32, 22, 0.8);
+        border-color: rgba(0, 200, 100, 0.1);
+    }
+
+    .news-date {
+        color: #666;
+    }
+
+    .top-count {
+        color: #666;
+    }
+
+    /* Модальки */
+    .modal-overlay {
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    .login-card {
+        background: rgba(16, 16, 26, 0.97);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    .login-card h1 {
+        color: #e8e8f0;
+    }
+
+    .modal-form input {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #e0e0ec;
+    }
+
+    .modal-form input::placeholder {
+        color: #666;
+    }
+
+    .switch-text {
+        color: #888;
+    }
+
+    .switch-text a {
+        color: #aab;
+    }
+
+    /* Профіль */
+    .profile-card,
+    .history-card {
+        background: rgba(18, 18, 30, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .profile-name {
+        color: #e8e8f0;
+    }
+
+    .profile-badge {
+        background: rgba(255, 255, 255, 0.08);
+        color: #888;
+    }
+
+    .profile-reg-date {
+        color: #666;
+    }
+
+    .stat-value {
+        color: #e8e8f0;
+    }
+
+    .history-table th {
+        color: #666;
+        border-bottom-color: rgba(255, 255, 255, 0.06);
+    }
+
+    .history-table td {
+        border-bottom-color: rgba(255, 255, 255, 0.04);
+        color: #ccc;
+    }
+
+    .history-table tbody tr:hover td {
+        background: rgba(255, 255, 255, 0.04);
+    }
+
+    .h-author {
+        color: #888;
+    }
+
+    .h-date {
+        color: #666;
+    }
+
+    .profile-divider {
+        border-top-color: rgba(255, 255, 255, 0.07);
+    }
+
+    .logout-profile-btn {
+        background: #1e1e2e;
+        color: #d0d0e0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .logout-profile-btn:hover {
+        background: #2a2a3e;
+    }
+
+    /* Фон сітка */
+    .grid-cell {
+        color: rgba(255, 255, 255, 0.06) !important;
+    }
+
+    /* Hamburger */
+    .hamburger {
+        color: #aaa;
+    }
+
+    .nav-menu>a,
+    .nav-menu>.dropdown {
+        border-top-color: rgba(255, 255, 255, 0.06);
+    }
+}
+
+/* ====== via html.dark (часовий, або system dark що теж додає клас) ====== */
+html.dark body,
+html.dark html {
+    background: #0d0d14;
+    color: #d8d8e4;
+}
+
+html.dark .main-header {
+    background: rgba(12, 12, 20, 0.75);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+html.dark .nav-menu a,
+html.dark .dropbtn {
+    color: #c8c8d8;
+}
+
+html.dark .nav-menu a:hover {
+    color: #fff;
+}
+
+html.dark .dropdown-content {
+    background: rgba(18, 18, 28, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+html.dark .dropdown-content a {
+    color: #c8c8d8;
+}
+
+html.dark .dropdown-content a:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+}
+
+html.dark .news-block,
+html.dark .top-books {
+    background: rgba(18, 18, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+html.dark .news-item {
+    background: rgba(28, 28, 44, 0.8);
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .news-item-download {
+    background: rgba(12, 32, 22, 0.8);
+    border-color: rgba(0, 200, 100, 0.1);
+}
+
+html.dark .news-date,
+html.dark .top-count {
+    color: #666;
+}
+
+html.dark .modal-overlay {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+html.dark .login-card {
+    background: rgba(16, 16, 26, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+html.dark .login-card h1 {
+    color: #e8e8f0;
+}
+
+html.dark .modal-form input {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e0e0ec;
+}
+
+html.dark .modal-form input::placeholder {
+    color: #666;
+}
+
+html.dark .switch-text {
+    color: #888;
+}
+
+html.dark .switch-text a {
+    color: #aab;
+}
+
+html.dark .profile-card,
+html.dark .history-card {
+    background: rgba(18, 18, 30, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+html.dark .profile-name {
+    color: #e8e8f0;
+}
+
+html.dark .profile-badge {
+    background: rgba(255, 255, 255, 0.08);
+    color: #888;
+}
+
+html.dark .profile-reg-date {
+    color: #666;
+}
+
+html.dark .stat-value {
+    color: #e8e8f0;
+}
+
+html.dark .history-table th {
+    color: #666;
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .history-table td {
+    border-bottom-color: rgba(255, 255, 255, 0.04);
+    color: #ccc;
+}
+
+html.dark .history-table tbody tr:hover td {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+html.dark .h-author {
+    color: #888;
+}
+
+html.dark .h-date {
+    color: #666;
+}
+
+html.dark .profile-divider {
+    border-top-color: rgba(255, 255, 255, 0.07);
+}
+
+html.dark .logout-profile-btn {
+    background: #1e1e2e;
+    color: #d0d0e0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+html.dark .logout-profile-btn:hover {
+    background: #2a2a3e;
+}
+
+html.dark .grid-cell {
+    color: rgba(255, 255, 255, 0.06) !important;
+}
+
+html.dark .hamburger {
+    color: #aaa;
+}
+
+html.dark .nav-menu>a,
+html.dark .nav-menu>.dropdown {
+    border-top-color: rgba(255, 255, 255, 0.06);
+}
