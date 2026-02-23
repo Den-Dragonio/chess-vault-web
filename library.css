@@ -589,3 +589,163 @@ body.library-page {
 .books-table tbody tr:hover td {
     background: rgba(255, 255, 255, 0.4);
 }
+
+/* ============================================
+   HAMBURGER — прихований на десктопі
+   ============================================ */
+.hamburger {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 1.6rem;
+    cursor: pointer;
+    color: #444;
+    padding: 4px 8px;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.hamburger:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+/* ============================================
+   MOBILE ≤ 768px
+   ============================================ */
+@media (max-width: 768px) {
+
+    body,
+    html {
+        overflow-x: hidden;
+        overflow-y: auto;
+        height: auto;
+    }
+
+    /* Header */
+    .main-header {
+        height: auto;
+        padding: 0 14px;
+        justify-content: flex-start;
+        position: sticky;
+        top: 0;
+    }
+
+    /* Nav */
+    .nav-menu {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 0;
+        width: 100%;
+        padding: 8px 0;
+        align-items: center;
+    }
+
+    .hamburger {
+        display: inline-flex;
+        margin-right: 12px;
+    }
+
+    .nav-menu>a,
+    .nav-menu>.dropdown {
+        display: none;
+        width: 100%;
+        padding: 10px 16px;
+        border-top: 1px solid rgba(0, 0, 0, 0.05);
+        font-size: 1.05rem;
+    }
+
+    .nav-menu.open>a,
+    .nav-menu.open>.dropdown {
+        display: block;
+    }
+
+    .nav-menu.open .dropdown-content {
+        opacity: 1;
+        visibility: visible;
+        position: static;
+        transform: none;
+        box-shadow: none;
+        border: none;
+        background: transparent;
+        padding: 0 8px;
+    }
+
+    .nav-menu.open .dropdown-content a {
+        padding: 8px 0;
+        display: block;
+    }
+
+    /* Library container */
+    .library-main {
+        width: 100%;
+        margin-top: 0;
+        border-radius: 0;
+        padding: 16px;
+    }
+
+    .library-main-container.narrower {
+        width: 100%;
+        margin: 0 auto;
+        padding: 16px 12px 30px;
+    }
+
+    /* Search */
+    #lib-search-input {
+        width: 100%;
+        font-size: 0.95rem;
+        padding: 12px 16px;
+    }
+
+    /* Sort controls */
+    .sort-controls {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .lib-stats {
+        margin-left: 0;
+        width: 100%;
+        margin-top: 4px;
+    }
+
+    /* Table: horizontal scroll */
+    .table-wrapper,
+    .table-area,
+    .books-list-block {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .books-table {
+        min-width: 520px;
+    }
+
+    /* Smaller text in table */
+    .books-table th,
+    .books-table td {
+        padding: 10px 8px;
+        font-size: 0.82rem;
+    }
+
+    .download-btn-js,
+    .download-link {
+        padding: 6px 10px;
+        font-size: 0.82rem;
+    }
+}
+
+/* ≤ 400px */
+@media (max-width: 400px) {
+    .library-main-container.narrower {
+        padding: 12px 8px 20px;
+    }
+
+    .sort-btn {
+        padding: 6px 10px;
+        font-size: 0.82rem;
+    }
+
+    .books-table {
+        min-width: 420px;
+    }
+}
