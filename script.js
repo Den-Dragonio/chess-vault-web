@@ -195,6 +195,17 @@ document.getElementById('signup-form').addEventListener('submit', async e => {
     try {
         const cred = await auth.createUserWithEmailAndPassword(toFakeEmail(username), password);
         await cred.user.updateProfile({ displayName: username });
+
+        // Привітання в стрічці новин на головній
+        try {
+            const db = firebase.firestore();
+            await db.collection('news').add({
+                text: `🎉 ${username} приєднався до Chess Vault! Ласкаво просимо!`,
+                timestamp: firebase.firestore.Timestamp.now(),
+                type: 'welcome'
+            });
+        } catch (_) { /* не критично */ }
+
         closeModal(regModal);
         showToast(`🎉 Аккаунт створено! Ласкаво просимо, ${username}!`);
     } catch (err) { errEl.textContent = translateError(err.code); }

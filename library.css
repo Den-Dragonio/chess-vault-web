@@ -269,6 +269,30 @@ html {
     background: #ffa502;
 }
 
+.format-epub {
+    background: #8e44ad;
+}
+
+.format-cbr {
+    background: #e67e22;
+}
+
+.format-cbz {
+    background: #e67e22;
+}
+
+.format-txt {
+    background: #27ae60;
+}
+
+.format-doc {
+    background: #2980b9;
+}
+
+.format-docx {
+    background: #2980b9;
+}
+
 /* Кнопка скачування */
 .download-btn {
     background: #1a1a1a;

@@ -49,7 +49,8 @@ async function fetchArchiveData() {
     try {
         const response = await fetch(`https://archive.org/metadata/${ARCHIVE_ID}`);
         const data = await response.json();
-        const files = data.files.filter(f => f.name.endsWith('.pdf') || f.name.endsWith('.djvu'));
+        const ALLOWED = ['.pdf', '.djvu', '.epub', '.cbr', '.cbz', '.txt', '.doc', '.docx'];
+        const files = data.files.filter(f => ALLOWED.some(ext => f.name.toLowerCase().endsWith(ext)));
 
         allBooks = files.map(f => {
             const fileName = f.name.replace(/\.[^/.]+$/, '');
