@@ -1,0 +1,751 @@
+/* ==============================================
+   CHESS VAULT — CHAMPIONS LIST & MODAL STYLES
+   1 рядок на 1 людину, квадратні рамки фото
+   Модалка 1 в 1 як для книги (1100px, фото 200x280)
+   ============================================== */
+
+/* --- СЕКЦІЯ ЧЕМПІОНІВ НА ГОЛОВНІЙ --- */
+.champions-section {
+    position: relative;
+    z-index: 10;
+    width: 880px;
+    max-width: calc(100% - 40px);
+    margin: 40px auto 140px;
+    padding: 0;
+    pointer-events: all;
+}
+
+.champions-header {
+    text-align: center;
+    margin-bottom: 25px;
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    padding: 22px 24px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+}
+
+.champions-title {
+    font-size: 2.4rem;
+    margin: 0;
+    color: #1a1a1a;
+    letter-spacing: 0.5px;
+}
+
+/* --- СПИСОК: 1 РЯДОК НА 1 ЛЮДИНУ --- */
+.champions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.champion-row {
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.03);
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    text-decoration: none;
+    color: inherit;
+}
+
+.champion-row:hover {
+    transform: translateX(6px) scale(1.008);
+    background: rgba(255, 255, 255, 0.75);
+    border-color: rgba(212, 175, 55, 0.7);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+}
+
+/* Квадратне фото без рамки */
+.champ-row-portrait-wrap {
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+}
+
+.champ-row-portrait {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: 12px;
+    border: none;
+    outline: none;
+}
+
+/* Номер та Ім'я */
+.champ-row-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 200px;
+}
+
+.champ-row-name {
+    font-size: 1.3rem;
+    color: #111;
+    margin: 0 0 3px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.champ-row-num {
+    font-size: 0.88rem;
+    color: #888;
+    font-weight: normal;
+}
+
+/* Роки правління */
+.champ-row-reign {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.92rem;
+    color: #444;
+}
+
+/* Статистика книг */
+.champ-row-stats {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.champ-pill {
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.07);
+    border-radius: 10px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+
+.champ-pill.has-books {
+    background: rgba(46, 204, 113, 0.15);
+    border-color: rgba(46, 204, 113, 0.4);
+    color: #196f3d;
+}
+
+.champ-row-arrow {
+    font-size: 1.4rem;
+    color: #999;
+    transition: transform 0.2s;
+    margin-left: 6px;
+}
+
+.champion-row:hover .champ-row-arrow {
+    color: #111;
+    transform: translateX(4px);
+}
+
+/* ==============================================
+   МОДАЛЬНЕ ВІКНО ЧЕМПІОНА — 1 В 1 ЯК ДЛЯ КНИГИ
+   ============================================== */
+#book-detail-overlay {
+    z-index: 3600 !important;
+}
+
+#champion-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 3100;
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    overflow-y: auto;
+}
+
+#champion-modal-overlay.active {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 60px 20px 40px;
+    animation: chOverlayIn 0.3s ease forwards;
+}
+
+@keyframes chOverlayIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Картка 1 в 1 як #book-detail-card */
+#champion-modal-card {
+    width: 100%;
+    max-width: 1100px;
+    min-height: calc(100vh - 120px);
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border-radius: 32px;
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    box-shadow: 0 40px 80px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255,255,255,0.9);
+    padding: 60px;
+    position: relative;
+    animation: chCardIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    display: flex;
+    flex-direction: column;
+    gap: 36px;
+}
+
+@keyframes chCardIn {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Кнопка закриття */
+#champion-modal-close {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    background: rgba(0, 0, 0, 0.07);
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: #555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s;
+    font-family: inherit;
+    z-index: 1;
+}
+
+#champion-modal-close:hover {
+    background: #1a1a1a;
+    color: #fff;
+    transform: rotate(90deg) scale(1.1);
+}
+
+/* Тіло модалки: збільшені відступи між блоками */
+#champion-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+}
+
+/* ВЕРХНЯ ЧАСТИНА: фото 200x280 (1 в 1 як обкладинка книги) + інформація */
+.chm-top {
+    display: flex;
+    gap: 50px;
+    align-items: flex-start;
+}
+
+.chm-photo-wrap {
+    flex-shrink: 0;
+    width: 200px;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.chm-photo {
+    width: 200px;
+    height: 280px;
+    object-fit: cover;
+    border-radius: 18px;
+    box-shadow: none !important;
+    display: block;
+    transition: transform 0.3s ease;
+    border: none !important;
+    outline: none !important;
+}
+
+.chm-photo:hover {
+    transform: scale(1.03) rotate(-1deg);
+}
+
+.chm-hero-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.chm-badge-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.chm-number-badge {
+    background: rgba(212, 175, 55, 0.2);
+    border: none !important;
+    color: #936a00;
+    padding: 4px 14px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: bold;
+}
+
+.chm-name {
+    font-size: 2.5rem;
+    color: #111;
+    margin: 0;
+    line-height: 1.15;
+}
+
+.chm-reign-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.07);
+    border: none !important;
+    padding: 6px 16px;
+    border-radius: 12px;
+    font-size: 1.05rem;
+    color: #222;
+    align-self: flex-start;
+}
+
+.chm-counts-summary {
+    display: flex;
+    gap: 14px;
+    margin-top: 8px;
+}
+
+.chm-count-pill {
+    background: rgba(255, 255, 255, 0.7);
+    border: none !important;
+    border-radius: 12px;
+    padding: 8px 16px;
+    font-size: 0.95rem;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chm-count-pill strong {
+    font-size: 1.2rem;
+    color: #27ae60;
+}
+
+/* --- ПРАПОРИ ТА КРАЇНИ --- */
+.champ-flag-img {
+    width: 20px;
+    height: 14px;
+    object-fit: cover;
+    border-radius: 2px;
+    vertical-align: -2px;
+    display: inline-block;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.champ-flag-emoji {
+    font-size: 1.15rem;
+    line-height: 1;
+    display: inline-block;
+    vertical-align: -1px;
+}
+
+.champ-country {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.92rem;
+    color: #444;
+}
+
+.champ-dot {
+    color: #888;
+    font-size: 0.85rem;
+    margin: 0 2px;
+}
+
+.champ-elo {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.92rem;
+    color: #d35400;
+}
+
+.champ-elo strong {
+    font-size: 0.98rem;
+    color: #b03a2e;
+}
+
+.chm-country-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.95rem;
+    color: #222;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 4px 12px;
+    border-radius: 10px;
+    border: none !important;
+}
+
+.chm-elo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.95rem;
+    color: #b7791f;
+    background: rgba(243, 156, 18, 0.12);
+    padding: 4px 12px;
+    border-radius: 10px;
+    border: none !important;
+}
+
+.chm-elo-val {
+    color: #d35400 !important;
+}
+
+/* ОПИС ТА ЦІКАВІ ФАКТИ (Без заднього фону, збільшені відступи) */
+.chm-section {
+    background: transparent !important;
+    border-radius: 0;
+    padding: 0;
+    border: none !important;
+    box-shadow: none !important;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.chm-section-title {
+    font-size: 1.35rem;
+    color: #111;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chm-bio-text {
+    font-size: 1.08rem;
+    line-height: 1.7;
+    color: #2c3e50;
+    margin: 0;
+}
+
+.chm-facts-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.chm-facts-list li {
+    position: relative;
+    padding-left: 28px;
+    font-size: 1.02rem;
+    line-height: 1.6;
+    color: #333;
+}
+
+.chm-facts-list li::before {
+    content: "⚡";
+    position: absolute;
+    left: 0;
+    top: 1px;
+}
+
+.chm-facts-list li:nth-child(even)::before {
+    content: "💡";
+}
+
+/* СПИСКИ КНИГ: АВТОРСЬКІ ТА ПОВ'ЯЗАНІ (Без заднього фону, збільшені відступи) */
+.chm-books-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 36px;
+}
+
+.chm-books-block {
+    background: transparent !important;
+    border-radius: 0;
+    padding: 0;
+    border: none !important;
+    box-shadow: none !important;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.chm-books-scroll-list {
+    max-height: 260px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 6px;
+    margin-top: 10px;
+}
+
+.chm-books-scroll-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chm-books-scroll-list::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 10px;
+}
+
+/* Клікне посилання на книгу */
+.chm-book-item {
+    background: rgba(0, 0, 0, 0.03);
+    border: none !important;
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    font-family: inherit;
+    width: 100%;
+}
+
+.chm-book-item:hover {
+    background: rgba(0, 0, 0, 0.07);
+    border: none !important;
+    transform: translateX(4px);
+    box-shadow: none !important;
+}
+
+.chm-book-title {
+    font-size: 0.98rem;
+    color: #222;
+    line-height: 1.4;
+    flex: 1;
+}
+
+.chm-empty-books {
+    font-size: 0.92rem;
+    color: #888;
+    margin: 10px 0 0 0;
+    font-style: italic;
+}
+
+/* ==============================================
+   DARK THEME (ТЕМНА ТЕМА)
+   ============================================== */
+html.dark .champions-header {
+    background: rgba(22, 24, 32, 0.55);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+html.dark .champions-title {
+    color: #f1f2f6;
+}
+
+html.dark .champion-row {
+    background: rgba(24, 27, 36, 0.55);
+    border-color: rgba(255, 255, 255, 0.09);
+}
+
+html.dark .champion-row:hover {
+    background: rgba(32, 36, 48, 0.85);
+    border-color: rgba(243, 156, 18, 0.6);
+}
+
+html.dark .champ-row-portrait-wrap,
+html.dark .champ-row-portrait {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+html.dark .champ-row-name {
+    color: #f1f2f6;
+}
+
+html.dark .champ-row-num {
+    color: #a4b0be;
+}
+
+html.dark .champ-row-reign {
+    color: #ced6e0;
+}
+
+html.dark .champ-pill {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.08);
+    color: #ced6e0;
+}
+
+html.dark .champ-pill.has-books {
+    background: rgba(46, 204, 113, 0.18);
+    border-color: rgba(46, 204, 113, 0.35);
+    color: #2ecc71;
+}
+
+html.dark .champ-row-arrow {
+    color: #747d8c;
+}
+
+html.dark .champion-row:hover .champ-row-arrow {
+    color: #f1f2f6;
+}
+
+/* Модалка в темній темі */
+html.dark #champion-modal-card {
+    background: rgba(18, 20, 26, 0.88);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 40px 80px rgba(0, 0, 0, 0.5);
+}
+
+html.dark #champion-modal-close {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ced6e0;
+}
+
+html.dark #champion-modal-close:hover {
+    background: #fff;
+    color: #111;
+}
+
+html.dark .chm-photo-wrap,
+html.dark .chm-photo {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+html.dark .chm-name {
+    color: #f1f2f6;
+}
+
+html.dark .chm-reign-badge {
+    background: transparent !important;
+    color: #dfe4ea;
+}
+
+html.dark .chm-count-pill {
+    background: transparent !important;
+    border: none !important;
+    color: #ced6e0;
+}
+
+html.dark .chm-section,
+html.dark .chm-books-block {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+html.dark .chm-section-title {
+    color: #f1f2f6;
+}
+
+html.dark .chm-bio-text {
+    color: #dfe4ea;
+}
+
+html.dark .chm-facts-list li {
+    color: #ced6e0;
+}
+
+html.dark .chm-book-item {
+    background: rgba(255, 255, 255, 0.04);
+    border: none !important;
+}
+
+html.dark .chm-book-item:hover {
+    background: rgba(255, 255, 255, 0.09);
+    border: none !important;
+}
+
+html.dark .chm-book-title {
+    color: #f1f2f6;
+}
+
+html.dark .champ-country {
+    color: #ced6e0;
+}
+
+html.dark .champ-elo {
+    color: #f39c12;
+}
+
+html.dark .champ-elo strong {
+    color: #e67e22;
+}
+
+html.dark .chm-country-badge {
+    color: #f1f2f6;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .chm-elo-badge {
+    color: #f1c40f;
+    background: rgba(243, 156, 18, 0.18);
+}
+
+html.dark .chm-elo-val {
+    color: #f39c12 !important;
+}
+
+/* --- АДАПТИВНІСТЬ --- */
+@media (max-width: 900px) {
+    #champion-modal-card {
+        padding: 36px 24px;
+    }
+    .chm-top {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 24px;
+    }
+    .chm-hero-info {
+        align-items: center;
+    }
+    .chm-reign-badge {
+        align-self: center;
+    }
+    .chm-books-columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 650px) {
+    .champion-row {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .champ-row-stats {
+        width: 100%;
+        justify-content: flex-start;
+        padding-top: 6px;
+        border-top: 1px dashed rgba(0, 0, 0, 0.08);
+    }
+    .champ-row-arrow {
+        display: none;
+    }
+}

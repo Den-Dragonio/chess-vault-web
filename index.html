@@ -8,6 +8,8 @@
     <link rel="icon" href="img/icon.png" type="image/png" sizes="64x64">
     <link rel="apple-touch-icon" href="img/icon.png">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="book-modal.css">
+    <link rel="stylesheet" href="champions.css">
     <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
     <script src="dark-mode-init.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -43,17 +45,58 @@
                 </div>
             </div>
         </div>
-        <div class="top-books">
-            <h3>Топ завантажень</h3>
-            <ol id="top-books-list">
-                <li>Поки порожньо...</li>
-                <li>-</li>
-                <li>-</li>
-                <li>-</li>
-                <li>-</li>
-            </ol>
+        <div class="main-sidebar">
+            <div class="top-books">
+                <h3>Топ завантажень</h3>
+                <ol id="top-books-list">
+                    <li>Поки порожньо...</li>
+                    <li>-</li>
+                    <li>-</li>
+                    <li>-</li>
+                    <li>-</li>
+                </ol>
+            </div>
+            <div class="useful-links">
+                <h3>Корисні посилання</h3>
+                <ul class="useful-links-list">
+                    <li><a href="https://www.chess.com" target="_blank" rel="noopener">♟️ Chess.com</a></li>
+                    <li><a href="https://lichess.org" target="_blank" rel="noopener">♞ Lichess</a></li>
+                    <li><a href="https://stepchess.ru" target="_blank" rel="noopener">📚 StepChess</a></li>
+                </ul>
+            </div>
         </div>
     </main>
+
+    <!-- ============================================
+         СЕКЦІЯ ЧЕМПІОНІВ СВІТУ (Тільки заголовок)
+         ============================================ -->
+    <section class="champions-section" id="champions">
+        <div class="champions-header">
+            <h2 class="champions-title">Чемпіони світу</h2>
+        </div>
+        <div class="champions-list" id="champions-list">
+            <!-- 1 рядок на 1 людину, квадратні рамки фото -->
+        </div>
+    </section>
+
+    <!-- ============================================
+         МОДАЛЬНЕ ВІКНО ЧЕМПІОНА (1 в 1 як для книги)
+         ============================================ -->
+    <div id="champion-modal-overlay">
+        <div id="champion-modal-card">
+            <button id="champion-modal-close">✕</button>
+            <div id="champion-modal-body">
+                <!-- Динамічний вміст з champions.js -->
+            </div>
+        </div>
+    </div>
+
+    <!-- BOOK DETAIL MODAL (для відкриття конкретної книги) -->
+    <div id="book-detail-overlay">
+        <div id="book-detail-card">
+            <button id="book-detail-close">✕</button>
+        </div>
+    </div>
 
     <!-- Модалка: Вхід -->
     <div class="modal-overlay" id="login-modal">
@@ -91,6 +134,16 @@
     <div id="giant-left" class="giant-container left"></div>
     <div id="giant-right" class="giant-container right"></div>
 
+    <!-- Плаваюча кнопка «Нагору» -->
+    <button id="scroll-to-top" class="scroll-to-top" title="Нагору" aria-label="Нагору">
+        <span class="scroll-arrow">↑</span>
+    </button>
+
+    <script src="page_counts.js"></script>
+    <script src="descriptions.js"></script>
+    <script src="book-modal.js"></script>
+    <script src="champions-data.js"></script>
+    <script src="champions.js"></script>
     <script src="script.js"></script>
 </body>
 

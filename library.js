@@ -18,24 +18,26 @@ for (const f of chessFiles) for (const r of chessRanks) chessSquares.push(f + r)
 
 const grid = document.getElementById('bg-grid-container');
 const cells = [];
-for (let i = 0; i < 150; i++) {
-    const c = document.createElement('div');
-    c.className = 'grid-cell';
-    c.innerText = chessSquares[Math.floor(Math.random() * chessSquares.length)];
-    const data = { el: c, x: Math.random() * 100, y: Math.random() * 250 - 150, speed: 0.008 + Math.random() * 0.01 };
-    c.style.left = data.x + 'vw';
-    grid.appendChild(c);
-    cells.push(data);
+if (grid) {
+    for (let i = 0; i < 150; i++) {
+        const c = document.createElement('div');
+        c.className = 'grid-cell';
+        c.innerText = chessSquares[Math.floor(Math.random() * chessSquares.length)];
+        const data = { el: c, x: Math.random() * 100, y: Math.random() * 250 - 150, speed: 0.008 + Math.random() * 0.01 };
+        c.style.left = data.x + 'vw';
+        grid.appendChild(c);
+        cells.push(data);
+    }
+    function animate() {
+        cells.forEach(c => {
+            c.y += c.speed;
+            if (c.y > 110) { c.y = -20; c.el.innerText = chessSquares[Math.floor(Math.random() * chessSquares.length)]; }
+            c.el.style.top = c.y + 'vh';
+        });
+        requestAnimationFrame(animate);
+    }
+    animate();
 }
-function animate() {
-    cells.forEach(c => {
-        c.y += c.speed;
-        if (c.y > 110) { c.y = -20; c.el.innerText = chessSquares[Math.floor(Math.random() * chessSquares.length)]; }
-        c.el.style.top = c.y + 'vh';
-    });
-    requestAnimationFrame(animate);
-}
-animate();
 
 // =============================================
 // СТЕЖЕННЯ ЗА АВТОРИЗАЦІЄЮ
@@ -76,6 +78,21 @@ async function fetchArchiveData() {
             initCollections(allBooks);
         } else {
             renderTable(allBooks);
+        }
+
+        // Автоматичний пошук з URL-параметрів (наприклад: library.html?search=Каспаров)
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchParam = urlParams.get('search');
+        if (searchParam) {
+            const searchInput = document.getElementById('lib-search-input');
+            if (searchInput) {
+                searchInput.value = searchParam;
+                if (typeof renderFilteredBooks === 'function') {
+                    renderFilteredBooks();
+                } else {
+                    searchInput.dispatchEvent(new Event('input'));
+                }
+            }
         }
 
         // Фоновий авто-скрапер: обробляємо нові книги (яких ще немає в кеші)
@@ -135,7 +152,9 @@ function renderTable(books) {
     container.querySelectorAll('.download-btn-js').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation(); // не відкривати модал при кліку на кнопку
-            onDownloadClick(btn);
+            if (typeof window.onDownloadClick === 'function') {
+                window.onDownloadClick(btn);
+            }
         });
     });
 
@@ -151,35 +170,12 @@ function renderTable(books) {
 }
 
 // =============================================
-// НАТИСКАННЯ "СКАЧАТИ"
+// СИСТЕМА СПОВІЩЕНЬ БІБЛІОТЕКИ
 // =============================================
-async function onDownloadClick(btn) {
-    if (typeof window.onDownloadClick === 'function') {
-        return window.onDownloadClick(btn);
-    }
-}
-
-function showLibToast(msg, type = 'ok') {
+function showLibToast(msg, type = 'ok', actionText = null, onAction = null) {
     if (typeof window.showToast === 'function') {
-        return window.showToast(msg, type);
+        return window.showToast(msg, type, actionText, onAction);
     }
-    let tc = document.getElementById('toast-container');
-    if (!tc) {
-        tc = document.createElement('div');
-        tc.id = 'toast-container';
-        document.body.appendChild(tc);
-    }
-    const t = document.createElement('div');
-    const isWarn = type === 'warn';
-    const isError = type === 'error';
-    t.className = `toast ${isWarn ? 'toast-warn' : (isError ? 'toast-error' : '')}`.trim();
-    const icon = isWarn ? '⚠️' : (isError ? '❌' : '✅');
-    t.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-msg">${msg}</span>`;
-    tc.appendChild(t);
-    setTimeout(() => {
-        t.classList.add('toast-out');
-        setTimeout(() => { if (t.parentNode) t.parentNode.removeChild(t); }, 400);
-    }, 3500);
 }
 window.showLibToast = showLibToast;
 

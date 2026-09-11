@@ -13,6 +13,8 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+window.auth = auth;
+window.db = db;
 
 function toFakeEmail(username) {
     return username.toLowerCase().trim().replace(/\s+/g, '_') + '@chess-lib.local';
@@ -153,16 +155,45 @@ function translateError(code) {
     return map[code] || 'Помилка. Спробуйте ще раз.';
 }
 
-function showToast(msg, type = 'ok') {
-    const tc = document.getElementById('toast-container');
-    if (!tc) return;
+function showToast(msg, type = 'ok', actionText = null, onAction = null) {
+    let tc = document.getElementById('toast-container');
+    if (!tc) {
+        tc = document.createElement('div');
+        tc.id = 'toast-container';
+        document.body.appendChild(tc);
+    }
     const t = document.createElement('div');
-    t.className = 'toast';
-    t.style.background = type === 'error' ? 'rgba(200,50,50,0.9)' : 'rgba(0,0,0,0.85)';
-    t.textContent = msg;
+    const isWarn = type === 'warn' || type === 'warning';
+    const isError = type === 'error';
+    t.className = `toast ${isWarn ? 'toast-warn' : (isError ? 'toast-error' : '')}`.trim();
+    const icon = isWarn ? '⚠️' : (isError ? '❌' : '✅');
+
+    let actionHtml = '';
+    if (actionText) {
+        actionHtml = `<a href="#" class="toast-action-btn">${actionText}</a>`;
+    }
+
+    t.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-msg"><span>${msg}</span>${actionHtml}</span>`;
     tc.appendChild(t);
-    setTimeout(() => t.remove(), 3500);
+
+    if (actionText && typeof onAction === 'function') {
+        const btn = t.querySelector('.toast-action-btn');
+        if (btn) {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                onAction();
+            });
+        }
+    }
+
+    setTimeout(() => {
+        t.classList.add('toast-out');
+        setTimeout(() => {
+            if (t.parentNode) t.parentNode.removeChild(t);
+        }, 400);
+    }, 4500);
 }
+window.showToast = showToast;
 
 // =============================================
 // 6. ВХІД
@@ -361,3 +392,33 @@ db.collection('downloads')
         const ol = document.getElementById('top-books-list');
         if (ol) ol.innerHTML = '<li>Поки порожньо...</li>' + '<li>-</li>'.repeat(4);
     });
+
+// =============================================
+// 11. ПЛАВАЮЧА КНОПКА «НАГОРУ»
+// =============================================
+function initScrollToTop() {
+    const scrollBtn = document.getElementById('scroll-to-top');
+    if (!scrollBtn) return;
+
+    // З'являється акуратно, коли користувач прокручує понад 450px
+    window.addEventListener('scroll', () => {
+        if (window.scrollY > 450) {
+            scrollBtn.classList.add('visible');
+        } else {
+            scrollBtn.classList.remove('visible');
+        }
+    }, { passive: true });
+
+    scrollBtn.addEventListener('click', () => {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initScrollToTop);
+} else {
+    initScrollToTop();
+}

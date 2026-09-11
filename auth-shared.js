@@ -14,6 +14,8 @@ if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
 const auth = firebase.auth();
+window.auth = auth;
+window.db = firebase.firestore();
 
 function bindLoginTrigger() {
     const el = document.getElementById('login-trigger');

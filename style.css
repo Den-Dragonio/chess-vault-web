@@ -15,8 +15,10 @@ html {
     margin: 0;
     padding: 0;
     width: 100%;
-    height: 100%;
-    overflow: hidden;
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scroll-behavior: smooth;
     background: #ffffff;
 }
 
@@ -26,14 +28,15 @@ html {
     z-index: 10;
     display: flex;
     justify-content: center;
-    align-items: flex-start;
+    align-items: stretch;
     padding-top: 120px;
     gap: 40px;
     pointer-events: none;
 }
 
 .news-block,
-.top-books {
+.top-books,
+.useful-links {
     background: rgba(255, 255, 255, 0.4);
     backdrop-filter: blur(15px);
     border-radius: 25px;
@@ -49,13 +52,60 @@ html {
     text-align: center;
 }
 
-.top-books {
+.main-sidebar {
     width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    pointer-events: all;
+}
+
+.top-books {
+    width: 100%;
+}
+
+.useful-links {
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 .top-books ol {
     padding-left: 20px;
     line-height: 1.7;
+}
+
+.top-books h3,
+.useful-links h3 {
+    margin: 0 0 16px 0;
+    font-size: 1.35rem;
+}
+
+.useful-links-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    justify-content: space-evenly;
+    flex: 1;
+}
+
+.useful-links-list li a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: #333;
+    font-size: 1.15rem;
+    transition: transform 0.2s, color 0.2s;
+}
+
+.useful-links-list li a:hover {
+    transform: translateX(6px);
+    color: #000;
 }
 
 .top-count {
@@ -335,34 +385,98 @@ input:focus {
 /* --- TOAST ПОВІДОМЛЕННЯ --- */
 #toast-container {
     position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
+    top: 24px;
+    right: 24px;
+    z-index: 99999;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
+    pointer-events: none;
 }
 
 .toast {
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 15px 25px;
-    border-radius: 12px;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-    animation: slideIn 0.5s ease forwards;
+    pointer-events: auto;
+    background: rgba(22, 24, 34, 0.92);
+    color: #ffffff;
+    padding: 14px 22px;
+    border-radius: 16px;
+    font-size: 0.96rem;
+    font-weight: 500;
+    box-shadow: 0 14px 35px rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes slideIn {
+.toast.toast-warn {
+    background: rgba(42, 26, 12, 0.94);
+    border-color: rgba(243, 156, 18, 0.6);
+    color: #fef5e7;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35), 0 0 24px rgba(243, 156, 18, 0.25);
+}
+
+.toast.toast-error {
+    background: rgba(45, 16, 16, 0.94);
+    border-color: rgba(231, 76, 60, 0.65);
+    color: #ffd8d3;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35), 0 0 24px rgba(231, 76, 60, 0.22);
+}
+
+.toast.toast-out {
+    animation: none;
+    opacity: 0 !important;
+    transform: translateY(-16px) scale(0.94) !important;
+    pointer-events: none;
+}
+
+@keyframes toastSlideIn {
     from {
-        transform: translateX(100%);
+        transform: translateY(-24px) scale(0.92);
         opacity: 0;
     }
-
     to {
-        transform: translateX(0);
+        transform: translateY(0) scale(1);
         opacity: 1;
     }
+}
+
+.toast-icon {
+    font-size: 1.3rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.toast-msg {
+    line-height: 1.4;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.toast-action-btn {
+    background: rgba(243, 156, 18, 0.25);
+    border: 1px solid rgba(243, 156, 18, 0.6);
+    color: #ffd166;
+    padding: 3px 10px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+    margin-left: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.toast-action-btn:hover {
+    background: #f39c12;
+    color: #111;
 }
 
 /* --- ФОН ТА ГІГАНТИ --- */
@@ -461,6 +575,66 @@ input:focus {
 
 .flipped {
     transform: scaleX(-1) !important;
+}
+
+/* ============================================
+   КНОПКА «НАГОРУ» (SCROLL TO TOP)
+   ============================================ */
+.scroll-to-top {
+    position: fixed;
+    bottom: 35px;
+    right: 35px;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+    color: #1a1a1a;
+    font-size: 1.5rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(20px) scale(0.9);
+    transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+                background 0.25s ease,
+                box-shadow 0.25s ease,
+                color 0.25s ease;
+}
+
+.scroll-to-top.visible {
+    opacity: 1;
+    pointer-events: all;
+    transform: translateY(0) scale(1);
+}
+
+.scroll-to-top:hover {
+    background: rgba(255, 255, 255, 0.95);
+    transform: translateY(-4px) scale(1.08);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.16);
+    color: #000;
+}
+
+.scroll-to-top:active {
+    transform: translateY(0) scale(0.96);
+}
+
+.scroll-arrow {
+    display: inline-block;
+    line-height: 1;
+    transition: transform 0.25s ease;
+}
+
+.scroll-to-top:hover .scroll-arrow {
+    transform: translateY(-2px);
 }
 
 /* ============================================
@@ -852,10 +1026,19 @@ html.dark .dropdown-content a:hover {
 }
 
 html.dark .news-block,
-html.dark .top-books {
+html.dark .top-books,
+html.dark .useful-links {
     background: rgba(18, 18, 30, 0.75);
     border: 1px solid rgba(255, 255, 255, 0.07);
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+html.dark .useful-links-list li a {
+    color: #dfe4ea;
+}
+
+html.dark .useful-links-list li a:hover {
+    color: #fff;
 }
 
 html.dark .news-item {
@@ -975,4 +1158,18 @@ html.dark .hamburger {
 html.dark .nav-menu>a,
 html.dark .nav-menu>.dropdown {
     border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .scroll-to-top {
+    background: rgba(24, 27, 36, 0.75);
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    color: #f1f2f6;
+}
+
+html.dark .scroll-to-top:hover {
+    background: rgba(36, 40, 54, 0.95);
+    color: #ffffff;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
+    border-color: rgba(212, 175, 55, 0.5);
 }

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24" width="22" height="15">
+  <rect width="36" height="24" fill="#cd0000" rx="3"/>
+  <g fill="#ffd700" stroke="#ffd700">
+    <!-- Red star with gold border in canton -->
+    <polygon points="8,3.2 8.7,4.8 10.4,4.8 9.1,5.8 9.6,7.4 8,6.4 6.4,7.4 6.9,5.8 5.6,4.8 7.3,4.8" stroke-width="0.3"/>
+    <!-- Hammer & Sickle -->
+    <path d="M6 13.5 C6 9.8 9 7.2 12.2 8.2 C12.6 8.4 11.2 9.5 10.2 9.8 C8 10.6 7.4 12 7.6 13.6 Z" fill="#ffd700" stroke="none"/>
+    <!-- Hammer handle and head -->
+    <rect x="5.5" y="10" width="6.5" height="1.2" transform="rotate(-45 8.7 10.6)" rx="0.4" stroke="none"/>
+    <rect x="9.8" y="6.4" width="2.2" height="3" transform="rotate(-45 10.9 7.9)" rx="0.5" stroke="none"/>
+  </g>
+</svg>

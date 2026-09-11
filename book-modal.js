@@ -340,21 +340,24 @@ async function loadBookMetadata(book) {
 
     // 1. Кеш Firestore
     let meta = null;
+    const firestoreDb = (typeof db !== 'undefined' && db) || window.db || (typeof firebase !== 'undefined' && firebase.apps?.length ? firebase.firestore() : null);
     try {
-        const snap = await db.collection('book_metadata').doc(safeDocId(book.id)).get();
-        if (snap.exists) {
-            const data = snap.data();
-            const ageDays = (Date.now() - (data.fetchedAt?.toMillis?.() || 0)) / 86400000;
-            if (ageDays < CACHE_TTL_DAYS) meta = data;
+        if (firestoreDb) {
+            const snap = await firestoreDb.collection('book_metadata').doc(safeDocId(book.id)).get();
+            if (snap.exists) {
+                const data = snap.data();
+                const ageDays = (Date.now() - (data.fetchedAt?.toMillis?.() || 0)) / 86400000;
+                if (ageDays < CACHE_TTL_DAYS) meta = data;
+            }
         }
     } catch (e) { /* firestore не доступний — продовжуємо */ }
 
     // 2. Якщо кешу немає — скрапимо
     if (!meta) {
         meta = await fetchBookMeta(book);
-        if (meta) {
+        if (meta && firestoreDb) {
             try {
-                await db.collection('book_metadata').doc(safeDocId(book.id)).set(
+                await firestoreDb.collection('book_metadata').doc(safeDocId(book.id)).set(
                     { ...meta, fetchedAt: firebase.firestore.Timestamp.now() },
                     { merge: true }
                 );
@@ -636,22 +639,31 @@ function renderModalFull(book, meta) {
 // =============================================
 async function autoScrapeNewBooks(books) {
     if (!books?.length) return;
+    const firestoreDb = (typeof db !== 'undefined' && db) || window.db || (typeof firebase !== 'undefined' && firebase.apps?.length ? firebase.firestore() : null);
+    if (!firestoreDb) return;
+
     let cachedIds = new Set();
     try {
-        const snap = await db.collection('book_metadata').get();
+        const snap = await firestoreDb.collection('book_metadata').get();
         snap.forEach(doc => cachedIds.add(doc.id));
     } catch (e) { return; }
 
-    const newBooks = books.filter(b => !cachedIds.has(safeDocId(b.id)));
+    const newBooks = books.filter(b => {
+        if (cachedIds.has(safeDocId(b.id))) return false;
+        // Якщо вже є локальний детальний опис у descriptions.js — не перевантажуємо мережу
+        if (typeof findDescriptionForBook === 'function' && findDescriptionForBook(b)) return false;
+        return true;
+    });
+
     if (!newBooks.length) return;
-    console.log(`[AutoScrape] ${newBooks.length} нових книг`);
+    console.log(`[AutoScrape] Знайдено ${newBooks.length} нових книг без описів — фоновий збір...`);
 
     for (const book of newBooks) {
         await delay(SCRAPE_DELAY_MS);
         const meta = await fetchBookMeta(book);
         if (meta) {
             try {
-                await db.collection('book_metadata').doc(safeDocId(book.id)).set(
+                await firestoreDb.collection('book_metadata').doc(safeDocId(book.id)).set(
                     { ...meta, fetchedAt: firebase.firestore.Timestamp.now() },
                     { merge: true }
                 );
@@ -685,7 +697,7 @@ function delay(ms) {
 // =============================================
 // СИСТЕМА СПОВІЩЕНЬ (TOAST NOTIFICATIONS)
 // =============================================
-function showToast(msg, type = 'ok') {
+function showToast(msg, type = 'ok', actionText = null, onAction = null) {
     let tc = document.getElementById('toast-container');
     if (!tc) {
         tc = document.createElement('div');
@@ -693,19 +705,35 @@ function showToast(msg, type = 'ok') {
         document.body.appendChild(tc);
     }
     const t = document.createElement('div');
-    const isWarn = type === 'warn';
+    const isWarn = type === 'warn' || type === 'warning';
     const isError = type === 'error';
     t.className = `toast ${isWarn ? 'toast-warn' : (isError ? 'toast-error' : '')}`.trim();
     const icon = isWarn ? '⚠️' : (isError ? '❌' : '✅');
-    t.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-msg">${escapeHtmlModal(msg)}</span>`;
+
+    let actionHtml = '';
+    if (actionText) {
+        actionHtml = `<a href="#" class="toast-action-btn">${actionText}</a>`;
+    }
+
+    t.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-msg"><span>${escapeHtmlModal(msg)}</span>${actionHtml}</span>`;
     tc.appendChild(t);
+
+    if (actionText && typeof onAction === 'function') {
+        const btn = t.querySelector('.toast-action-btn');
+        if (btn) {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                onAction();
+            });
+        }
+    }
 
     setTimeout(() => {
         t.classList.add('toast-out');
         setTimeout(() => {
             if (t.parentNode) t.parentNode.removeChild(t);
         }, 400);
-    }, 3500);
+    }, 4500);
 }
 window.showToast = showToast;
 window.showLibToast = showToast;
@@ -723,12 +751,40 @@ function getCanonicalBookId(title, filename) {
     return raw.trim().replace(/[/\\#?%]/g, '_').toLowerCase().slice(0, 120);
 }
 
+function getAuthUser() {
+    try {
+        if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+            const u = firebase.auth().currentUser;
+            if (u) return u;
+        }
+    } catch (_) {}
+    if (typeof auth !== 'undefined' && auth && auth.currentUser) return auth.currentUser;
+    if (window.auth && window.auth.currentUser) return window.auth.currentUser;
+    if (typeof currentUser !== 'undefined' && currentUser) return currentUser;
+    if (window.currentUser) return window.currentUser;
+    return null;
+}
+
 async function onDownloadClick(btn) {
-    const user = (typeof auth !== 'undefined' && auth.currentUser) || (typeof currentUser !== 'undefined' && currentUser);
+    if (!btn) return;
+    const user = getAuthUser();
 
     if (!user) {
-        const msg = 'Щоб скачати книгу — увійдіть в аккаунт!';
-        showToast(msg, 'warn');
+        const msg = 'Щоб завантажити книгу — будь ласка, увійдіть в аккаунт!';
+        const onLogin = () => {
+            const loginModal = document.getElementById('login-modal');
+            if (loginModal && typeof openModal === 'function') {
+                openModal(loginModal);
+            } else {
+                const loginTrigger = document.getElementById('login-trigger');
+                if (loginTrigger) {
+                    loginTrigger.click();
+                } else {
+                    window.location.href = 'index.html';
+                }
+            }
+        };
+        showToast(msg, 'warn', 'Увійти 🔑', onLogin);
         return;
     }
 
@@ -749,7 +805,10 @@ async function onDownloadClick(btn) {
 
     // 2. Перевіряємо в Firestore, чи це повторне скачування цим користувачем
     try {
-        const userHistoryRef = db.collection('user_downloads').doc(user.uid).collection('history');
+        const firestoreDb = (typeof db !== 'undefined' && db) || window.db || (typeof firebase !== 'undefined' && firebase.apps?.length ? firebase.firestore() : null);
+        if (!firestoreDb) return;
+
+        const userHistoryRef = firestoreDb.collection('user_downloads').doc(user.uid).collection('history');
         const userBookDocRef = userHistoryRef.doc(bookDocId);
 
         let isRepeat = false;
@@ -765,10 +824,6 @@ async function onDownloadClick(btn) {
         }
 
         if (isRepeat) {
-            // ❌ ПОВТОРНЕ СКАЧУВАННЯ:
-            // НЕ збільшуємо глобальний лічильник в downloads/{bookDocId}
-            // НЕ публікуємо подію в стрічку news
-            // Оновлюємо лише дату останнього звернення lastDownloadedAt (кількість унікальних завантажень не змінюється)
             await userBookDocRef.set({
                 lastDownloadedAt: now,
                 repeatCount: firebase.firestore.FieldValue.increment(1)
@@ -781,10 +836,10 @@ async function onDownloadClick(btn) {
         }
 
         // ✅ ПЕРШЕ (УНІКАЛЬНЕ) СКАЧУВАННЯ:
-        const batch = db.batch();
+        const batch = firestoreDb.batch();
 
-        // 1. Глобальний лічильник (збільшується тільки для нових унікальних скачувань!)
-        const globalRef = db.collection('downloads').doc(bookDocId);
+        // 1. Глобальний лічильник
+        const globalRef = firestoreDb.collection('downloads').doc(bookDocId);
         batch.set(globalRef, {
             title,
             author,
@@ -807,7 +862,7 @@ async function onDownloadClick(btn) {
         }, { merge: true });
 
         // 3. Новина для стрічки активності
-        const newsRef = db.collection('news').doc();
+        const newsRef = firestoreDb.collection('news').doc();
         batch.set(newsRef, {
             text: `📥 ${userName} завантажив "${title}"`,
             timestamp: now,
@@ -826,6 +881,7 @@ async function onDownloadClick(btn) {
 }
 
 window.onDownloadClick = onDownloadClick;
+window.handleBookDownload = onDownloadClick;
 window.getCanonicalBookId = getCanonicalBookId;
 window.openBookModal = openBookModal;
 window.closeBookModal = closeBookModal;
