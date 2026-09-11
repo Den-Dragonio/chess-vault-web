@@ -17,10 +17,17 @@ html {
     margin: 0;
     padding: 0;
     width: 100%;
-    height: 100%;
-    overflow: hidden;
+    min-height: 100%;
     background: #ffffff;
     color: #222;
+}
+
+html.library-html,
+body.library-page {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    height: auto !important;
+    min-height: 100% !important;
 }
 
 /* --- 2. ХЕДЕР ТА НАВІГАЦІЯ --- */
@@ -237,14 +244,28 @@ html {
     color: #777;
 }
 
+.col-pages {
+    text-align: center;
+    color: #666;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
 .col-format {
     text-align: center;
+    white-space: nowrap;
 }
 
 .col-size {
     text-align: center;
     color: #888;
     font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.col-action {
+    text-align: center;
+    white-space: nowrap;
 }
 
 /* Плашки форматів */
@@ -395,16 +416,18 @@ input {
     max-width: 1300px;
     width: calc(100% - 80px);
     margin: 110px auto 60px;
-    height: 80vh;
+    min-height: 80vh;
     display: flex;
     flex-direction: column;
 }
 
 .table-area {
     flex-grow: 1;
-    overflow-y: auto;
-    /* Добавляет скролл внутри таблицы */
+    overflow-y: auto !important;
+    overflow-x: auto;
+    max-height: 65vh;
     padding-right: 10px;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* Скроллбар в стиле проекта */
@@ -531,39 +554,69 @@ body.library-page {
 .col-author {
     font-style: italic;
     color: #555;
-    width: 20%;
+    width: 22%;
 }
 
 .col-title {
     font-weight: bold;
-    width: 40%;
+    width: 38%;
 }
 
 .col-year {
     text-align: center;
-    width: 10%;
+    width: 7%;
+    white-space: nowrap;
+}
+
+.col-pages {
+    text-align: center;
+    color: #666;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    width: 7%;
+}
+
+.col-format {
+    text-align: center;
+    white-space: nowrap;
+    width: 6%;
 }
 
 .col-size {
     color: #888;
     font-size: 0.9rem;
     text-align: center;
+    white-space: nowrap;
+    width: 8%;
+}
+
+.col-action {
+    text-align: center;
+    white-space: nowrap;
+    width: 12%;
 }
 
 /* Кнопка скачування */
 .download-link,
 .download-btn-js {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     background: #1a1a1a;
     color: #fff;
     padding: 8px 16px;
     border-radius: 8px;
     text-decoration: none;
     font-size: 0.9rem;
-    transition: 0.3s;
+    font-weight: 500;
+    transition: 0.2s ease;
     border: none;
     cursor: pointer;
     font-family: inherit;
+    white-space: nowrap;
+    box-sizing: border-box;
+    line-height: 1.2;
 }
 
 .download-link:hover,
@@ -582,14 +635,16 @@ body.library-page {
     border-radius: 20px;
     border: 1px solid rgba(255, 255, 255, 0.7);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
-    overflow: hidden;
-    min-height: 0;
+    min-height: 400px;
 }
 
 .books-list-block .table-area {
     flex-grow: 1;
-    overflow-y: auto;
+    overflow-y: auto !important;
+    overflow-x: auto;
     padding: 0 5px;
+    max-height: 65vh;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* Рядок завантаження / порожньо */
@@ -741,7 +796,7 @@ body.library-page {
     }
 
     .books-table {
-        min-width: 520px;
+        min-width: 650px;
     }
 
     /* Smaller text in table */
@@ -1008,4 +1063,397 @@ html.dark .hamburger {
 html.dark .nav-menu>a,
 html.dark .nav-menu>.dropdown {
     border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+/* ========================================================
+   TOAST NOTIFICATIONS
+   ======================================================== */
+#toast-container {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    pointer-events: none;
+}
+
+.toast {
+    pointer-events: auto;
+    background: rgba(20, 20, 26, 0.95);
+    color: #fff;
+    padding: 14px 22px;
+    border-radius: 14px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transition: all 0.3s ease;
+}
+
+.toast.toast-warn {
+    background: rgba(45, 20, 15, 0.96);
+    border-color: rgba(231, 76, 60, 0.5);
+    color: #ffd8d3;
+    box-shadow: 0 10px 30px rgba(231, 76, 60, 0.3);
+}
+
+.toast.toast-out {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+}
+
+@keyframes toastSlideIn {
+    from {
+        transform: translateY(-20px) scale(0.95);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+/* ========================================================
+   СТАТИСТИКА БАЗИ ДАНИХ (STATS DASHBOARD)
+   ======================================================== */
+.collections-stats-wrap {
+    margin-bottom: 40px;
+}
+
+.stats-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    animation: statsFadeIn 0.4s ease;
+}
+
+@keyframes statsFadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* KPI GRID */
+.stats-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 18px;
+}
+
+.stats-kpi-card {
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    border-radius: 20px;
+    padding: 22px 24px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: transform 0.25s, box-shadow 0.25s;
+}
+
+.stats-kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 35px rgba(0, 0, 0, 0.08);
+}
+
+.stats-kpi-icon {
+    font-size: 2rem;
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.04);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.stats-kpi-val {
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1.1;
+    color: #111;
+}
+
+.stats-kpi-label {
+    font-size: 0.84rem;
+    color: #666;
+    margin-top: 4px;
+}
+
+/* SECTION CARDS */
+.stats-section-card {
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    border-radius: 24px;
+    padding: 28px 32px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+}
+
+.stats-section-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #111;
+    margin: 0 0 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.stats-section-sub {
+    font-size: 0.9rem;
+    color: #666;
+    margin: 0 0 24px;
+}
+
+/* 1. РОКИ ПУБЛІКАЦІЙ (BAR CHART) */
+.years-chart-container {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    height: 250px;
+    padding-top: 36px;
+    padding-bottom: 30px;
+    border-bottom: 2px solid rgba(0, 0, 0, 0.06);
+    overflow-x: auto;
+}
+
+.year-bar-col {
+    flex: 1;
+    min-width: 54px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    position: relative;
+}
+
+.year-bar-fill {
+    width: 100%;
+    max-width: 44px;
+    border-radius: 8px 8px 0 0;
+    background: linear-gradient(180deg, #1a1a1a 0%, #444 100%);
+    transition: height 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s, background 0.2s;
+    cursor: pointer;
+    position: relative;
+}
+
+.year-bar-fill:hover {
+    transform: scaleY(1.03);
+    background: linear-gradient(180deg, #d4af37 0%, #a67c00 100%);
+}
+
+.year-bar-val {
+    position: absolute;
+    top: -24px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #222;
+}
+
+.year-bar-label {
+    margin-top: 10px;
+    font-size: 0.78rem;
+    color: #666;
+    white-space: nowrap;
+    text-align: center;
+}
+
+/* 2. РОЗПОДІЛ ЗА СТОРІНКАМИ */
+.pages-dist-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.pages-dist-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pages-dist-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #222;
+}
+
+.pages-dist-highlight {
+    font-size: 0.75rem;
+    background: #e8f5e9;
+    color: #2e7d32;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: bold;
+}
+
+.pages-dist-track {
+    width: 100%;
+    height: 14px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.pages-dist-bar {
+    height: 100%;
+    border-radius: 8px;
+    transition: width 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pages-summary-banner {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 12px;
+    font-size: 0.92rem;
+    color: #444;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 3. ТОП АВТОРІВ */
+.top-authors-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+}
+
+.top-author-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(0, 0, 0, 0.07);
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.top-author-card:hover {
+    background: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.top-author-rank {
+    font-size: 1.15rem;
+    font-weight: 800;
+    width: 28px;
+    text-align: center;
+    color: #888;
+}
+
+.top-author-info {
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.top-author-name {
+    font-weight: 700;
+    color: #111;
+    font-size: 0.98rem;
+    margin: 0 0 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.top-author-books {
+    font-size: 0.82rem;
+    color: #666;
+}
+
+.magazines-info-banner {
+    margin-top: 24px;
+    padding: 16px 20px;
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px dashed rgba(0, 0, 0, 0.15);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 0.92rem;
+    color: #555;
+    line-height: 1.45;
+}
+
+/* DARK MODE FOR STATS */
+html.dark .stats-kpi-card,
+html.dark .stats-section-card {
+    background: rgba(18, 18, 28, 0.85);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+html.dark .stats-kpi-val,
+html.dark .stats-section-title,
+html.dark .pages-dist-header,
+html.dark .top-author-name {
+    color: #eeeef8;
+}
+
+html.dark .stats-kpi-label,
+html.dark .stats-section-sub,
+html.dark .year-bar-label,
+html.dark .top-author-books,
+html.dark .pages-summary-banner {
+    color: #888899;
+}
+
+html.dark .stats-kpi-icon {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .year-bar-val {
+    color: #eee;
+}
+
+html.dark .year-bar-fill {
+    background: linear-gradient(180deg, #d4af37 0%, #665014 100%);
+}
+
+html.dark .years-chart-container {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .pages-dist-track {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .pages-summary-banner {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+html.dark .top-author-card {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .top-author-card:hover {
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(212, 175, 55, 0.4);
+}
+
+html.dark .magazines-info-banner {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #aaaab8;
 }

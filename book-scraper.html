@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Vault — Bulk Book Scraper (Admin)</title>
+    <link rel="icon" href="img/icon.png" type="image/png" sizes="64x64">
+    <link rel="stylesheet" href="library.css">
+    <style>
+        body { overflow-y: auto !important; padding: 80px 40px 60px; }
+        .scraper-card {
+            max-width: 900px; margin: 0 auto;
+            background: rgba(255,255,255,0.5);
+            backdrop-filter: blur(20px);
+            border-radius: 28px;
+            border: 1px solid rgba(255,255,255,0.7);
+            padding: 50px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.07);
+        }
+        h1 { margin: 0 0 8px; font-size: 2rem; }
+        .subtitle { color: #888; margin: 0 0 36px; font-size: 1rem; }
+        .run-btn {
+            background: #1a1a1a; color: #fff;
+            border: none; padding: 16px 40px;
+            border-radius: 14px; font-size: 1.15rem;
+            cursor: pointer; transition: 0.3s;
+            font-family: inherit; margin-bottom: 36px;
+        }
+        .run-btn:hover { background: #000; transform: scale(1.03); }
+        .run-btn:disabled { background: #999; cursor: not-allowed; transform: none; }
+        .progress-wrap {
+            margin-bottom: 24px;
+        }
+        .progress-bar-bg {
+            width: 100%; height: 10px;
+            background: rgba(0,0,0,0.07);
+            border-radius: 10px; overflow: hidden;
+            margin-bottom: 10px;
+        }
+        .progress-bar-fill {
+            height: 100%; width: 0%;
+            background: linear-gradient(90deg, #1a1a1a, #555);
+            border-radius: 10px;
+            transition: width 0.4s ease;
+        }
+        .progress-text {
+            font-size: 0.95rem; color: #666;
+        }
+        #log {
+            background: rgba(0,0,0,0.04);
+            border-radius: 14px;
+            padding: 20px;
+            font-family: monospace;
+            font-size: 0.82rem;
+            max-height: 400px;
+            overflow-y: auto;
+            line-height: 1.7;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        .log-ok   { color: #27ae60; }
+        .log-warn { color: #e67e22; }
+        .log-err  { color: #e74c3c; }
+        .log-info { color: #3498db; }
+        .summary-box {
+            display: none;
+            margin-top: 28px;
+            background: rgba(39,174,96,0.08);
+            border: 1px solid rgba(39,174,96,0.2);
+            border-radius: 16px;
+            padding: 24px;
+            font-size: 1.1rem;
+        }
+        @media (prefers-color-scheme: dark) {
+            .scraper-card { background: rgba(14,14,24,0.85); border-color: rgba(255,255,255,0.07); }
+            h1 { color: #eeeef8; }
+            .subtitle { color: #666; }
+            #log { background: rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.05); color: #aaa; }
+            .progress-bar-bg { background: rgba(255,255,255,0.07); }
+            .progress-text { color: #666; }
+        }
+    </style>
+    <script src="dark-mode-init.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <div id="bg-grid-container"></div>
+
+    <div class="scraper-card">
+        <h1>📚 Bulk Book Scraper</h1>
+        <p class="subtitle">Одноразовий інструмент: скрапить всі книги з Internet Archive → зберігає в Firestore</p>
+
+        <button class="run-btn" id="run-btn" onclick="startScraping()">
+            🚀 Запустити скрапер
+        </button>
+
+        <div class="progress-wrap">
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progress-fill"></div>
+            </div>
+            <p class="progress-text" id="progress-text">Очікування запуску...</p>
+        </div>
+
+        <div id="log"></div>
+
+        <div class="summary-box" id="summary-box">
+            <!-- заповнюється після завершення -->
+        </div>
+    </div>
+
+    <script src="auth-shared.js"></script>
+    <script>
+        const ARCHIVE_ID = '1971_20260223';
+        const DELAY_MS = 600;
+        const db = firebase.firestore();
+
+        let isRunning = false;
+
+        function log(msg, type = 'info') {
+            const box = document.getElementById('log');
+            const line = document.createElement('div');
+            line.className = `log-${type}`;
+            const time = new Date().toLocaleTimeString('uk-UA');
+            line.textContent = `[${time}] ${msg}`;
+            box.appendChild(line);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function setProgress(done, total) {
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+            document.getElementById('progress-fill').style.width = pct + '%';
+            document.getElementById('progress-text').textContent = `${done} / ${total} (${pct}%)`;
+        }
+
+        function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        function safeDocId(id) {
+            return id.replace(/\//g, '__').slice(0, 200);
+        }
+
+        function isJournalFile(book) {
+            return /^64-\d{4}-\d+/.test(book.id);
+        }
+
+        async function scrapeOne(book) {
+            const isJournal = isJournalFile(book);
+            const hasProperTitle = book.title && book.title.length > 3 && book.year !== '---'
+                && book.author && book.author !== '64';
+
+            // Archive.org thumb завжди доступний
+            const encodedFile = encodeURIComponent(book.id);
+            const archiveThumb = `https://archive.org/download/${ARCHIVE_ID}/${encodedFile}?scale=4&rotate=0&format=jpg`;
+
+            // Для журналів та книг без нормальної назви — тільки archive thumb
+            if (isJournal || !hasProperTitle) {
+                return {
+                    title: book.title,
+                    author: book.author,
+                    year: book.year,
+                    coverUrl: archiveThumb,
+                    description: '',
+                    subjects: [],
+                    openLibraryKey: null,
+                    source: 'archive',
+                    fetchedAt: firebase.firestore.Timestamp.now()
+                };
+            }
+
+            // Для книг — пробуємо Open Library
+            try {
+                const cleanTitle = book.title.replace(/[():,\.]/g, ' ').replace(/\s+/g, ' ').trim();
+                const cleanAuthor = book.author.replace(/[():,\.]/g, ' ').replace(/\s+/g, ' ').trim();
+                const q = encodeURIComponent(cleanTitle);
+                const a = encodeURIComponent(cleanAuthor);
+                const url = `https://openlibrary.org/search.json?title=${q}&author=${a}&limit=3&fields=key,title,author_name,first_publish_year,cover_i,subject,first_sentence`;
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('OL not ok');
+                const data = await res.json();
+                if (!data.docs || !data.docs.length) throw new Error('not found');
+
+                const doc = data.docs.find(d => d.cover_i) || data.docs[0];
+                let description = '';
+                if (doc.key) {
+                    try {
+                        const wr = await fetch(`https://openlibrary.org${doc.key}.json`);
+                        if (wr.ok) {
+                            const work = await wr.json();
+                            if (work.description) {
+                                description = typeof work.description === 'object'
+                                    ? work.description.value || '' : String(work.description);
+                            }
+                        }
+                    } catch (_) {}
+                }
+                if (!description && doc.first_sentence) {
+                    description = typeof doc.first_sentence === 'object'
+                        ? doc.first_sentence.value || '' : String(doc.first_sentence);
+                }
+
+                const coverId = doc.cover_i;
+                return {
+                    title: doc.title || book.title,
+                    author: (doc.author_name || [book.author]).join(', '),
+                    year: doc.first_publish_year || book.year,
+                    coverUrl: coverId ? `https://covers.openlibrary.org/b/id/${coverId}-L.jpg` : archiveThumb,
+                    description,
+                    subjects: (doc.subject || []).slice(0, 12),
+                    openLibraryKey: doc.key || null,
+                    source: 'openlibrary',
+                    fetchedAt: firebase.firestore.Timestamp.now()
+                };
+            } catch (e) {
+                // Fallback: archive thumb + базові дані
+                return {
+                    title: book.title,
+                    author: book.author,
+                    year: book.year,
+                    coverUrl: archiveThumb,
+                    description: '',
+                    subjects: [],
+                    openLibraryKey: null,
+                    source: 'archive',
+                    fetchedAt: firebase.firestore.Timestamp.now()
+                };
+            }
+        }
+
+
+        async function startScraping() {
+            if (isRunning) return;
+            isRunning = true;
+
+            const btn = document.getElementById('run-btn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Працює...';
+
+            log('Завантаження списку книг з Internet Archive...', 'info');
+
+            // 1. Отримуємо список з archive.org
+            let books = [];
+            try {
+                const res = await fetch(`https://archive.org/metadata/${ARCHIVE_ID}`);
+                const data = await res.json();
+                const ALLOWED = ['.pdf', '.djvu', '.epub', '.cbr', '.cbz', '.txt', '.doc', '.docx'];
+                const files = data.files.filter(f => ALLOWED.some(ext => f.name.toLowerCase().endsWith(ext)));
+                books = files.map(f => {
+                    const fileName = f.name.replace(/\.[^/.]+$/, '');
+                    const match = fileName.match(/(.*?)\s*-\s*(.*)\s*\((\d{4})\)/);
+                    return {
+                        author: match ? match[1].trim() : fileName.split('-')[0].trim(),
+                        title: match ? match[2].trim() : fileName,
+                        year: match ? match[3] : '---',
+                        format: f.name.split('.').pop().toLowerCase(),
+                        sizeDisplay: (f.size / 1024 / 1024).toFixed(2) + ' MB',
+                        url: `https://archive.org/download/${ARCHIVE_ID}/${f.name}`,
+                        id: f.name
+                    };
+                });
+                log(`✅ Знайдено ${books.length} книг у архіві`, 'ok');
+            } catch (e) {
+                log(`❌ Помилка завантаження архіву: ${e.message}`, 'err');
+                btn.disabled = false;
+                btn.textContent = '🚀 Запустити знову';
+                isRunning = false;
+                return;
+            }
+
+            // 2. Перевіряємо що вже є в кеші
+            let cachedIds = new Set();
+            try {
+                const snap = await db.collection('book_metadata').get();
+                snap.forEach(doc => cachedIds.add(doc.id));
+                log(`📦 В кеші вже є ${cachedIds.size} книг`, 'info');
+            } catch (e) {
+                log(`⚠️ Не вдалось прочитати кеш: ${e.message}`, 'warn');
+            }
+
+            const toScrape = books.filter(b => !cachedIds.has(safeDocId(b.id)));
+            log(`🔍 Потребують скрапінгу: ${toScrape.length} книг`, 'info');
+
+            if (toScrape.length === 0) {
+                log('🎉 Всі книги вже є в кеші! Нічого робити.', 'ok');
+                btn.disabled = false;
+                btn.textContent = '✅ Вже скраплено';
+                isRunning = false;
+                return;
+            }
+
+            // 3. Скрапимо
+            let done = 0, success = 0, failed = 0;
+            setProgress(0, toScrape.length);
+
+            for (const book of toScrape) {
+                await delay(DELAY_MS);
+                log(`🔎 [${done + 1}/${toScrape.length}] "${book.title}" — ${book.author}`, 'info');
+
+                const meta = await scrapeOne(book);
+                if (meta) {
+                    try {
+                        await db.collection('book_metadata').doc(safeDocId(book.id)).set(meta, { merge: true });
+                        log(`  ✅ OK · обкладинка: ${meta.coverUrl ? '✓' : '✗'} · опис: ${meta.description ? '✓' : '✗'}`, 'ok');
+                        success++;
+                    } catch (e) {
+                        log(`  ❌ Firestore помилка: ${e.message}`, 'err');
+                        failed++;
+                    }
+                } else {
+                    // Зберігаємо заглушку
+                    try {
+                        await db.collection('book_metadata').doc(safeDocId(book.id)).set({
+                            title: book.title, author: book.author, year: book.year,
+                            coverUrl: null, description: '', subjects: [],
+                            source: 'archive',
+                            fetchedAt: firebase.firestore.Timestamp.now()
+                        }, { merge: true });
+                        log(`  ⚠️ Не знайдено в Open Library, збережено базові дані`, 'warn');
+                    } catch (e) { /* тихо */ }
+                    failed++;
+                }
+
+                done++;
+                setProgress(done, toScrape.length);
+            }
+
+            // 4. Підсумок
+            const summary = document.getElementById('summary-box');
+            summary.style.display = 'block';
+            summary.innerHTML = `
+                🎉 <strong>Скрапінг завершено!</strong><br>
+                ✅ Знайдено в Open Library: <strong>${success}</strong><br>
+                ⚠️ Не знайдено / помилки: <strong>${failed}</strong><br>
+                📦 Всього в кеші тепер: <strong>${cachedIds.size + done}</strong>
+            `;
+            log(`✅ Все! Успішно: ${success}, не знайдено: ${failed}`, 'ok');
+
+            btn.disabled = false;
+            btn.textContent = '🔄 Запустити знову';
+            isRunning = false;
+        }
+
+        // Фоновий гріт (декорація)
+        const chessSquares = [];
+        const chessFiles = ['a','b','c','d','e','f','g','h'];
+        const chessRanks = ['1','2','3','4','5','6','7','8'];
+        for (const f of chessFiles) for (const r of chessRanks) chessSquares.push(f+r);
+        const grid = document.getElementById('bg-grid-container');
+        const cells = [];
+        for (let i = 0; i < 80; i++) {
+            const c = document.createElement('div');
+            c.className = 'grid-cell';
+            c.innerText = chessSquares[Math.floor(Math.random() * chessSquares.length)];
+            const data = { el: c, x: Math.random() * 100, y: Math.random() * 250 - 150, speed: 0.006 + Math.random() * 0.008 };
+            c.style.left = data.x + 'vw';
+            grid.appendChild(c);
+            cells.push(data);
+        }
+        function animate() {
+            cells.forEach(c => {
+                c.y += c.speed;
+                if (c.y > 110) { c.y = -20; c.el.innerText = chessSquares[Math.floor(Math.random() * chessSquares.length)]; }
+                c.el.style.top = c.y + 'vh';
+            });
+            requestAnimationFrame(animate);
+        }
+        animate();
+    </script>
+</body>
+</html>

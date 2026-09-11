@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="uk" class="library-html">
 
 <head>
     <meta charset="UTF-8">
@@ -8,6 +8,8 @@
     <link rel="icon" href="img/icon.png" type="image/png" sizes="64x64">
     <link rel="apple-touch-icon" href="img/icon.png">
     <link rel="stylesheet" href="library.css">
+    <link rel="stylesheet" href="book-modal.css">
+    <link rel="stylesheet" href="collections.css">
     <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
     <script src="dark-mode-init.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -16,6 +18,7 @@
 </head>
 
 <body class="library-page">
+    <div id="toast-container"></div>
     <header class="main-header">
         <nav class="nav-menu">
             <button class="hamburger" onclick="this.closest('nav').classList.toggle('open')">☰</button>
@@ -35,6 +38,50 @@
     <div id="bg-grid-container"></div>
 
     <main class="library-main-container narrower">
+        <!-- ПЕРЕМИКАЧ БІБЛІОТЕК (Всі книги / Розділи гри / Автори) -->
+        <div class="collections-switcher-wrap">
+            <div class="collections-switcher">
+                <button class="collections-tab-btn active" data-view="all" onclick="switchCollectionView('all')">
+                    <span class="tab-icon">📚</span>
+                    <span>Всі книги</span>
+                </button>
+                <button class="collections-tab-btn" data-view="topics" onclick="switchCollectionView('topics')">
+                    <span class="tab-icon">♟️</span>
+                    <span>Розділи гри</span>
+                </button>
+                <button class="collections-tab-btn" data-view="authors" onclick="switchCollectionView('authors')">
+                    <span class="tab-icon">👤</span>
+                    <span>За авторами</span>
+                </button>
+                <button class="collections-tab-btn" data-view="stats" onclick="switchCollectionView('stats')">
+                    <span class="tab-icon">📊</span>
+                    <span>Статистика БД</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- АКТИВНА КОЛЕКЦІЯ (ХЛІБНІ КРОШКИ ТА НАЗВА) -->
+        <div id="collection-active-header" class="collection-active-header" style="display: none;"></div>
+
+        <!-- РОЗДІЛИ ГРИ (СІТКА КАТЕГОРІЙ) -->
+        <div id="collections-topics-wrap" style="display: none;">
+            <div class="categories-grid" id="collections-topics-grid"></div>
+        </div>
+
+        <!-- АВТОРИ (ПОШУК, АЛФАВІТ ТА СІТКА АВТОРІВ) -->
+        <div id="collections-authors-wrap" style="display: none;">
+            <div class="authors-toolbar">
+                <div class="authors-search-box">
+                    <input type="text" id="authors-search-input" class="authors-search-input" placeholder="🔍 Пошук автора серед колекцій...">
+                </div>
+                <div class="alphabet-bar" id="authors-alphabet-bar"></div>
+            </div>
+            <div class="authors-grid" id="collections-authors-grid"></div>
+        </div>
+
+        <!-- СТАТИСТИКА БАЗИ ДАНИХ -->
+        <div id="collections-stats-wrap" class="collections-stats-wrap" style="display: none;"></div>
+
         <div class="search-box">
             <input type="text" id="lib-search-input" placeholder="Шукати за автором, назвою або роком...">
         </div>
@@ -43,6 +90,7 @@
             <span class="sort-label">Упорядкувати:</span>
             <button class="sort-btn" onclick="sortBooks('author')">🔤 Автор</button>
             <button class="sort-btn" onclick="sortBooks('year')">📅 Дата</button>
+            <button class="sort-btn" onclick="sortBooks('pages')">📄 Стор.</button>
             <button class="sort-btn" onclick="sortBooks('sizeRaw')">⚖️ Розмір</button>
             <span class="lib-stats" id="lib-stats"></span>
         </div>
@@ -53,17 +101,18 @@
                 <table class="books-table">
                     <thead>
                         <tr>
-                            <th>Автор</th>
-                            <th>Назва книги</th>
-                            <th>Рік</th>
-                            <th>Вид</th>
-                            <th>Вага</th>
-                            <th>Дія</th>
+                            <th class="col-author">Автор</th>
+                            <th class="col-title">Назва книги</th>
+                            <th class="col-year">Рік</th>
+                            <th class="col-pages">Стор.</th>
+                            <th class="col-format">Вид</th>
+                            <th class="col-size">Вага</th>
+                            <th class="col-action">Дія</th>
                         </tr>
                     </thead>
                     <tbody id="books-table-body">
                         <tr>
-                            <td colspan="6" class="loading-row">⏳ Завантаження бібліотеки...</td>
+                            <td colspan="7" class="loading-row">⏳ Завантаження бібліотеки...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -71,7 +120,22 @@
         </div>
     </main>
 
+    <!-- ============================================
+         BOOK DETAIL MODAL
+         ============================================ -->
+    <div id="book-detail-overlay">
+        <div id="book-detail-card">
+            <!-- Вміст рендериться динамічно через book-modal.js -->
+            <button id="book-detail-close">✕</button>
+        </div>
+    </div>
+
     <script src="auth-shared.js"></script>
+    <script src="page_counts.js"></script>
+    <script src="descriptions.js"></script>
+    <script src="book-modal.js"></script>
+    <script src="collections-data.js"></script>
+    <script src="collections.js"></script>
     <script src="library.js"></script>
 </body>
 

@@ -181,6 +181,19 @@ document.getElementById('auth-form').addEventListener('submit', async e => {
     } catch (err) { errEl.textContent = translateError(err.code); }
 });
 
+function validateUsernameStrict(username) {
+    if (!username) return 'Введіть логін.';
+    if (username.length <= 3) return 'Логін має бути довшим за 3 символи (від 4 до 20).';
+    if (username.length > 20) return 'Логін не може перевищувати 20 символів.';
+    if (!/^[a-zA-Z0-9 -]+$/.test(username)) {
+        return 'Логін може містити лише англійські літери, цифри, дефіс (-) та пробіл.';
+    }
+    if (!/[a-zA-Z]/.test(username)) {
+        return 'Логін повинен містити хоча б одну англійську літеру.';
+    }
+    return null;
+}
+
 // =============================================
 // 7. РЕЄСТРАЦІЯ
 // =============================================
@@ -190,15 +203,37 @@ document.getElementById('signup-form').addEventListener('submit', async e => {
     const password = document.getElementById('reg-password').value;
     const errEl = document.getElementById('reg-error');
     errEl.textContent = '';
-    if (!username) { errEl.textContent = 'Введіть логін.'; return; }
-    if (username.length < 3) { errEl.textContent = 'Логін занадто короткий (мін. 3 символи).'; return; }
+    
+    const valErr = validateUsernameStrict(username);
+    if (valErr) {
+        errEl.textContent = valErr;
+        return;
+    }
+
     try {
+        // Перевірка унікальності логіну
+        try {
+            const snap = await db.collection('usernames').doc(username.toLowerCase().replace(/\s+/g, '_')).get();
+            if (snap.exists) {
+                errEl.textContent = 'Цей логін вже зайнятий іншим користувачем.';
+                return;
+            }
+        } catch (_) {}
+
         const cred = await auth.createUserWithEmailAndPassword(toFakeEmail(username), password);
         await cred.user.updateProfile({ displayName: username });
 
+        // Фіксуємо унікальний логін
+        try {
+            await db.collection('usernames').doc(username.toLowerCase().replace(/\s+/g, '_')).set({
+                uid: cred.user.uid,
+                username: username,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } catch (_) {}
+
         // Привітання в стрічці новин на головній
         try {
-            const db = firebase.firestore();
             await db.collection('news').add({
                 text: `🎉 ${username} приєднався до Chess Vault! Ласкаво просимо!`,
                 timestamp: firebase.firestore.Timestamp.now(),

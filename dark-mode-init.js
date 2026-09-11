@@ -1,19 +1,25 @@
 // dark-mode-init.js — завантажується в <head>, до рендеру сторінки
-// Пріоритет: 1) налаштування системи  2) поточний час (20:00–07:00 = темна)
+// Пріоритет: 1) збережене налаштування користувача  2) налаштування системи  3) час доби
 (function () {
     try {
+        var theme = localStorage.getItem('chess_theme') || 'system';
         var prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
-        var prefersLight = window.matchMedia('(prefers-color-scheme: light)');
 
-        if (prefersDark.matches) {
-            // Система явно хоче темну — CSS @media сам справляється
-            // але додаємо клас щоб javascript теж міг реагувати
+        if (theme === 'dark') {
             document.documentElement.classList.add('dark');
-        } else if (!prefersLight.matches) {
-            // Немає явних налаштувань → перевіряємо час
-            var h = new Date().getHours();
-            if (h >= 20 || h < 7) {
+        } else if (theme === 'light') {
+            document.documentElement.classList.remove('dark');
+        } else {
+            // system
+            if (prefersDark.matches) {
                 document.documentElement.classList.add('dark');
+            } else {
+                var h = new Date().getHours();
+                if (h >= 20 || h < 7) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
             }
         }
     } catch (e) { /* silent fail */ }

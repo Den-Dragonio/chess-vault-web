@@ -8,6 +8,7 @@
     <link rel="icon" href="img/icon.png" type="image/png" sizes="64x64">
     <link rel="apple-touch-icon" href="img/icon.png">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="book-modal.css">
     <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
     <script src="dark-mode-init.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -113,21 +114,41 @@
         }
 
         .logout-profile-btn {
-            margin-top: 16px;
+            width: 100%;
+            margin-top: 8px;
             background: #1a1a1a;
             color: #fff;
-            border: none;
+            border: 1px solid transparent;
             border-radius: 12px;
-            padding: 12px 30px;
+            padding: 12px 20px;
             font-size: 0.95rem;
             cursor: pointer;
             transition: 0.3s;
             font-family: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-sizing: border-box;
         }
 
         .logout-profile-btn:hover {
             background: #000;
-            transform: scale(1.03);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        html.dark .logout-profile-btn {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        html.dark .logout-profile-btn:hover {
+            background: #e74c3c;
+            color: #fff;
+            border-color: #e74c3c;
+            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
         }
 
         /* ---- БЛОК ІСТОРІЇ ---- */
@@ -170,8 +191,33 @@
             vertical-align: top;
         }
 
-        .history-table tbody tr:hover td {
-            background: rgba(255, 255, 255, 0.4);
+        .history-table tbody tr.clickable-row {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .history-table tbody tr.clickable-row:hover td {
+            background: rgba(255, 255, 255, 0.65);
+        }
+
+        html.dark .history-table tbody tr.clickable-row:hover td {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .h-title-link {
+            color: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.2s ease;
+        }
+
+        .history-table tbody tr.clickable-row:hover .h-title-link {
+            color: #0984e3;
+        }
+
+        html.dark .history-table tbody tr.clickable-row:hover .h-title-link {
+            color: #74b9ff;
         }
 
         .h-title {
@@ -194,6 +240,318 @@
             padding: 40px;
             color: #bbb;
             font-size: 1rem;
+        }
+
+        /* ---- НАЛАШТУВАННЯ ---- */
+        .settings-profile-btn {
+            width: 100%;
+            margin-top: 14px;
+            margin-bottom: 0;
+            background: rgba(0, 0, 0, 0.05);
+            color: #222;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            padding: 12px 20px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: 0.3s;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-sizing: border-box;
+        }
+
+        .settings-profile-btn:hover {
+            background: #1a1a1a;
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        html.dark .settings-profile-btn {
+            background: rgba(255, 255, 255, 0.07);
+            color: #eee;
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        html.dark .settings-profile-btn:hover {
+            background: #d4af37;
+            color: #111;
+            border-color: #d4af37;
+        }
+
+        /* МОДАЛКА НАЛАШТУВАНЬ */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .settings-card {
+            position: relative;
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(35px);
+            -webkit-backdrop-filter: blur(35px);
+            border-radius: 28px;
+            border: 1px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.2);
+            padding: 34px 38px;
+            max-width: 500px;
+            width: 100%;
+            animation: modalFadeIn 0.3s ease;
+        }
+
+        html.dark .settings-card {
+            background: rgba(18, 18, 28, 0.94);
+            border-color: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6);
+            color: #eee;
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 18px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.06);
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            color: #555;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+            font-family: inherit;
+        }
+
+        .modal-close:hover {
+            background: #111;
+            color: #fff;
+            transform: rotate(90deg);
+        }
+
+        html.dark .modal-close {
+            background: rgba(255, 255, 255, 0.08);
+            color: #bbb;
+        }
+
+        html.dark .modal-close:hover {
+            background: #fff;
+            color: #111;
+        }
+
+        .settings-title {
+            margin: 0 0 18px 0;
+            font-size: 1.4rem;
+            color: #111;
+            text-align: center;
+        }
+
+        html.dark .settings-title {
+            color: #fff;
+        }
+
+        .settings-alert {
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 0.88rem;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .settings-alert.success {
+            background: rgba(46, 204, 113, 0.15);
+            color: #27ae60;
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+
+        .settings-alert.error {
+            background: rgba(231, 76, 60, 0.15);
+            color: #e74c3c;
+            border: 1px solid rgba(231, 76, 60, 0.3);
+        }
+
+        .settings-section {
+            margin-bottom: 16px;
+        }
+
+        .settings-label {
+            display: block;
+            font-weight: bold;
+            font-size: 0.95rem;
+            margin-bottom: 3px;
+            color: #222;
+        }
+
+        html.dark .settings-label {
+            color: #eee;
+        }
+
+        .settings-hint {
+            font-size: 0.76rem;
+            color: #888;
+            margin: 0 0 8px 0;
+            line-height: 1.35;
+        }
+
+        .settings-input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .settings-input-col {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .settings-input {
+            flex-grow: 1;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            background: rgba(255, 255, 255, 0.9);
+            font-size: 0.92rem;
+            outline: none;
+            transition: 0.2s;
+            font-family: inherit;
+        }
+
+        html.dark .settings-input {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.15);
+            color: #fff;
+        }
+
+        .settings-input:focus {
+            border-color: #d4af37;
+            box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
+        }
+
+        .settings-action-btn {
+            background: #1a1a1a;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 16px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: 0.25s;
+            font-family: inherit;
+            white-space: nowrap;
+        }
+
+        .settings-action-btn:hover {
+            background: #000;
+            transform: translateY(-1px);
+        }
+
+        html.dark .settings-action-btn {
+            background: #d4af37;
+            color: #111;
+            font-weight: bold;
+        }
+
+        html.dark .settings-action-btn:hover {
+            background: #e6c555;
+        }
+
+        .settings-divider {
+            border: none;
+            border-top: 1px solid rgba(0, 0, 0, 0.08);
+            margin: 14px 0;
+        }
+
+        html.dark .settings-divider {
+            border-top-color: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Теми */
+        .theme-switcher-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .theme-opt-btn {
+            flex: 1;
+            padding: 9px 6px;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            background: rgba(0, 0, 0, 0.04);
+            color: #444;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .theme-opt-btn:hover {
+            background: rgba(0, 0, 0, 0.08);
+        }
+
+        .theme-opt-btn.active {
+            background: #1a1a1a;
+            color: #fff;
+            border-color: #1a1a1a;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        html.dark .theme-opt-btn {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.12);
+            color: #bbb;
+        }
+
+        html.dark .theme-opt-btn.active {
+            background: #d4af37;
+            color: #111;
+            border-color: #d4af37;
+            font-weight: bold;
+        }
+
+        .danger-label {
+            color: #e74c3c !important;
+        }
+
+        .settings-delete-btn {
+            background: rgba(231, 76, 60, 0.1);
+            color: #e74c3c;
+            border: 1px solid rgba(231, 76, 60, 0.25);
+            border-radius: 10px;
+            padding: 10px 16px;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: 0.25s;
+            font-family: inherit;
+            width: 100%;
+        }
+
+        .settings-delete-btn:hover {
+            background: #e74c3c;
+            color: #fff;
+            border-color: #e74c3c;
+            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.25);
         }
     </style>
 </head>
@@ -234,12 +592,14 @@
             </div>
 
             <hr class="profile-divider">
+            <button class="settings-profile-btn" id="settings-profile-btn">⚙️ Налаштування</button>
             <button class="logout-profile-btn" id="logout-profile-btn">🚪 Вийти</button>
         </div>
 
         <!-- Права картка: Історія -->
         <div class="history-card">
             <h2>📚 Мої завантаження</h2>
+            <p style="font-size: 0.86rem; color: #777; margin: -14px 0 20px;">💡 Натисніть на книгу, щоб прочитати опис і завантажити знову</p>
             <table class="history-table">
                 <thead>
                     <tr>
@@ -257,6 +617,72 @@
         </div>
     </div>
 
+    <!-- МОДАЛКА НАЛАШТУВАНЬ -->
+    <div class="modal-overlay" id="settings-modal" style="display: none;">
+        <div class="settings-card">
+            <button class="modal-close" id="close-settings">✕</button>
+            <h2 class="settings-title">⚙️ Налаштування аккаунту</h2>
+
+            <div id="settings-alert" class="settings-alert" style="display: none;"></div>
+
+            <!-- 1. ЗМІНА ЛОГІНУ / ІМЕНІ -->
+            <div class="settings-section">
+                <label class="settings-label">👤 Зміна логіну / імені</label>
+                <p class="settings-hint">Від 4 до 20 символів. Лише англійські літери, цифри, дефіс (-) та пробіл.</p>
+                <div class="settings-input-group">
+                    <input type="text" id="set-username" class="settings-input" placeholder="Новий логін" maxlength="20">
+                    <button type="button" id="btn-save-username" class="settings-action-btn">Оновити</button>
+                </div>
+            </div>
+
+            <hr class="settings-divider">
+
+            <!-- 2. ЗМІНА ПАРОЛЯ -->
+            <div class="settings-section">
+                <label class="settings-label">🔒 Зміна пароля</label>
+                <p class="settings-hint">Введіть старий пароль для підтвердження, потім новий пароль (мін. 6 символів).</p>
+                <div class="settings-input-col">
+                    <input type="password" id="set-old-password" class="settings-input" placeholder="Поточний пароль" autocomplete="current-password">
+                    <input type="password" id="set-new-password" class="settings-input" placeholder="Новий пароль" autocomplete="new-password">
+                    <button type="button" id="btn-save-password" class="settings-action-btn">Зберегти пароль</button>
+                </div>
+            </div>
+
+            <hr class="settings-divider">
+
+            <!-- 3. ВИБІР ТЕМИ -->
+            <div class="settings-section">
+                <label class="settings-label">🎨 Тема оформлення</label>
+                <p class="settings-hint">Оберіть зовнішній вигляд для інтерфейсу сайту.</p>
+                <div class="theme-switcher-group">
+                    <button type="button" class="theme-opt-btn" data-theme="light" id="theme-btn-light">☀️ Світла</button>
+                    <button type="button" class="theme-opt-btn" data-theme="dark" id="theme-btn-dark">🌙 Темна</button>
+                    <button type="button" class="theme-opt-btn" data-theme="system" id="theme-btn-system">💻 Системна</button>
+                </div>
+            </div>
+
+            <hr class="settings-divider">
+
+            <!-- 4. ВИДАЛЕННЯ АККАУНТУ -->
+            <div class="settings-section">
+                <label class="settings-label danger-label">⚠️ Видалення аккаунту</label>
+                <p class="settings-hint">Безповоротне видалення вашого профілю та історії завантажень.</p>
+                <button type="button" id="btn-delete-account" class="settings-delete-btn">🗑️ Видалити аккаунт</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOOK DETAIL MODAL -->
+    <div id="book-detail-overlay">
+        <div id="book-detail-card">
+            <!-- Вміст рендериться динамічно через book-modal.js -->
+            <button id="book-detail-close">✕</button>
+        </div>
+    </div>
+
+    <script src="page_counts.js"></script>
+    <script src="descriptions.js"></script>
+    <script src="book-modal.js"></script>
     <script>
         // Фон
         (function () {
@@ -283,13 +709,224 @@
             })();
         })();
 
-        // Авторизація та дані
         function fmt(ts) {
             if (!ts) return '—';
             const d = ts.toDate ? ts.toDate() : new Date(ts);
             return d.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric' });
         }
 
+        function showSettingsAlert(msg, isSuccess = false) {
+            const el = document.getElementById('settings-alert');
+            if (!el) return;
+            el.className = 'settings-alert ' + (isSuccess ? 'success' : 'error');
+            el.textContent = msg;
+            el.style.display = 'block';
+            setTimeout(() => { if (el) el.style.display = 'none'; }, 4500);
+        }
+
+        function validateUsernameStrict(username) {
+            if (!username) return 'Введіть логін.';
+            if (username.length <= 3) return 'Логін має бути довшим за 3 символи (від 4 до 20).';
+            if (username.length > 20) return 'Логін не може перевищувати 20 символів.';
+            if (!/^[a-zA-Z0-9 -]+$/.test(username)) {
+                return 'Логін може містити лише англійські літери, цифри, дефіс (-) та пробіл.';
+            }
+            if (!/[a-zA-Z]/.test(username)) {
+                return 'Логін повинен містити хоча б одну англійську літеру.';
+            }
+            return null;
+        }
+
+        function toFakeEmail(username) {
+            return username.toLowerCase().trim().replace(/\s+/g, '_') + '@chess-lib.local';
+        }
+
+        // Керування темою
+        function initThemeControls() {
+            const curTheme = localStorage.getItem('chess_theme') || 'system';
+            document.querySelectorAll('.theme-opt-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.theme === curTheme);
+                btn.onclick = () => {
+                    const t = btn.dataset.theme;
+                    localStorage.setItem('chess_theme', t);
+                    document.querySelectorAll('.theme-opt-btn').forEach(b => b.classList.toggle('active', b.dataset.theme === t));
+                    if (t === 'dark') {
+                        document.documentElement.classList.add('dark');
+                    } else if (t === 'light') {
+                        document.documentElement.classList.remove('dark');
+                    } else {
+                        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                        document.documentElement.classList.toggle('dark', prefersDark);
+                    }
+                    showSettingsAlert(`Тему переключено на: ${btn.textContent.trim()}`, true);
+                };
+            });
+        }
+        initThemeControls();
+
+        // Модалка налаштувань
+        const settingsModal = document.getElementById('settings-modal');
+        document.getElementById('settings-profile-btn').onclick = () => {
+            const user = auth.currentUser;
+            if (user) {
+                const curName = user.displayName || user.email.split('@')[0];
+                document.getElementById('set-username').value = curName;
+            }
+            settingsModal.style.display = 'flex';
+        };
+
+        document.getElementById('close-settings').onclick = () => {
+            settingsModal.style.display = 'none';
+        };
+
+        settingsModal.onclick = (e) => {
+            if (e.target === settingsModal) settingsModal.style.display = 'none';
+        };
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && settingsModal.style.display === 'flex') {
+                settingsModal.style.display = 'none';
+            }
+        });
+
+        // 1. Оновлення логіну
+        document.getElementById('btn-save-username').onclick = async () => {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            const newName = document.getElementById('set-username').value.trim();
+            const err = validateUsernameStrict(newName);
+            if (err) {
+                showSettingsAlert(err, false);
+                return;
+            }
+
+            const curName = user.displayName || user.email.split('@')[0];
+            if (newName.toLowerCase() === curName.toLowerCase()) {
+                showSettingsAlert('Введіть логін, відмінний від поточного.', false);
+                return;
+            }
+
+            try {
+                // Перевірка унікальності в базі
+                const docKey = newName.toLowerCase().replace(/\s+/g, '_');
+                const docSnap = await db.collection('usernames').doc(docKey).get();
+                if (docSnap.exists) {
+                    showSettingsAlert('Цей логін вже зайнятий іншим користувачем.', false);
+                    return;
+                }
+
+                // Оновлюємо профіль та email
+                await user.updateProfile({ displayName: newName });
+                try {
+                    await user.updateEmail(toFakeEmail(newName));
+                } catch (e) {
+                    if (e.code === 'auth/requires-recent-login') {
+                        const pass = prompt('Для зміни системного логіну введіть ваш поточний пароль:');
+                        if (pass) {
+                            const cred = firebase.auth.EmailAuthProvider.credential(user.email, pass);
+                            await user.reauthenticateWithCredential(cred);
+                            await user.updateEmail(toFakeEmail(newName));
+                        }
+                    } else if (e.code === 'auth/email-already-in-use') {
+                        showSettingsAlert('Цей логін вже зайнятий іншим користувачем.', false);
+                        return;
+                    }
+                }
+
+                // Фіксуємо новий логін в базі
+                await db.collection('usernames').doc(docKey).set({
+                    uid: user.uid,
+                    username: newName,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // Видаляємо старий запис якщо був
+                try {
+                    await db.collection('usernames').doc(curName.toLowerCase().replace(/\s+/g, '_')).delete();
+                } catch (_) {}
+
+                document.getElementById('profile-name').textContent = newName;
+                document.getElementById('profile-avatar').textContent = newName.charAt(0).toUpperCase();
+                document.getElementById('acc-btn').textContent = `👤 ${newName} ▾`;
+                showSettingsAlert(`🎉 Логін успішно оновлено на: ${newName}`, true);
+            } catch (err) {
+                console.error(err);
+                showSettingsAlert('Помилка оновлення логіну: ' + (err.message || err), false);
+            }
+        };
+
+        // 2. Оновлення пароля
+        document.getElementById('btn-save-password').onclick = async () => {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            const oldPass = document.getElementById('set-old-password').value;
+            const newPass = document.getElementById('set-new-password').value;
+
+            if (!oldPass) {
+                showSettingsAlert('Введіть поточний пароль для перевірки.', false);
+                return;
+            }
+            if (!newPass || newPass.length < 6) {
+                showSettingsAlert('Новий пароль має містити щонайменше 6 символів.', false);
+                return;
+            }
+
+            try {
+                // Перевіряємо старий пароль
+                const cred = firebase.auth.EmailAuthProvider.credential(user.email, oldPass);
+                await user.reauthenticateWithCredential(cred);
+
+                // Встановлюємо новий
+                await user.updatePassword(newPass);
+                document.getElementById('set-old-password').value = '';
+                document.getElementById('set-new-password').value = '';
+                showSettingsAlert('✅ Пароль успішно оновлено!', true);
+            } catch (err) {
+                console.error(err);
+                if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+                    showSettingsAlert('Невірний поточний пароль.', false);
+                } else if (err.code === 'auth/weak-password') {
+                    showSettingsAlert('Пароль занадто простий або короткий.', false);
+                } else {
+                    showSettingsAlert('Помилка: ' + (err.message || 'Спробуйте пізніше'), false);
+                }
+            }
+        };
+
+        // 3. Видалення аккаунту
+        document.getElementById('btn-delete-account').onclick = async () => {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            const pass = prompt('УВАГА! Ви дійсно бажаєте видалити свій аккаунт? Цю дію неможливо скасувати.\nВведіть ваш пароль для підтвердження:');
+            if (!pass) return;
+
+            try {
+                const cred = firebase.auth.EmailAuthProvider.credential(user.email, pass);
+                await user.reauthenticateWithCredential(cred);
+
+                // Очищення даних користувача
+                const curName = user.displayName || user.email.split('@')[0];
+                try {
+                    await db.collection('usernames').doc(curName.toLowerCase().replace(/\s+/g, '_')).delete();
+                } catch (_) {}
+
+                await user.delete();
+                alert('Ваш аккаунт успішно видалено.');
+                window.location.href = 'index.html';
+            } catch (err) {
+                console.error(err);
+                if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+                    showSettingsAlert('Невірний пароль для видалення аккаунту.', false);
+                } else {
+                    showSettingsAlert('Помилка видалення: ' + (err.message || err), false);
+                }
+            }
+        };
+
+        // Головний слухач стану авторизації
         auth.onAuthStateChanged(async (user) => {
             if (!user) { window.location.href = 'index.html'; return; }
 
@@ -310,27 +947,119 @@
             document.getElementById('logout-profile-btn').onclick = async () => { await auth.signOut(); window.location.href = 'index.html'; };
             document.getElementById('logout-btn').onclick = async (e) => { e.preventDefault(); await auth.signOut(); window.location.href = 'index.html'; };
 
+        function esc(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function showToast(msg, type = 'ok') {
+            const tc = document.getElementById('toast-container');
+            if (!tc) return;
+            const t = document.createElement('div');
+            t.className = 'toast';
+            if (type === 'warn') t.classList.add('toast-warn');
+            t.textContent = msg;
+            tc.appendChild(t);
+            setTimeout(() => {
+                t.classList.add('toast-out');
+                setTimeout(() => t.remove(), 400);
+            }, 3000);
+        }
+
+        function openBookModalFromData(bookData) {
+            const rawUrl = bookData.url || '';
+            let filename = bookData.id || (rawUrl ? decodeURIComponent(rawUrl.split('/').pop()) : '');
+            let title = bookData.title || '';
+            let author = bookData.author || '';
+
+            if (!filename) {
+                filename = `${author || 'книга'} - ${title || 'твір'}.pdf`;
+            }
+
+            if (!author || author === '—') {
+                const parts = filename.replace(/\.[^/.]+$/, '').split(/\s*-\s*/);
+                if (parts.length > 1) {
+                    author = parts[0].trim();
+                    title = title || parts.slice(1).join(' - ').trim();
+                }
+            }
+
+            const format = bookData.format || filename.split('.').pop().toLowerCase() || 'pdf';
+            const pages = bookData.pages
+                || (window.CHESS_PAGE_COUNTS && (window.CHESS_PAGE_COUNTS[filename] || window.CHESS_PAGE_COUNTS[filename.toLowerCase()]))
+                || (window.CHESS_DESCRIPTIONS && (window.CHESS_DESCRIPTIONS[filename]?.pages || window.CHESS_DESCRIPTIONS[filename.toLowerCase()]?.pages))
+                || null;
+
+            const bookObj = {
+                id: filename,
+                title: title || filename.replace(/\.[^/.]+$/, ''),
+                author: author || '—',
+                year: bookData.year || '---',
+                pages: pages,
+                format: format,
+                sizeDisplay: bookData.sizeDisplay || '—',
+                url: rawUrl || `https://archive.org/download/1971_20260223/${encodeURIComponent(filename)}`
+            };
+
+            if (typeof openBookModal === 'function') {
+                openBookModal(bookObj);
+            } else {
+                console.error('openBookModal is not defined');
+            }
+        }
+
             // Історія завантажень
             try {
                 const snap = await db
                     .collection('user_downloads').doc(user.uid)
-                    .collection('history').orderBy('downloadedAt', 'desc').get();
+                    .collection('history').get();
 
-                document.getElementById('stat-downloads').textContent = snap.size;
+                // 1. Дедуплікація: лічильник враховує ТІЛЬКИ УНІКАЛЬНІ книги!
+                const uniqueMap = new Map();
+                const allDocs = snap.docs.slice().sort((a, b) => {
+                    const timeA = a.data().lastDownloadedAt?.toMillis?.() || a.data().downloadedAt?.toMillis?.() || 0;
+                    const timeB = b.data().lastDownloadedAt?.toMillis?.() || b.data().downloadedAt?.toMillis?.() || 0;
+                    return timeB - timeA;
+                });
+
+                allDocs.forEach(d => {
+                    const data = d.data();
+                    const key = (data.bookId || data.id || data.title || d.id).trim().toLowerCase();
+                    if (!uniqueMap.has(key)) {
+                        uniqueMap.set(key, { ...data, _docId: d.id });
+                    }
+                });
+
+                // Лічильник показує виключно кількість унікальних творів
+                document.getElementById('stat-downloads').textContent = uniqueMap.size;
                 const tbody = document.getElementById('history-body');
 
-                if (snap.empty) {
+                const uniqueList = Array.from(uniqueMap.values());
+                if (uniqueList.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="3" class="history-empty">📭 Ви ще нічого не завантажували</td></tr>`;
                     return;
                 }
-                tbody.innerHTML = snap.docs.map(d => {
-                    const data = d.data();
-                    return `<tr>
-                    <td class="h-title">${data.title || '—'}</td>
-                    <td class="h-author">${data.author || '—'}</td>
-                    <td class="h-date">${fmt(data.downloadedAt)}</td>
+
+                tbody.innerHTML = uniqueList.map((data, idx) => {
+                    const displayDate = data.lastDownloadedAt || data.downloadedAt;
+                    const rawTitle = data.title || '—';
+                    const rawAuthor = data.author || '—';
+                    return `<tr class="clickable-row" data-idx="${idx}" title="Натисніть для перегляду синопсису та завантаження">
+                    <td class="h-title"><span class="h-title-link">📖 ${esc(rawTitle)}</span></td>
+                    <td class="h-author">${esc(rawAuthor)}</td>
+                    <td class="h-date">${fmt(displayDate)}</td>
                 </tr>`;
                 }).join('');
+
+                tbody.querySelectorAll('.clickable-row').forEach(row => {
+                    row.addEventListener('click', () => {
+                        const idx = parseInt(row.dataset.idx);
+                        const bookData = uniqueList[idx];
+                        if (bookData) {
+                            openBookModalFromData(bookData);
+                        }
+                    });
+                });
             } catch (e) {
                 document.getElementById('history-body').innerHTML =
                     `<tr><td colspan="3" class="history-empty">❌ Помилка завантаження${e.code === 'permission-denied' ? ': перевірте правила Firestore' : ''}</td></tr>`;
