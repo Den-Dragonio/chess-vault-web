@@ -447,7 +447,18 @@ function renderStatsDashboard() {
     const avgPages = booksWithPages.length ? Math.round(totalKnownPages / booksWithPages.length) : 0;
 
     // 2. ГРАФІК РОКІВ ПУБЛІКАЦІЙ (BAR CHART)
-    const yearBuckets = [
+    const isEn = window.i18n && window.i18n.currentLang === 'en';
+    const yearBuckets = isEn ? [
+        { label: 'pre-1930', min: 0, max: 1929, count: 0, desc: 'Early Classics' },
+        { label: '1930–49', min: 1930, max: 1949, count: 0, desc: 'Golden Era of 30-40s' },
+        { label: '1950s', min: 1950, max: 1959, count: 0, desc: 'Soviet Chess School' },
+        { label: '1960s', min: 1960, max: 1969, count: 0, desc: 'Tal & Petrosian Era' },
+        { label: '1970s', min: 1970, max: 1979, count: 0, desc: 'Fischer & Karpov Era' },
+        { label: '1980s', min: 1980, max: 1989, count: 0, desc: 'Karpov vs Kasparov' },
+        { label: '1990s', min: 1990, max: 1999, count: 0, desc: 'Computer Revolution' },
+        { label: '2000s', min: 2000, max: 2009, count: 0, desc: 'Modern Theory' },
+        { label: '2010+', min: 2010, max: 2099, count: 0, desc: 'Contemporary Works' }
+    ] : [
         { label: 'до 1930', min: 0, max: 1929, count: 0, desc: 'Рання класика' },
         { label: '1930–49', min: 1930, max: 1949, count: 0, desc: 'Золота доба 30-40х' },
         { label: '1950-і', min: 1950, max: 1959, count: 0, desc: 'Радянська школа' },
