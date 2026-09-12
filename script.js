@@ -389,18 +389,32 @@ function renderNewsList(docs) {
 async function seedSystemNews() {
     const systemNews = [
         { 
+            id: 'english-language-added',
+            text: 'Додано англійську мову інтерфейсу! Тепер у налаштуваннях профілю можна обирати мову (English / Українська).',
+            text_uk: 'Додано англійську мову інтерфейсу! Тепер у налаштуваннях профілю можна обирати мову (English / Українська).',
+            text_en: 'English language added! You can now switch between English and Ukrainian in your account settings.',
+            date: new Date()
+        },
+        { 
+            id: 'dark-system-themes-added',
+            text: 'Оновлено теми оформлення: додано повноцінну темну тему та синхронізацію з системною темою вашого пристрою.',
+            text_uk: 'Оновлено теми оформлення: додано повноцінну темну тему та синхронізацію з системною темою вашого пристрою.',
+            text_en: 'Themes updated: Dark theme and automatic system theme sync are now available in settings.',
+            date: new Date(Date.now() - 1000)
+        },
+        { 
             id: 'library-transfer-completed', 
             text: 'Шахову бібліотеку повністю перенесено в сховище Internet Archive — усі 1879 рідкісних книг збережено та доступно для вивчення!',
             text_uk: 'Шахову бібліотеку повністю перенесено в сховище Internet Archive — усі 1879 рідкісних книг збережено та доступно для вивчення!',
             text_en: 'Chess library migration completed! All 1,879 rare books and treatises are safely archived and ready to explore.',
-            date: new Date() 
+            date: new Date(Date.now() - 2000) 
         },
         { 
             id: 'champions-gallery-added', 
             text: 'Додано інтерактивну залу та повний список чемпіонів світу з шахів — від Вільгельма Стейніца до Дін Ліженя з біографіями та цікавими фактами!',
             text_uk: 'Додано інтерактивну залу та повний список чемпіонів світу з шахів — від Вільгельма Стейніца до Дін Ліженя з біографіями та цікавими фактами!',
             text_en: 'World Chess Champions gallery added! Explore all 22 official world champions from Wilhelm Steinitz to Ding Liren with rich biographies and facts.',
-            date: new Date() 
+            date: new Date(Date.now() - 3000) 
         },
         { 
             id: 'section-b', 
