@@ -522,7 +522,6 @@ function renderStatsDashboard() {
     // 4. ТОП АВТОРІВ (Журнали виключені, тільки автори книг)
     const topAuthors = sortedAuthors.slice(0, 15);
 
-    const isEn = window.i18n && window.i18n.currentLang === 'en';
     const booksWord = isEn ? 'books' : 'книг';
     const kpiTotal = isEn ? 'Total works in database' : 'Всього творів у базі';
     const kpiAuthors = isEn ? 'Unique authors' : 'Унікальних авторів';
@@ -825,6 +824,8 @@ if (typeof module !== 'undefined' && module.exports) {
         renderStatsDashboard,
         isMagazineBook
     };
+}
+
 if (typeof window !== 'undefined') {
     window.addEventListener('chessVaultLanguageChanged', () => {
         if (typeof switchCollectionView === 'function' && collectionsState && collectionsState.currentView) {
