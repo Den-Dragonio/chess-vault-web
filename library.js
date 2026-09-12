@@ -173,19 +173,22 @@ async function fetchArchiveData() {
                         || (window.CHESS_DESCRIPTIONS && (window.CHESS_DESCRIPTIONS[bookId]?.pages || window.CHESS_DESCRIPTIONS[bookId.toLowerCase()]?.pages))
                         || null;
 
-                    const bookObj = {
-                        author: match ? match[1].trim() : fileName.split('-')[0].trim(),
-                        title: match ? match[2].trim() : fileName,
-                        year: match ? match[3] : '---',
-                        pages: pages ? parseInt(pages, 10) : null,
-                        format: f.name.split('.').pop().toLowerCase(),
-                        sizeDisplay: (f.size / 1024 / 1024).toFixed(2) + ' MB',
-                        sizeRaw: parseInt(f.size) || 0,
-                        url: `https://archive.org/download/${volId}/${f.name}`,
-                        id: f.name,
-                        archiveVolume: volId
-                    };
-                    booksMap.set(bookId.toLowerCase(), bookObj);
+                    const isMulti = booksMap.has(bookId.toLowerCase()) && booksMap.get(bookId.toLowerCase()).formats;
+                    if (!isMulti) {
+                        const bookObj = {
+                            author: match ? match[1].trim() : fileName.split('-')[0].trim(),
+                            title: match ? match[2].trim() : fileName,
+                            year: match ? match[3] : '---',
+                            pages: pages ? parseInt(pages, 10) : null,
+                            format: f.name.split('.').pop().toLowerCase(),
+                            sizeDisplay: (f.size / 1024 / 1024).toFixed(2) + ' MB',
+                            sizeRaw: parseInt(f.size) || 0,
+                            url: `https://archive.org/download/${volId}/${f.name}`,
+                            id: f.name,
+                            archiveVolume: volId
+                        };
+                        booksMap.set(bookId.toLowerCase(), bookObj);
+                    }
                 });
             }
         });

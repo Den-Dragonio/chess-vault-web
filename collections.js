@@ -23,7 +23,7 @@ const CHESS_TOPICS = [
         title: 'Ендшпіль',
         icon: '👑',
         subtitle: 'Теорія закінчень, техніка пішакових та фігурних фіналів',
-        keywords: ['эндшпил', 'окончан', 'финал', 'ладейн', 'ферзев', 'конев', 'слонов']
+        keywords: ['эндшпил', 'окончан', 'финал', 'ладейн', 'ферзев', 'конев', 'слонов', 'endgame', 'ending', 'endings', 'rook endings', 'pawn endings']
     },
     {
         id: 'etudes',
@@ -103,6 +103,11 @@ function classifyBookTopic(book) {
     const raw = (book.id || book.title || '').toLowerCase();
     const norm = normalizeTextForMatch(book.id || book.title);
 
+    // 0. Прямий топік (якщо заданий у моделі книги)
+    if (book.topicId && CHESS_TOPICS.some(t => t.id === book.topicId)) {
+        return book.topicId;
+    }
+
     // 1. Перевірка топіку з бази флешки (CHESS_COLLECTIONS_DATA)
     if (window.CHESS_COLLECTIONS_DATA && window.CHESS_COLLECTIONS_DATA.themeIndex) {
         const themeIndex = window.CHESS_COLLECTIONS_DATA.themeIndex;
@@ -122,7 +127,7 @@ function classifyBookTopic(book) {
     }
 
     // 3. Ендшпіль (пріоритет над мітельшпілем)
-    if (['эндшпил', 'окончан', 'финал', 'ладейн', 'ферзев', 'конев', 'слонов'].some(k => raw.includes(k))) {
+    if (['эндшпил', 'окончан', 'финал', 'ладейн', 'ферзев', 'конев', 'слонов', 'endgame', 'endings', 'ending'].some(k => raw.includes(k))) {
         return 'endgame';
     }
 

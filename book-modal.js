@@ -603,8 +603,46 @@ function renderModalFull(book, meta) {
     const pages = getBookPages(book, meta);
     const pagesSuffix = isEn ? ' p.' : ' стор.';
     const pagesPill = pages ? `<span class="bd-meta-pill" id="bd-pages-pill">📖 ${pages}${pagesSuffix}</span>` : '';
-    const dlBtnLabel = window.i18n ? window.i18n.t('modal_btn_download', { size: book.sizeDisplay || (isEn ? 'file' : 'файл') }) : `⬇ Скачати (${book.sizeDisplay || 'файл'})`;
     const sourceDataText = window.i18n ? window.i18n.t('modal_source_data', { source: sourceLabel }) : `Дані: ${sourceLabel}`;
+
+    // Мовна мітка (Language)
+    const bookLang = book.lang || (/[а-яёіїєґ]/i.test(book.title || '') ? 'ru' : 'en');
+    const langLabel = bookLang === 'ru' ? (isEn ? '🇷🇺 Russian' : '🇷🇺 Мова: Рос.') : (isEn ? '🇬🇧 English' : '🇬🇧 Мова: Англ.');
+    const langPill = `<span class="bd-meta-pill bd-lang-badge">${langLabel}</span>`;
+
+    // Кнопки завантаження: якщо у книги є кілька форматів (PDF, EPUB)
+    let downloadButtonsHTML = '';
+    if (Array.isArray(book.formats) && book.formats.length > 1) {
+        // Сортуємо: перевага у PDF, потім EPUB, потім інші
+        const order = { pdf: 1, djvu: 2, epub: 3, doc: 4, txt: 5 };
+        const sortedFormats = [...book.formats].sort((a, b) => (order[a.format.toLowerCase()] || 99) - (order[b.format.toLowerCase()] || 99));
+        
+        downloadButtonsHTML = sortedFormats.map((f, fIdx) => {
+            const isPrimary = fIdx === 0;
+            const btnClass = isPrimary ? 'bd-btn-download' : 'bd-btn-download-secondary';
+            const fLabel = `⬇ ${f.format.toUpperCase()} (${f.sizeDisplay})`;
+            return `
+                <button class="${btnClass} bd-multi-download-btn"
+                        data-url="${escHtml(f.url || '')}"
+                        data-title="${escHtml(book.title || '')}"
+                        data-author="${escHtml(book.author || '')}"
+                        data-id="${escHtml(book.id || '')}"
+                        data-format="${escHtml(f.format || '')}"
+                        data-size="${escHtml(f.sizeDisplay || '')}">${fLabel}</button>
+            `;
+        }).join('');
+    } else {
+        const dlBtnLabel = window.i18n ? window.i18n.t('modal_btn_download', { size: book.sizeDisplay || (isEn ? 'file' : 'файл') }) : `⬇ Скачати (${book.sizeDisplay || 'файл'})`;
+        downloadButtonsHTML = `
+            <button class="bd-btn-download" id="bd-download-btn"
+                    data-url="${escHtml(book.url || '')}"
+                    data-title="${escHtml(book.title || '')}"
+                    data-author="${escHtml(book.author || '')}"
+                    data-id="${escHtml(book.id || '')}"
+                    data-format="${escHtml(book.format || '')}"
+                    data-size="${escHtml(book.sizeDisplay || '')}">${dlBtnLabel}</button>
+        `;
+    }
 
     card.innerHTML = `
         <button id="book-detail-close">✕</button>
@@ -620,17 +658,12 @@ function renderModalFull(book, meta) {
                     ${year && year !== '---' ? `<span class="bd-meta-pill">📅 ${year}</span>` : ''}
                     <span class="bd-meta-pill">💾 ${book.sizeDisplay}</span>
                     <span class="bd-meta-pill">📄 ${book.format.toUpperCase()}</span>
+                    ${langPill}
                     ${pagesPill}
                     ${journalBadge}
                 </div>
                 <div class="bd-hero-actions">
-                    <button class="bd-btn-download" id="bd-download-btn"
-                            data-url="${escHtml(book.url || '')}"
-                            data-title="${escHtml(book.title || '')}"
-                            data-author="${escHtml(book.author || '')}"
-                            data-id="${escHtml(book.id || '')}"
-                            data-format="${escHtml(book.format || '')}"
-                            data-size="${escHtml(book.sizeDisplay || '')}">${dlBtnLabel}</button>
+                    ${downloadButtonsHTML}
                     ${extBtnHTML}
                 </div>
                 ${source !== 'notfound' ? `<p class="bd-source-badge">${sourceDataText}</p>` : ''}
@@ -645,7 +678,9 @@ function renderModalFull(book, meta) {
         ${subjectsHTML}`;
 
     document.getElementById('book-detail-close').addEventListener('click', closeBookModal);
-    document.getElementById('bd-download-btn').addEventListener('click', function () { onDownloadClick(this); });
+    card.querySelectorAll('#bd-download-btn, .bd-multi-download-btn').forEach(btn => {
+        btn.addEventListener('click', function () { onDownloadClick(this); });
+    });
 }
 
 // =============================================
