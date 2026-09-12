@@ -143,16 +143,18 @@ window.onclick = e => { if (e.target.classList.contains('modal-overlay')) closeM
 // =============================================
 // 5. ПОМИЛКИ FIREBASE
 // =============================================
+// =============================================
 function translateError(code) {
+    const t = (k) => window.i18n ? window.i18n.t(k) : k;
     const map = {
-        'auth/user-not-found': 'Користувач з таким логіном не знайдений.',
-        'auth/wrong-password': 'Невірний пароль.',
-        'auth/invalid-credential': 'Невірний логін або пароль.',
-        'auth/email-already-in-use': 'Цей логін вже зайнятий.',
-        'auth/weak-password': 'Пароль занадто короткий (мін. 6 символів).',
-        'auth/too-many-requests': 'Забагато спроб. Спробуйте пізніше.',
+        'auth/user-not-found': t('auth_invalid_cred'),
+        'auth/wrong-password': t('auth_invalid_cred'),
+        'auth/invalid-credential': t('auth_invalid_cred'),
+        'auth/email-already-in-use': t('auth_email_taken'),
+        'auth/weak-password': t('auth_weak_pass'),
+        'auth/too-many-requests': t('auth_too_many'),
     };
-    return map[code] || 'Помилка. Спробуйте ще раз.';
+    return map[code] || t('auth_generic_err');
 }
 
 function showToast(msg, type = 'ok', actionText = null, onAction = null) {
@@ -204,23 +206,25 @@ document.getElementById('auth-form').addEventListener('submit', async e => {
     const password = document.getElementById('login-password').value;
     const errEl = document.getElementById('auth-error');
     errEl.textContent = '';
-    if (!username) { errEl.textContent = 'Введіть логін.'; return; }
+    const t = (k, p) => window.i18n ? window.i18n.t(k, p) : k;
+    if (!username) { errEl.textContent = t('auth_err_empty_username'); return; }
     try {
         await auth.signInWithEmailAndPassword(toFakeEmail(username), password);
         closeModal(loginModal);
-        showToast(`✅ Ласкаво просимо, ${username}!`);
+        showToast(t('auth_welcome', { username: username }));
     } catch (err) { errEl.textContent = translateError(err.code); }
 });
 
 function validateUsernameStrict(username) {
-    if (!username) return 'Введіть логін.';
-    if (username.length <= 3) return 'Логін має бути довшим за 3 символи (від 4 до 20).';
-    if (username.length > 20) return 'Логін не може перевищувати 20 символів.';
+    const t = (k) => window.i18n ? window.i18n.t(k) : k;
+    if (!username) return t('auth_err_empty_username');
+    if (username.length <= 3) return t('auth_err_len');
+    if (username.length > 20) return t('auth_err_len');
     if (!/^[a-zA-Z0-9 -]+$/.test(username)) {
-        return 'Логін може містити лише англійські літери, цифри, дефіс (-) та пробіл.';
+        return t('auth_err_chars');
     }
     if (!/[a-zA-Z]/.test(username)) {
-        return 'Логін повинен містити хоча б одну англійську літеру.';
+        return t('auth_err_letter');
     }
     return null;
 }
@@ -234,6 +238,7 @@ document.getElementById('signup-form').addEventListener('submit', async e => {
     const password = document.getElementById('reg-password').value;
     const errEl = document.getElementById('reg-error');
     errEl.textContent = '';
+    const t = (k, p) => window.i18n ? window.i18n.t(k, p) : k;
     
     const valErr = validateUsernameStrict(username);
     if (valErr) {
@@ -246,7 +251,7 @@ document.getElementById('signup-form').addEventListener('submit', async e => {
         try {
             const snap = await db.collection('usernames').doc(username.toLowerCase().replace(/\s+/g, '_')).get();
             if (snap.exists) {
-                errEl.textContent = 'Цей логін вже зайнятий іншим користувачем.';
+                errEl.textContent = t('auth_err_taken');
                 return;
             }
         } catch (_) {}
@@ -263,6 +268,15 @@ document.getElementById('signup-form').addEventListener('submit', async e => {
             });
         } catch (_) {}
 
+        // Зберігаємо дефолтні налаштування користувача (поточну мову та тему)
+        try {
+            await db.collection('user_preferences').doc(cred.user.uid).set({
+                language: window.i18n ? window.i18n.getLanguage() : 'en',
+                theme: localStorage.getItem('chess_theme') || 'system',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+        } catch (_) {}
+
         // Привітання в стрічці новин на головній
         try {
             await db.collection('news').add({
@@ -273,41 +287,71 @@ document.getElementById('signup-form').addEventListener('submit', async e => {
         } catch (_) { /* не критично */ }
 
         closeModal(regModal);
-        showToast(`🎉 Аккаунт створено! Ласкаво просимо, ${username}!`);
+        showToast(t('auth_created', { username: username }));
     } catch (err) { errEl.textContent = translateError(err.code); }
 });
 
 // =============================================
 // 8. СТАН АВТОРИЗАЦІЇ → хедер
 // =============================================
-auth.onAuthStateChanged(user => {
+function updateHeaderAuthUI(user) {
     const accBtn = document.getElementById('acc-btn');
     const accDropdown = document.getElementById('acc-dropdown');
     const myAccountLink = document.getElementById('nav-my-account');
+    const t = (k) => window.i18n ? window.i18n.t(k) : k;
 
     if (user) {
         const name = user.displayName || user.email.split('@')[0];
         if (accBtn) accBtn.textContent = `👤 ${name} ▾`;
-        if (myAccountLink) myAccountLink.style.display = 'inline';
+        if (myAccountLink) {
+            myAccountLink.style.display = 'inline';
+            myAccountLink.textContent = t('nav_my_account');
+        }
         if (accDropdown) {
-            accDropdown.innerHTML = `<a href="#" id="logout-btn">🚪 Вийти</a>`;
+            accDropdown.innerHTML = `<a href="#" id="logout-btn">🚪 ${t('nav_logout')}</a>`;
             document.getElementById('logout-btn').onclick = async e => {
                 e.preventDefault();
                 await auth.signOut();
-                showToast('До побачення!');
+                showToast(t('auth_bye'));
             };
         }
     } else {
-        if (accBtn) accBtn.textContent = 'Аккаунт ▾';
+        if (accBtn) accBtn.textContent = `${t('nav_account')} ▾`;
         if (myAccountLink) myAccountLink.style.display = 'none';
         if (accDropdown) {
             accDropdown.innerHTML = `
-                <a href="#" id="login-trigger">🔑 Вхід</a>
-                <a href="#" id="reg-trigger">📝 Реєстрація</a>`;
+                <a href="#" id="login-trigger">🔑 ${t('nav_login')}</a>
+                <a href="#" id="reg-trigger">📝 ${t('nav_register')}</a>`;
             bindLoginTrigger();
             bindRegTrigger();
         }
     }
+}
+
+auth.onAuthStateChanged(async user => {
+    if (user) {
+        // Підтягуємо налаштування мови та теми з Firestore
+        try {
+            const prefSnap = await db.collection('user_preferences').doc(user.uid).get();
+            if (prefSnap.exists) {
+                const prefs = prefSnap.data();
+                if (prefs.theme) {
+                    localStorage.setItem('chess_theme', prefs.theme);
+                    if (window.applyTheme) window.applyTheme(prefs.theme);
+                }
+                if (prefs.language && window.i18n) {
+                    window.i18n.setLanguage(prefs.language, false);
+                }
+            }
+        } catch (err) {
+            console.warn('Could not load user preferences:', err);
+        }
+    }
+    updateHeaderAuthUI(user);
+});
+
+window.addEventListener('chessVaultLanguageChanged', () => {
+    updateHeaderAuthUI(auth.currentUser);
 });
 
 // =============================================

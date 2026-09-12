@@ -216,6 +216,8 @@ function updateViewDisplay() {
     const sortControls = document.querySelector('.sort-controls');
 
     const searchInput = document.getElementById('lib-search-input');
+    const isEn = window.i18n && window.i18n.currentLang === 'en';
+    const booksWord = isEn ? 'books' : 'книг';
 
     if (view === 'all') {
         if (topicsWrap) topicsWrap.style.display = 'none';
@@ -225,7 +227,7 @@ function updateViewDisplay() {
         if (booksListBlock) booksListBlock.style.display = 'flex';
         if (searchBox) searchBox.style.display = 'block';
         if (sortControls) sortControls.style.display = 'flex';
-        if (searchInput) searchInput.placeholder = 'Шукати за автором, назвою або роком...';
+        if (searchInput) searchInput.placeholder = window.i18n ? window.i18n.t('lib_search_ph') : 'Шукати за автором, назвою або роком...';
         renderFilteredBooks();
     } else if (view === 'topics') {
         if (statsWrap) statsWrap.style.display = 'none';
@@ -239,8 +241,10 @@ function updateViewDisplay() {
             if (sortControls) sortControls.style.display = 'none';
         } else {
             // Показати список книг обраного розділу
-            const topic = CHESS_TOPICS.find(t => t.id === activeTopicId) || { title: 'Розділ', icon: '♟️' };
+            const topic = CHESS_TOPICS.find(t => t.id === activeTopicId) || { id: 'all', title: 'Розділ', icon: '♟️' };
+            const topicTitle = window.i18n ? window.i18n.t(`topic_${topic.id}_title`) : topic.title;
             const count = collectionsState.allBooks.filter(b => b.topicId === activeTopicId).length;
+            const backText = isEn ? '← All sections' : '← Всі розділи';
             if (topicsWrap) topicsWrap.style.display = 'none';
             if (authorsWrap) authorsWrap.style.display = 'none';
             if (activeHeader) {
@@ -249,19 +253,19 @@ function updateViewDisplay() {
                     <div class="collection-header-info">
                         <span class="collection-header-icon">${topic.icon}</span>
                         <h2 class="collection-header-title">
-                            ${topic.title}
-                            <span class="collection-header-badge">${count} книг</span>
+                            ${topicTitle}
+                            <span class="collection-header-badge">${count} ${booksWord}</span>
                         </h2>
                     </div>
                     <button class="collection-back-btn" onclick="backToTopics()">
-                        ← Всі розділи
+                        ${backText}
                     </button>
                 `;
             }
             if (booksListBlock) booksListBlock.style.display = 'flex';
             if (searchBox) searchBox.style.display = 'block';
             if (sortControls) sortControls.style.display = 'flex';
-            if (searchInput) searchInput.placeholder = `Шукати серед книг розділу «${topic.title}»...`;
+            if (searchInput) searchInput.placeholder = isEn ? `Search books in «${topicTitle}»...` : `Шукати серед книг розділу «${topicTitle}»...`;
             renderFilteredBooks();
         }
     } else if (view === 'authors') {
@@ -277,6 +281,7 @@ function updateViewDisplay() {
         } else {
             // Показати книги обраного автора
             const count = collectionsState.allBooks.filter(b => b.cleanAuthor === activeAuthor).length;
+            const backText = isEn ? '← All authors' : '← Всі автори';
             if (topicsWrap) topicsWrap.style.display = 'none';
             if (authorsWrap) authorsWrap.style.display = 'none';
             if (activeHeader) {
@@ -286,18 +291,18 @@ function updateViewDisplay() {
                         <span class="collection-header-icon">👤</span>
                         <h2 class="collection-header-title">
                             ${escapeHtml(activeAuthor)}
-                            <span class="collection-header-badge">${count} книг</span>
+                            <span class="collection-header-badge">${count} ${booksWord}</span>
                         </h2>
                     </div>
                     <button class="collection-back-btn" onclick="backToAuthors()">
-                        ← Всі автори
+                        ${backText}
                     </button>
                 `;
             }
             if (booksListBlock) booksListBlock.style.display = 'flex';
             if (searchBox) searchBox.style.display = 'block';
             if (sortControls) sortControls.style.display = 'flex';
-            if (searchInput) searchInput.placeholder = `Шукати серед книг автора «${activeAuthor}»...`;
+            if (searchInput) searchInput.placeholder = isEn ? `Search books by «${activeAuthor}»...` : `Шукати серед книг автора «${activeAuthor}»...`;
             renderFilteredBooks();
         }
     } else if (view === 'stats') {
@@ -506,6 +511,20 @@ function renderStatsDashboard() {
     // 4. ТОП АВТОРІВ (Журнали виключені, тільки автори книг)
     const topAuthors = sortedAuthors.slice(0, 15);
 
+    const isEn = window.i18n && window.i18n.currentLang === 'en';
+    const booksWord = isEn ? 'books' : 'книг';
+    const kpiTotal = isEn ? 'Total works in database' : 'Всього творів у базі';
+    const kpiAuthors = isEn ? 'Unique authors' : 'Унікальних авторів';
+    const kpiPages = isEn ? 'Avg pages per book' : 'Сер. кількість сторінок';
+    const kpiMagazines = isEn ? 'Magazines in separate cast' : 'Журналів в окремій касті';
+    const yearsSecTitle = isEn ? 'Publication Years' : 'Роки публікацій літератури';
+    const pagesSecTitle = isEn ? 'Page Count Distribution' : 'Розподіл за обсягом: яких книг більше?';
+    const authorsSecTitle = isEn ? 'Leading Authors by Book Count' : 'Лідери за кількістю книг (Топ авторів)';
+    const authorsSecSub = isEn ? 'Author ranking by number of published works in the chess fund. Magazines and periodicals are separated.' : 'Рейтинг авторів за кількістю творів у шахматному фонді. Журнали та періодика виділені в окрему касту і не беруть участі в авторському заліку.';
+    const booksInDbText = isEn ? 'books in database →' : 'книг у базі →';
+    const mostInDbText = isEn ? 'Most in database' : 'Найбільше в базі';
+    const verdictTitle = isEn ? 'Analytics verdict:' : 'Вердикт аналітики:';
+
     // ГЕНЕРУЄМО ДАШБОРД HTML
     container.innerHTML = `
         <div class="stats-dashboard">
@@ -514,29 +533,29 @@ function renderStatsDashboard() {
                 <div class="stats-kpi-card">
                     <div class="stats-kpi-icon">📚</div>
                     <div>
-                        <div class="stats-kpi-val">${books.length.toLocaleString('uk-UA')}</div>
-                        <div class="stats-kpi-label">Всього творів у базі</div>
+                        <div class="stats-kpi-val">${books.length.toLocaleString(isEn ? 'en-US' : 'uk-UA')}</div>
+                        <div class="stats-kpi-label">${kpiTotal}</div>
                     </div>
                 </div>
                 <div class="stats-kpi-card">
                     <div class="stats-kpi-icon">✍️</div>
                     <div>
                         <div class="stats-kpi-val">${totalAuthors}</div>
-                        <div class="stats-kpi-label">Унікальних авторів</div>
+                        <div class="stats-kpi-label">${kpiAuthors}</div>
                     </div>
                 </div>
                 <div class="stats-kpi-card">
                     <div class="stats-kpi-icon">📄</div>
                     <div>
                         <div class="stats-kpi-val">~${avgPages}</div>
-                        <div class="stats-kpi-label">Сер. кількість сторінок</div>
+                        <div class="stats-kpi-label">${kpiPages}</div>
                     </div>
                 </div>
                 <div class="stats-kpi-card" style="cursor:pointer;" onclick="openTopic('magazines')">
                     <div class="stats-kpi-icon">📰</div>
                     <div>
                         <div class="stats-kpi-val">${magazineBooks.length}</div>
-                        <div class="stats-kpi-label">Журналів в окремій касті</div>
+                        <div class="stats-kpi-label">${kpiMagazines}</div>
                     </div>
                 </div>
             </div>
@@ -545,11 +564,10 @@ function renderStatsDashboard() {
             <div class="stats-section-card">
                 <h3 class="stats-section-title">
                     <span>📅</span>
-                    <span>Роки публікацій літератури</span>
+                    <span>${yearsSecTitle}</span>
                 </h3>
                 <p class="stats-section-sub">
-                    Розподіл видань за хронологічними десятиліттями (оцифровано ${totalWithYear} книг із зазначеним роком).
-                    Піковий період: <strong>${peakDecade.label} (${peakDecade.desc})</strong> — ${peakDecade.count} творів!
+                    ${isEn ? `Distribution across chronological decades (${totalWithYear} books with specified year). Peak period: <strong>${peakDecade.label}</strong> — ${peakDecade.count} works!` : `Розподіл видань за хронологічними десятиліттями (оцифровано ${totalWithYear} книг із зазначеним роком). Піковий період: <strong>${peakDecade.label} (${peakDecade.desc})</strong> — ${peakDecade.count} творів!`}
                 </p>
 
                 <div class="years-chart-container">
@@ -557,8 +575,9 @@ function renderStatsDashboard() {
                         const heightPct = Math.max(6, Math.round((bucket.count / maxYearCount) * 100));
                         const pctOfTotal = totalWithYear ? Math.round((bucket.count / totalWithYear) * 100) : 0;
                         const isPeak = bucket === peakDecade;
+                        const tipText = isEn ? `${bucket.label}: ${bucket.count} books (${pctOfTotal}% of catalog)` : `${bucket.label}: ${bucket.count} книг (${pctOfTotal}% від оцифрованих)`;
                         return `
-                            <div class="year-bar-col" title="${bucket.label}: ${bucket.count} книг (${pctOfTotal}% від оцифрованих)">
+                            <div class="year-bar-col" title="${tipText}">
                                 <div class="year-bar-val">${bucket.count}</div>
                                 <div class="year-bar-fill ${isPeak ? 'peak-bar' : ''}" style="height: ${heightPct}%;"></div>
                                 <div class="year-bar-label">${bucket.label}</div>
@@ -572,23 +591,24 @@ function renderStatsDashboard() {
             <div class="stats-section-card">
                 <h3 class="stats-section-title">
                     <span>📖</span>
-                    <span>Розподіл за обсягом: яких книг більше?</span>
+                    <span>${pagesSecTitle}</span>
                 </h3>
                 <p class="stats-section-sub">
-                    Аналіз сторінкового обсягу оцифрованої літератури (вибірка: ${booksWithPages.length} книг з точним підрахунком).
+                    ${isEn ? `Page volume analysis of digitized literature (sample: ${booksWithPages.length} books with exact count).` : `Аналіз сторінкового обсягу оцифрованої літератури (вибірка: ${booksWithPages.length} книг з точним підрахунком).`}
                 </p>
 
                 <div class="pages-dist-list">
                     ${pageTiers.map(t => {
                         const isWinner = t === winnerTier;
+                        const tierName = isEn ? (t.id === 'micro' ? 'Short brochures' : (t.id === 'compact' ? 'Compact editions' : (t.id === 'medium' ? 'Standard monographs' : (t.id === 'large' ? 'Voluminous textbooks' : 'Multivolume tomes')))) : t.name;
                         return `
                             <div class="pages-dist-item">
                                 <div class="pages-dist-header">
                                     <div style="display:flex; align-items:center; gap:8px;">
-                                        <span>${t.name} <small style="opacity:0.75; font-weight:normal;">(${t.range})</small></span>
-                                        ${isWinner ? `<span class="pages-dist-highlight">🏆 Найбільше в базі (${t.pct}%)</span>` : ''}
+                                        <span>${tierName} <small style="opacity:0.75; font-weight:normal;">(${t.range})</small></span>
+                                        ${isWinner ? `<span class="pages-dist-highlight">🏆 ${mostInDbText} (${t.pct}%)</span>` : ''}
                                     </div>
-                                    <span style="font-weight:700;">${t.count} книг <span style="opacity:0.6; font-size:0.85em;">(${t.pct}%)</span></span>
+                                    <span style="font-weight:700;">${t.count} ${booksWord} <span style="opacity:0.6; font-size:0.85em;">(${t.pct}%)</span></span>
                                 </div>
                                 <div class="pages-dist-track">
                                     <div class="pages-dist-bar" style="width: ${t.pct}%; background: ${t.color};"></div>
@@ -601,13 +621,16 @@ function renderStatsDashboard() {
                 <div class="pages-summary-banner">
                     <span style="font-size:1.4rem;">💡</span>
                     <div>
-                        <strong>Вердикт аналітики:</strong>
-                        ${totalShort > totalLong
-                            ? `У базі переважають <strong>компактні та короткі книги</strong> (до 249 стор. — <strong>${shortPct}%</strong> бази проти ${longPct}% довгих книг).`
-                            : `У базі переважають <strong>солідні монографії та підручники</strong> (від 250 стор. — <strong>${longPct}%</strong> бази проти ${shortPct}% коротких брошур).`
+                        <strong>${verdictTitle}</strong>
+                        ${isEn
+                            ? (totalShort > totalLong
+                                ? `The database is dominated by <strong>compact and short books</strong> (under 249 pages — <strong>${shortPct}%</strong> vs ${longPct}% long books). `
+                                : `The database is dominated by <strong>solid monographs and comprehensive textbooks</strong> (over 250 pages — <strong>${longPct}%</strong> vs ${shortPct}% short brochures). `)
+                            : (totalShort > totalLong
+                                ? `У базі переважають <strong>компактні та короткі книги</strong> (до 249 стор. — <strong>${shortPct}%</strong> бази проти ${longPct}% довгих книг). `
+                                : `У базі переважають <strong>солідні монографії та підручники</strong> (від 250 стор. — <strong>${longPct}%</strong> бази проти ${shortPct}% коротких брошур). `)
                         }
-                        Найчисельніша окрема категорія: <strong>«${winnerTier.name}»</strong> (${winnerTier.count} книг, ${winnerTier.pct}%).
-                        Середній обсяг однієї книги становить <strong>${avgPages} сторінок</strong>.
+                        ${isEn ? `Average volume per book is <strong>${avgPages} pages</strong>.` : `Середній обсяг однієї книги становить <strong>${avgPages} сторінок</strong>.`}
                     </div>
                 </div>
             </div>
@@ -616,10 +639,10 @@ function renderStatsDashboard() {
             <div class="stats-section-card">
                 <h3 class="stats-section-title">
                     <span>👑</span>
-                    <span>Лідери за кількістю книг (Топ авторів)</span>
+                    <span>${authorsSecTitle}</span>
                 </h3>
                 <p class="stats-section-sub">
-                    Рейтинг авторів за кількістю творів у шахматному фонді. Журнали та періодика виділені в окрему касту і не беруть участі в авторському заліку.
+                    ${authorsSecSub}
                 </p>
 
                 <div class="top-authors-grid">
@@ -631,7 +654,7 @@ function renderStatsDashboard() {
                                 <div class="top-author-rank">${medal}</div>
                                 <div class="top-author-info">
                                     <div class="top-author-name" title="${escapeHtmlAttr(a.name)}">${escapeHtml(a.name)}</div>
-                                    <div class="top-author-books">${a.count} книг у базі →</div>
+                                    <div class="top-author-books">${a.count} ${booksInDbText}</div>
                                 </div>
                             </div>
                         `;
@@ -791,5 +814,12 @@ if (typeof module !== 'undefined' && module.exports) {
         renderStatsDashboard,
         isMagazineBook
     };
+if (typeof window !== 'undefined') {
+    window.addEventListener('chessVaultLanguageChanged', () => {
+        if (typeof switchCollectionView === 'function' && collectionsState && collectionsState.currentView) {
+            switchCollectionView(collectionsState.currentView);
+        }
+    });
 }
+
 

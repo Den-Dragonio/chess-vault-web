@@ -1,26 +1,42 @@
 // dark-mode-init.js — завантажується в <head>, до рендеру сторінки
-// Пріоритет: 1) збережене налаштування користувача  2) налаштування системи  3) час доби
+// За замовчуванням для неавторизованих: 'system' (на основі prefers-color-scheme ОС)
 (function () {
     try {
-        var theme = localStorage.getItem('chess_theme') || 'system';
         var prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
 
-        if (theme === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else if (theme === 'light') {
-            document.documentElement.classList.remove('dark');
-        } else {
-            // system
-            if (prefersDark.matches) {
+        function applyTheme(theme) {
+            if (theme === 'dark') {
                 document.documentElement.classList.add('dark');
+            } else if (theme === 'light') {
+                document.documentElement.classList.remove('dark');
             } else {
-                var h = new Date().getHours();
-                if (h >= 20 || h < 7) {
+                // system
+                if (prefersDark.matches) {
                     document.documentElement.classList.add('dark');
                 } else {
                     document.documentElement.classList.remove('dark');
                 }
             }
         }
+
+        var theme = localStorage.getItem('chess_theme') || 'system';
+        applyTheme(theme);
+
+        // Слухач зміни системної теми ОС в режимі 'system'
+        if (prefersDark.addEventListener) {
+            prefersDark.addEventListener('change', function (e) {
+                var current = localStorage.getItem('chess_theme') || 'system';
+                if (current === 'system') {
+                    if (e.matches) {
+                        document.documentElement.classList.add('dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                    }
+                }
+            });
+        }
+
+        window.applyTheme = applyTheme;
     } catch (e) { /* silent fail */ }
 })();
+

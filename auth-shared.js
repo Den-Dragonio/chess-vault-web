@@ -26,32 +26,63 @@ function bindRegTrigger() {
     if (el) el.onclick = (e) => { e.preventDefault(); window.location.href = 'index.html'; };
 }
 
-auth.onAuthStateChanged((user) => {
+function updateSharedAuthUI(user) {
     const accBtn = document.getElementById('acc-btn');
     const accDropdown = document.getElementById('acc-dropdown');
     const myAccountLink = document.getElementById('nav-my-account');
+    const t = (k) => window.i18n ? window.i18n.t(k) : k;
 
     if (user) {
         const name = user.displayName || user.email.split('@')[0];
         if (accBtn) accBtn.textContent = `👤 ${name} ▾`;
-        if (myAccountLink) myAccountLink.style.display = 'inline';
+        if (myAccountLink) {
+            myAccountLink.style.display = 'inline';
+            myAccountLink.textContent = t('nav_my_account');
+        }
         if (accDropdown) {
-            accDropdown.innerHTML = `<a href="#" id="logout-btn">🚪 Вийти</a>`;
+            accDropdown.innerHTML = `<a href="#" id="logout-btn">🚪 ${t('nav_logout')}</a>`;
             document.getElementById('logout-btn').onclick = async (e) => {
                 e.preventDefault();
                 await auth.signOut();
             };
         }
     } else {
-        if (accBtn) accBtn.textContent = 'Аккаунт ▾';
+        if (accBtn) accBtn.textContent = `${t('nav_account')} ▾`;
         if (myAccountLink) myAccountLink.style.display = 'none';
         if (accDropdown) {
             accDropdown.innerHTML = `
-                <a href="#" id="login-trigger">🔑 Вхід</a>
-                <a href="#" id="reg-trigger">📝 Реєстрація</a>
+                <a href="#" id="login-trigger">🔑 ${t('nav_login')}</a>
+                <a href="#" id="reg-trigger">📝 ${t('nav_register')}</a>
             `;
             bindLoginTrigger();
             bindRegTrigger();
         }
     }
+}
+
+auth.onAuthStateChanged(async (user) => {
+    if (user) {
+        // Завантаження збережених налаштувань теми та мови з Firestore
+        try {
+            const prefSnap = await window.db.collection('user_preferences').doc(user.uid).get();
+            if (prefSnap.exists) {
+                const prefs = prefSnap.data();
+                if (prefs.theme) {
+                    localStorage.setItem('chess_theme', prefs.theme);
+                    if (window.applyTheme) window.applyTheme(prefs.theme);
+                }
+                if (prefs.language && window.i18n) {
+                    window.i18n.setLanguage(prefs.language, false);
+                }
+            }
+        } catch (err) {
+            console.warn('Could not load user preferences:', err);
+        }
+    }
+    updateSharedAuthUI(user);
 });
+
+window.addEventListener('chessVaultLanguageChanged', () => {
+    updateSharedAuthUI(auth.currentUser);
+});
+

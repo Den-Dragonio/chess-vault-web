@@ -268,7 +268,7 @@ function renderModalSkeleton(book) {
                     ${book.year !== '---' ? `<span class="bd-meta-pill">📅 ${book.year}</span>` : ''}
                     <span class="bd-meta-pill">💾 ${book.sizeDisplay}</span>
                     <span class="bd-meta-pill">📄 ${book.format.toUpperCase()}</span>
-                    ${pages ? `<span class="bd-meta-pill" id="bd-pages-pill">📖 ${pages} стор.</span>` : `<span class="bd-meta-pill" id="bd-pages-pill" style="display:none"></span>`}
+                    ${pages ? `<span class="bd-meta-pill" id="bd-pages-pill">📖 ${pages} ${(window.i18n && window.i18n.currentLang === 'en' ? 'p.' : 'стор.')}</span>` : `<span class="bd-meta-pill" id="bd-pages-pill" style="display:none"></span>`}
                 </div>
                 <div class="bd-hero-actions">
                     <button class="bd-btn-download" id="bd-download-btn"
@@ -277,13 +277,13 @@ function renderModalSkeleton(book) {
                             data-author="${escHtml(book.author || '')}"
                             data-id="${escHtml(book.id || '')}"
                             data-format="${escHtml(book.format || '')}"
-                            data-size="${escHtml(book.sizeDisplay || '')}">⬇ Скачати (${book.sizeDisplay || 'файл'})</button>
+                            data-size="${escHtml(book.sizeDisplay || '')}">${window.i18n ? window.i18n.t('modal_btn_download', { size: book.sizeDisplay || (window.i18n.currentLang === 'en' ? 'file' : 'файл') }) : `⬇ Скачати (${book.sizeDisplay || 'файл'})`}</button>
                 </div>
             </div>
         </div>
         <hr class="bd-divider">
         <div>
-            <p class="bd-section-label">Про книгу</p>
+            <p class="bd-section-label">${window.i18n ? window.i18n.t('modal_section_about') : 'Про книгу'}</p>
             <div class="bd-skeleton">
                 <div class="bd-skeleton-line" style="width:95%"></div>
                 <div class="bd-skeleton-line" style="width:85%"></div>
@@ -538,10 +538,17 @@ function renderModalFull(book, meta) {
             <span class="bd-placeholder-text">Обкладинка<br>не знайдена</span>
         </div>`;
 
+    const isEn = window.i18n && window.i18n.currentLang === 'en';
+    const topicsLabel = window.i18n ? window.i18n.t('modal_section_topics') : 'Теми';
+    const aboutBookLabel = window.i18n ? window.i18n.t('modal_section_about') : 'Про книгу';
+    const aboutAuthorLabel = window.i18n ? window.i18n.t('modal_section_author') : 'Про автора';
+    const wikiLabel = window.i18n ? window.i18n.t('modal_wiki_link') : 'Стаття у Вікіпедії';
+    const journalLabel = window.i18n ? window.i18n.t('modal_journal_tag') : 'Журнал "64"';
+
     // Теги
     const subjectsHTML = subjects.length > 0
         ? `<hr class="bd-divider"><div>
-               <p class="bd-section-label">Теми</p>
+               <p class="bd-section-label">${topicsLabel}</p>
                <div class="bd-subjects">
                    ${subjects.map(s => `<span class="bd-subject-chip">🏷️ ${escHtml(s)}</span>`).join('')}
                </div>
@@ -550,15 +557,15 @@ function renderModalFull(book, meta) {
     // Мітки
     const sourceMap = { 
         openlibrary: '📖 Open Library', 
-        journal_catalog: '📰 Шаховий каталог',
-        book_ocr: '📄 Анотація з книги',
-        wikipedia: '🌐 Вікіпедія',
-        author_bio: '✍️ Біографія автора',
-        smart_summary: '♟ Шаховий довідник',
-        notfound: '📄 Файл' 
+        journal_catalog: isEn ? '📰 Chess Catalog' : '📰 Шаховий каталог',
+        book_ocr: isEn ? '📄 Book Annotation' : '📄 Анотація з книги',
+        wikipedia: isEn ? '🌐 Wikipedia' : '🌐 Вікіпедія',
+        author_bio: isEn ? '✍️ Author Biography' : '✍️ Біографія автора',
+        smart_summary: isEn ? '♟ Chess Reference' : '♟ Шаховий довідник',
+        notfound: isEn ? '📄 File' : '📄 Файл' 
     };
-    const sourceLabel = sourceMap[source] || '📄 Файл';
-    const journalBadge = isJournal ? `<span class="bd-meta-pill">📰 Журнал "64"</span>` : '';
+    const sourceLabel = sourceMap[source] || (isEn ? '📄 File' : '📄 Файл');
+    const journalBadge = isJournal ? `<span class="bd-meta-pill">📰 ${journalLabel}</span>` : '';
 
     // Опис книги
     const bookDesc = meta?.bookDescription || meta?.description || '';
@@ -570,27 +577,34 @@ function renderModalFull(book, meta) {
     } else if (isJournal) {
         const parts = book.id.replace(/\.[^/.]+$/, '').split('-');
         const num = parts[2] ? `№${parseInt(parts[2])}` : '';
-        bookDescHTML = `<p class="bd-p"><span style="opacity:0.65">Шаховий журнал «64» — ${parts[1] || ''} рік, ${num}. Відкрийте файл щоб переглянути вміст та аналізи партій.</span></p>`;
+        const journalDesc = isEn
+            ? `Chess magazine «64» — ${parts[1] || ''}, ${num}. Open the file to review contents and game analyses.`
+            : `Шаховий журнал «64» — ${parts[1] || ''} рік, ${num}. Відкрийте файл щоб переглянути вміст та аналізи партій.`;
+        bookDescHTML = `<p class="bd-p"><span style="opacity:0.65">${journalDesc}</span></p>`;
     } else {
-        bookDescHTML = `<p class="bd-p"><span style="opacity:0.55">Опис для цієї книги готується. Ви можете завантажити книгу та ознайомитися з її змістом.</span></p>`;
+        const descPreparing = window.i18n ? window.i18n.t('modal_desc_preparing') : 'Опис для цієї книги готується. Ви можете завантажити книгу та ознайомитися з її змістом.';
+        bookDescHTML = `<p class="bd-p"><span style="opacity:0.55">${descPreparing}</span></p>`;
     }
 
     const authorBioHTML = authorBio ? `
         <hr class="bd-divider">
         <div class="bd-section">
-            <p class="bd-section-label">✍️ Про автора</p>
+            <p class="bd-section-label">✍️ ${aboutAuthorLabel}</p>
             <div class="bd-description bd-author-bio">${formatDescriptionText(authorBio)}</div>
         </div>` : '';
 
     let extBtnHTML = '';
     if (meta?.wikiUrl) {
-        extBtnHTML = `<a class="bd-btn-openlibrary" href="${escHtml(meta.wikiUrl)}" target="_blank" rel="noopener">🌐 Стаття у Вікіпедії</a>`;
+        extBtnHTML = `<a class="bd-btn-openlibrary" href="${escHtml(meta.wikiUrl)}" target="_blank" rel="noopener">🌐 ${wikiLabel}</a>`;
     } else if (olKey) {
         extBtnHTML = `<a class="bd-btn-openlibrary" href="https://openlibrary.org${olKey}" target="_blank" rel="noopener">🌐 Open Library</a>`;
     }
 
     const pages = getBookPages(book, meta);
-    const pagesPill = pages ? `<span class="bd-meta-pill" id="bd-pages-pill">📖 ${pages} стор.</span>` : '';
+    const pagesSuffix = isEn ? ' p.' : ' стор.';
+    const pagesPill = pages ? `<span class="bd-meta-pill" id="bd-pages-pill">📖 ${pages}${pagesSuffix}</span>` : '';
+    const dlBtnLabel = window.i18n ? window.i18n.t('modal_btn_download', { size: book.sizeDisplay || (isEn ? 'file' : 'файл') }) : `⬇ Скачати (${book.sizeDisplay || 'файл'})`;
+    const sourceDataText = window.i18n ? window.i18n.t('modal_source_data', { source: sourceLabel }) : `Дані: ${sourceLabel}`;
 
     card.innerHTML = `
         <button id="book-detail-close">✕</button>
@@ -616,15 +630,15 @@ function renderModalFull(book, meta) {
                             data-author="${escHtml(book.author || '')}"
                             data-id="${escHtml(book.id || '')}"
                             data-format="${escHtml(book.format || '')}"
-                            data-size="${escHtml(book.sizeDisplay || '')}">⬇ Скачати (${book.sizeDisplay || 'файл'})</button>
+                            data-size="${escHtml(book.sizeDisplay || '')}">${dlBtnLabel}</button>
                     ${extBtnHTML}
                 </div>
-                ${source !== 'notfound' ? `<p class="bd-source-badge">Дані: ${sourceLabel}</p>` : ''}
+                ${source !== 'notfound' ? `<p class="bd-source-badge">${sourceDataText}</p>` : ''}
             </div>
         </div>
         <hr class="bd-divider">
         <div class="bd-section">
-            <p class="bd-section-label">📖 Про книгу</p>
+            <p class="bd-section-label">📖 ${aboutBookLabel}</p>
             <div class="bd-description">${bookDescHTML}</div>
         </div>
         ${authorBioHTML}
@@ -769,8 +783,10 @@ async function onDownloadClick(btn) {
     if (!btn) return;
     const user = getAuthUser();
 
+    const isEn = window.i18n && window.i18n.currentLang === 'en';
+
     if (!user) {
-        const msg = 'Щоб завантажити книгу — будь ласка, увійдіть в аккаунт!';
+        const msg = isEn ? 'To download a book, please log in to your account!' : 'Щоб завантажити книгу — будь ласка, увійдіть в аккаунт!';
         const onLogin = () => {
             const loginModal = document.getElementById('login-modal');
             if (loginModal && typeof openModal === 'function') {
@@ -784,7 +800,7 @@ async function onDownloadClick(btn) {
                 }
             }
         };
-        showToast(msg, 'warn', 'Увійти 🔑', onLogin);
+        showToast(msg, 'warn', isEn ? 'Log In 🔑' : 'Увійти 🔑', onLogin);
         return;
     }
 
@@ -829,9 +845,9 @@ async function onDownloadClick(btn) {
                 repeatCount: firebase.firestore.FieldValue.increment(1)
             }, { merge: true });
 
-            const msg = `📥 Книгу завантажено знову (повторне завантаження)`;
-            if (typeof showLibToast === 'function') showLibToast(msg);
-            else if (typeof showToast === 'function') showToast(msg);
+            const repeatMsg = isEn ? '📥 Book downloaded again' : '📥 Книгу завантажено знову (повторне завантаження)';
+            if (typeof showLibToast === 'function') showLibToast(repeatMsg);
+            else if (typeof showToast === 'function') showToast(repeatMsg);
             return;
         }
 
@@ -871,9 +887,9 @@ async function onDownloadClick(btn) {
 
         await batch.commit();
 
-        const msg = `📥 Завантаження розпочато!`;
-        if (typeof showLibToast === 'function') showLibToast(msg);
-        else if (typeof showToast === 'function') showToast(msg);
+        const startMsg = window.i18n ? window.i18n.t('modal_download_success', { title: title || filename }) : `📥 Завантаження розпочато!`;
+        if (typeof showLibToast === 'function') showLibToast(startMsg);
+        else if (typeof showToast === 'function') showToast(startMsg);
 
     } catch (e) {
         console.error('Firestore download tracking error:', e);

@@ -32,6 +32,10 @@ function renderChampionsList() {
     const listContainer = document.getElementById('champions-list');
     if (!listContainer) return;
 
+    const isEn = window.i18n && window.i18n.currentLang === 'en';
+    const authPillText = isEn ? 'auth.' : 'авт.';
+    const aboutPillText = isEn ? 'about' : 'про нього';
+
     listContainer.innerHTML = WORLD_CHAMPIONS_DATA.map(champ => {
         const authorPillClass = champ.authorBooksCount > 0 ? 'has-books' : '';
         const aboutPillClass = champ.aboutBooksCount > 0 ? 'has-books' : '';
@@ -52,10 +56,10 @@ function renderChampionsList() {
                 </div>
                 <div class="champ-row-stats">
                     <span class="champ-pill ${authorPillClass}" title="Книг авторства">
-                        ✍️ ${champ.authorBooksCount} авт.
+                        ✍️ ${champ.authorBooksCount} ${authPillText}
                     </span>
                     <span class="champ-pill ${aboutPillClass}" title="Книг про нього або збірок партій">
-                        📖 ${champ.aboutBooksCount} про нього
+                        📖 ${champ.aboutBooksCount} ${aboutPillText}
                     </span>
                 </div>
                 <span class="champ-row-arrow">›</span>
@@ -114,14 +118,18 @@ function openChampionModal(champ) {
     const modalBody = document.getElementById('champion-modal-body');
     if (!modalBody) return;
 
+    const isEn = window.i18n && window.i18n.currentLang === 'en';
+
     const numDisplay = typeof champ.number === 'number' 
-        ? `${champ.number}-й Чемпіон Світу` 
-        : `Чемпіон Світу (${champ.number})`;
+        ? (isEn ? `${champ.number}th World Champion` : `${champ.number}-й Чемпіон Світу`)
+        : (isEn ? `World Champion (${champ.number})` : `Чемпіон Світу (${champ.number})`);
 
     const factsHtml = champ.facts.map(f => `<li>${f}</li>`).join('');
 
     // Генерація списку авторських книг
-    let authorBooksHtml = '<p class="chm-empty-books">У сховищі поки немає окремих видань авторства.</p>';
+    let authorBooksHtml = isEn 
+        ? '<p class="chm-empty-books">No separate authored books in vault yet.</p>'
+        : '<p class="chm-empty-books">У сховищі поки немає окремих видань авторства.</p>';
     if (champ.authorBooks && champ.authorBooks.length > 0) {
         authorBooksHtml = `
             <div class="chm-books-scroll-list">
@@ -135,7 +143,9 @@ function openChampionModal(champ) {
     }
 
     // Генерація списку книг про нього
-    let aboutBooksHtml = '<p class="chm-empty-books">У сховищі поки немає окремих книг про цього шахіста.</p>';
+    let aboutBooksHtml = isEn
+        ? '<p class="chm-empty-books">No separate books about this player in vault yet.</p>'
+        : '<p class="chm-empty-books">У сховищі поки немає окремих книг про цього шахіста.</p>';
     if (champ.aboutBooks && champ.aboutBooks.length > 0) {
         aboutBooksHtml = `
             <div class="chm-books-scroll-list">
@@ -147,6 +157,15 @@ function openChampionModal(champ) {
             </div>
         `;
     }
+
+    const reignLabel = isEn ? 'Reign' : 'Час правління';
+    const peakEloLabel = isEn ? 'Peak rating:' : 'Піковий рейтинг:';
+    const authorBooksLabel = isEn ? 'Authored books:' : 'Авторських книг:';
+    const aboutBooksLabel = isEn ? 'Books about him:' : 'Книг про нього:';
+    const aboutChampTitle = isEn ? 'About Champion' : 'Про шахіста';
+    const factsTitle = isEn ? 'Interesting Facts' : 'Цікаві факти';
+    const authorColTitle = isEn ? `Authored Books (${champ.authorBooksCount})` : `Книги авторства (${champ.authorBooksCount})`;
+    const aboutColTitle = isEn ? `Books About Him & Matches (${champ.aboutBooksCount})` : `Книги про нього та матчі (${champ.aboutBooksCount})`;
 
     modalBody.innerHTML = `
         <!-- ВЕРХНЯ ЧАСТИНА: фото 200x280 (як обкладинка книги) + інформація -->
@@ -161,20 +180,20 @@ function openChampionModal(champ) {
                 </div>
                 <h2 class="chm-name">${champ.name}</h2>
                 <div class="chm-reign-badge">
-                    <span>Час правління: <strong>${champ.years}</strong></span>
+                    <span>${reignLabel}: <strong>${champ.years}</strong></span>
                 </div>
                 <div class="chm-counts-summary">
                     ${champ.peakEloDisplay ? `
                     <div class="chm-count-pill">
-                        <span>⚡ Піковий рейтинг:</span>
+                        <span>⚡ ${peakEloLabel}</span>
                         <strong class="chm-elo-val">${champ.peakEloDisplay}</strong>
                     </div>` : ''}
                     <div class="chm-count-pill">
-                        <span>✍️ Авторських книг:</span>
+                        <span>✍️ ${authorBooksLabel}</span>
                         <strong>${champ.authorBooksCount}</strong>
                     </div>
                     <div class="chm-count-pill">
-                        <span>📖 Книг про нього:</span>
+                        <span>📖 ${aboutBooksLabel}</span>
                         <strong>${champ.aboutBooksCount}</strong>
                     </div>
                 </div>
@@ -183,12 +202,12 @@ function openChampionModal(champ) {
 
         <!-- ОПИС ТА ЦІКАВІ ФАКТИ -->
         <div class="chm-section">
-            <h3 class="chm-section-title">📖 Про шахіста</h3>
+            <h3 class="chm-section-title">📖 ${aboutChampTitle}</h3>
             <p class="chm-bio-text">${champ.bio}</p>
         </div>
 
         <div class="chm-section">
-            <h3 class="chm-section-title">⚡ Цікаві факти</h3>
+            <h3 class="chm-section-title">⚡ ${factsTitle}</h3>
             <ul class="chm-facts-list">
                 ${factsHtml}
             </ul>
@@ -197,12 +216,12 @@ function openChampionModal(champ) {
         <!-- СПИСКИ КНИГ З ПРЯМИМ ПЕРЕХОДОМ НА МОДАЛКУ ТВОРУ -->
         <div class="chm-books-columns">
             <div class="chm-books-block">
-                <h3 class="chm-section-title">✍️ Книги авторства (${champ.authorBooksCount})</h3>
+                <h3 class="chm-section-title">✍️ ${authorColTitle}</h3>
                 ${authorBooksHtml}
             </div>
 
             <div class="chm-books-block">
-                <h3 class="chm-section-title">📖 Книги про нього та матчі (${champ.aboutBooksCount})</h3>
+                <h3 class="chm-section-title">📖 ${aboutColTitle}</h3>
                 ${aboutBooksHtml}
             </div>
         </div>
@@ -288,3 +307,10 @@ function escapeHtml(str) {
 
 window.closeChampionModal = closeChampionModal;
 window.openBookModalFromFilename = openBookModalFromFilename;
+
+window.addEventListener('chessVaultLanguageChanged', () => {
+    if (typeof renderChampionsList === 'function') {
+        renderChampionsList();
+    }
+});
+

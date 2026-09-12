@@ -52,11 +52,15 @@ function updateLibraryStats(books) {
     const totalCount = books.length;
     const totalBytes = books.reduce((sum, b) => sum + (b.sizeRaw || 0), 0);
     const totalGB = totalBytes / 1024 / 1024 / 1024;
+    const isEn = window.i18n && window.i18n.currentLang === 'en';
+    const unitGB = isEn ? 'GB' : 'ГБ';
+    const unitMB = isEn ? 'MB' : 'МБ';
     const sizeStr = totalGB >= 1
-        ? totalGB.toFixed(2) + ' ГБ'
-        : (totalBytes / 1024 / 1024).toFixed(0) + ' МБ';
+        ? totalGB.toFixed(2) + ' ' + unitGB
+        : (totalBytes / 1024 / 1024).toFixed(0) + ' ' + unitMB;
     const statsEl = document.getElementById('lib-stats');
-    if (statsEl) statsEl.textContent = `📚 ${totalCount} файлів · 💾 ${sizeStr}`;
+    const filesLabel = isEn ? 'files' : 'файлів';
+    if (statsEl) statsEl.textContent = `📚 ${totalCount} ${filesLabel} · 💾 ${sizeStr}`;
 }
 
 function applyUrlSearch() {
@@ -241,8 +245,13 @@ async function fetchArchiveData() {
 function renderTable(books) {
     const container = document.getElementById('books-table-body');
     if (!container) return;
+    const isEn = window.i18n && window.i18n.currentLang === 'en';
+    const noBooksMsg = window.i18n ? window.i18n.t('lib_no_books') : 'Нічого не знайдено';
+    const dlText = isEn ? 'Download' : 'Скачати';
+    const pageSuffix = isEn ? ' p.' : ' с.';
+
     if (books.length === 0) {
-        container.innerHTML = `<tr><td colspan="7" class="loading-row">📭 Нічого не знайдено</td></tr>`;
+        container.innerHTML = `<tr><td colspan="7" class="loading-row">📭 ${noBooksMsg}</td></tr>`;
         return;
     }
     container.innerHTML = books.map((b, idx) => `
@@ -250,7 +259,7 @@ function renderTable(books) {
             <td class="col-author">${b.author}</td>
             <td class="col-title">${b.title}</td>
             <td class="col-year">${b.year}</td>
-            <td class="col-pages">${b.pages ? b.pages + ' с.' : '—'}</td>
+            <td class="col-pages">${b.pages ? b.pages + pageSuffix : '—'}</td>
             <td class="col-format"><span class="badge format-${b.format}">${b.format}</span></td>
             <td class="col-size">${b.sizeDisplay}</td>
             <td class="col-action">
@@ -261,7 +270,7 @@ function renderTable(books) {
                         data-id="${b.id.replace(/"/g, '&quot;')}"
                         data-format="${b.format}"
                         data-size="${b.sizeDisplay}">
-                    <span>⬇</span><span>Скачати</span>
+                    <span>⬇</span><span>${dlText}</span>
                 </button>
             </td>
         </tr>
@@ -337,5 +346,16 @@ function sortBooks(key) {
         renderTable(allBooks);
     }
 }
+
+window.addEventListener('chessVaultLanguageChanged', () => {
+    if (typeof renderFilteredBooks === 'function') {
+        renderFilteredBooks();
+    } else if (allBooks && allBooks.length > 0) {
+        renderTable(allBooks);
+    }
+    if (allBooks && allBooks.length > 0) {
+        updateLibraryStats(allBooks);
+    }
+});
 
 fetchArchiveData();

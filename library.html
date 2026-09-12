@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="collections.css">
     <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
     <script src="dark-mode-init.js"></script>
+    <script src="i18n.js?v=1"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -22,14 +23,15 @@
     <header class="main-header">
         <nav class="nav-menu">
             <button class="hamburger" onclick="this.closest('nav').classList.toggle('open')">☰</button>
-            <a href="index.html">Головна</a>
-            <a href="profile.html" id="nav-my-account" style="display:none;">Мій Аккаунт</a>
-            <a href="library.html" class="active-link">Бібліотека</a>
+            <a href="index.html" data-i18n="nav_home">Головна</a>
+            <a href="profile.html" id="nav-my-account" style="display:none;" data-i18n="nav_my_account">Мій Аккаунт</a>
+            <a href="library.html" class="active-link" data-i18n="nav_library">Бібліотека</a>
+            <a href="#" class="lang-switcher-toggle" id="lang-switcher-toggle" onclick="event.preventDefault(); i18n.toggleLanguage();">🌐 ENG</a>
             <div class="dropdown">
-                <a class="dropbtn" id="acc-btn">Аккаунт ▾</a>
+                <a class="dropbtn" id="acc-btn"><span data-i18n="nav_account">Аккаунт</span> ▾</a>
                 <div class="dropdown-content" id="acc-dropdown">
-                    <a href="#" id="login-trigger">🔑 Вхід</a>
-                    <a href="#" id="reg-trigger">📝 Реєстрація</a>
+                    <a href="#" id="login-trigger">🔑 <span data-i18n="nav_login">Вхід</span></a>
+                    <a href="#" id="reg-trigger">📝 <span data-i18n="nav_register">Реєстрація</span></a>
                 </div>
             </div>
         </nav>
@@ -43,19 +45,19 @@
             <div class="collections-switcher">
                 <button class="collections-tab-btn active" data-view="all" onclick="switchCollectionView('all')">
                     <span class="tab-icon">📚</span>
-                    <span>Всі книги</span>
+                    <span data-i18n="lib_tab_all">Всі книги</span>
                 </button>
                 <button class="collections-tab-btn" data-view="topics" onclick="switchCollectionView('topics')">
                     <span class="tab-icon">♟️</span>
-                    <span>Розділи гри</span>
+                    <span data-i18n="lib_tab_topics">Розділи гри</span>
                 </button>
                 <button class="collections-tab-btn" data-view="authors" onclick="switchCollectionView('authors')">
                     <span class="tab-icon">👤</span>
-                    <span>За авторами</span>
+                    <span data-i18n="lib_tab_authors">За авторами</span>
                 </button>
                 <button class="collections-tab-btn" data-view="stats" onclick="switchCollectionView('stats')">
                     <span class="tab-icon">📊</span>
-                    <span>Статистика БД</span>
+                    <span data-i18n="lib_tab_stats">Статистика БД</span>
                 </button>
             </div>
         </div>
@@ -72,7 +74,7 @@
         <div id="collections-authors-wrap" style="display: none;">
             <div class="authors-toolbar">
                 <div class="authors-search-box">
-                    <input type="text" id="authors-search-input" class="authors-search-input" placeholder="🔍 Пошук автора серед колекцій...">
+                    <input type="text" id="authors-search-input" class="authors-search-input" placeholder="🔍 Пошук автора серед колекцій..." data-i18n-placeholder="lib_authors_search_ph">
                 </div>
                 <div class="alphabet-bar" id="authors-alphabet-bar"></div>
             </div>
@@ -83,15 +85,15 @@
         <div id="collections-stats-wrap" class="collections-stats-wrap" style="display: none;"></div>
 
         <div class="search-box">
-            <input type="text" id="lib-search-input" placeholder="Шукати за автором, назвою або роком...">
+            <input type="text" id="lib-search-input" placeholder="Шукати за автором, назвою або роком..." data-i18n-placeholder="lib_search_ph">
         </div>
 
         <div class="sort-controls">
-            <span class="sort-label">Упорядкувати:</span>
-            <button class="sort-btn" onclick="sortBooks('author')">🔤 Автор</button>
-            <button class="sort-btn" onclick="sortBooks('year')">📅 Дата</button>
-            <button class="sort-btn" onclick="sortBooks('pages')">📄 Стор.</button>
-            <button class="sort-btn" onclick="sortBooks('sizeRaw')">⚖️ Розмір</button>
+            <span class="sort-label" data-i18n="lib_sort_label">Упорядкувати:</span>
+            <button class="sort-btn" onclick="sortBooks('author')">🔤 <span data-i18n="lib_sort_author">Автор</span></button>
+            <button class="sort-btn" onclick="sortBooks('year')">📅 <span data-i18n="lib_sort_year">Дата</span></button>
+            <button class="sort-btn" onclick="sortBooks('pages')">📄 <span data-i18n="lib_sort_pages">Стор.</span></button>
+            <button class="sort-btn" onclick="sortBooks('sizeRaw')">⚖️ <span data-i18n="lib_sort_size">Розмір</span></button>
             <span class="lib-stats" id="lib-stats"></span>
         </div>
 
@@ -101,18 +103,18 @@
                 <table class="books-table">
                     <thead>
                         <tr>
-                            <th class="col-author">Автор</th>
-                            <th class="col-title">Назва книги</th>
-                            <th class="col-year">Рік</th>
-                            <th class="col-pages">Стор.</th>
-                            <th class="col-format">Вид</th>
-                            <th class="col-size">Вага</th>
-                            <th class="col-action">Дія</th>
+                            <th class="col-author" data-i18n="lib_th_author">Автор</th>
+                            <th class="col-title" data-i18n="lib_th_title">Назва книги</th>
+                            <th class="col-year" data-i18n="lib_th_year">Рік</th>
+                            <th class="col-pages" data-i18n="lib_th_pages">Стор.</th>
+                            <th class="col-format" data-i18n="lib_th_format">Вид</th>
+                            <th class="col-size" data-i18n="lib_th_size">Вага</th>
+                            <th class="col-action" data-i18n="lib_th_action">Дія</th>
                         </tr>
                     </thead>
                     <tbody id="books-table-body">
                         <tr>
-                            <td colspan="7" class="loading-row">⏳ Завантаження бібліотеки...</td>
+                            <td colspan="7" class="loading-row" data-i18n="lib_loading">⏳ Завантаження бібліотеки...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -131,14 +133,14 @@
     </div>
 
 
-    <script src="auth-shared.js?v=2"></script>
-    <script src="page_counts.js?v=2"></script>
-    <script src="descriptions.js?v=2"></script>
-    <script src="book-modal.js?v=2"></script>
-    <script src="collections-data.js?v=2"></script>
-    <script src="collections.js?v=2"></script>
-    <script src="books-cache.js?v=2"></script>
-    <script src="library.js?v=2"></script>
+    <script src="auth-shared.js?v=3"></script>
+    <script src="page_counts.js?v=3"></script>
+    <script src="descriptions.js?v=3"></script>
+    <script src="book-modal.js?v=3"></script>
+    <script src="collections-data.js?v=3"></script>
+    <script src="collections.js?v=3"></script>
+    <script src="books-cache.js?v=3"></script>
+    <script src="library.js?v=3"></script>
 </body>
 
 </html>
