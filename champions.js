@@ -254,14 +254,19 @@ function openBookModalFromFilename(filename) {
         || (window.CHESS_DESCRIPTIONS && (window.CHESS_DESCRIPTIONS[filename]?.pages || window.CHESS_DESCRIPTIONS[filename.toLowerCase()]?.pages))
         || null;
 
+    const cachedBook = window.CHESS_BOOKS_CACHE && window.CHESS_BOOKS_CACHE.find(b => b.id === filename || b.id.toLowerCase() === filename.toLowerCase());
+    const sizeDisplay = cachedBook ? cachedBook.sizeDisplay : '—';
+    const sizeRaw = cachedBook ? cachedBook.sizeRaw : 0;
+
     const bookObj = {
         id: filename,
-        title: title || cleanName,
-        author: author,
-        year: year,
-        pages: pages ? parseInt(pages, 10) : null,
+        title: title || (cachedBook ? cachedBook.title : cleanName),
+        author: author || (cachedBook ? cachedBook.author : ''),
+        year: year !== '---' ? year : (cachedBook ? cachedBook.year : '---'),
+        pages: pages ? parseInt(pages, 10) : (cachedBook ? cachedBook.pages : null),
         format: format,
-        sizeDisplay: '—',
+        sizeDisplay: sizeDisplay,
+        sizeRaw: sizeRaw,
         url: `https://archive.org/download/1971_20260223/${encodeURIComponent(filename)}`
     };
 

@@ -45,16 +45,100 @@ if (grid) {
 auth.onAuthStateChanged(user => { currentUser = user; });
 
 // =============================================
-// ЗАВАНТАЖЕННЯ ДАНИХ З ARCHIVE.ORG
+// =============================================
+// СТАТИСТИКА ТА ДОПОМІЖНІ ФУНКЦІЇ
+// =============================================
+function updateLibraryStats(books) {
+    const totalCount = books.length;
+    const totalBytes = books.reduce((sum, b) => sum + (b.sizeRaw || 0), 0);
+    const totalGB = totalBytes / 1024 / 1024 / 1024;
+    const sizeStr = totalGB >= 1
+        ? totalGB.toFixed(2) + ' ГБ'
+        : (totalBytes / 1024 / 1024).toFixed(0) + ' МБ';
+    const statsEl = document.getElementById('lib-stats');
+    if (statsEl) statsEl.textContent = `📚 ${totalCount} файлів · 💾 ${sizeStr}`;
+}
+
+function applyUrlSearch() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchParam = urlParams.get('search');
+    if (searchParam) {
+        const searchInput = document.getElementById('lib-search-input');
+        if (searchInput) {
+            searchInput.value = searchParam;
+            if (typeof renderFilteredBooks === 'function') {
+                renderFilteredBooks();
+            } else {
+                searchInput.dispatchEvent(new Event('input'));
+            }
+        }
+    }
+}
+
+function getLocalCachedBooks() {
+    // 1. Попередньо скомпільований кеш з books-cache.js (швидкість 0 мс)
+    if (window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE) && window.CHESS_BOOKS_CACHE.length > 0) {
+        return window.CHESS_BOOKS_CACHE;
+    }
+    // 2. Локальне сховище браузера (localStorage)
+    try {
+        const stored = localStorage.getItem('chess_vault_books_cache');
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                return parsed;
+            }
+        }
+    } catch (e) {
+        console.warn('Помилка читання localStorage:', e);
+    }
+    return null;
+}
+
+// =============================================
+// ЗАВАНТАЖЕННЯ ДАНИХ З ARCHIVE.ORG + OFFLINE-FALLBACK
 // =============================================
 async function fetchArchiveData() {
+    // ЕТАП 1: Миттєво відображаємо збережений каталог (0 секунд затримки)
+    const cached = getLocalCachedBooks();
+    let hasLoadedCache = false;
+
+    if (cached && cached.length > 0) {
+        allBooks = cached;
+        hasLoadedCache = true;
+        if (typeof initCollections === 'function') {
+            initCollections(allBooks);
+        } else {
+            renderTable(allBooks);
+        }
+        updateLibraryStats(allBooks);
+        applyUrlSearch();
+    }
+
+    // ЕТАП 2: У фоновому режимі перевіряємо свіжі оновлення з Internet Archive
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
+
     try {
-        const response = await fetch(`https://archive.org/metadata/${ARCHIVE_ID}?_=${Date.now()}`, { cache: 'no-store' });
+        const response = await fetch(`https://archive.org/metadata/${ARCHIVE_ID}?_=${Date.now()}`, {
+            signal: controller.signal,
+            headers: { 'Accept': 'application/json' }
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
         const data = await response.json();
+        if (!data || !Array.isArray(data.files)) {
+            throw new Error('Некоректний формат відповіді від сервера Archive.org');
+        }
+
         const ALLOWED = ['.pdf', '.djvu', '.epub', '.cbr', '.cbz', '.txt', '.doc', '.docx'];
         const files = data.files.filter(f => ALLOWED.some(ext => f.name.toLowerCase().endsWith(ext)));
 
-        allBooks = files.map(f => {
+        const freshBooks = files.map(f => {
             const fileName = f.name.replace(/\.[^/.]+$/, '');
             const match = fileName.match(/(.*?)\s*-\s*(.*)\s*\((\d{4})\)/);
             const bookId = f.name;
@@ -66,32 +150,32 @@ async function fetchArchiveData() {
                 title: match ? match[2].trim() : fileName,
                 year: match ? match[3] : '---',
                 pages: pages ? parseInt(pages, 10) : null,
-                format: f.name.split('.').pop(),
+                format: f.name.split('.').pop().toLowerCase(),
                 sizeDisplay: (f.size / 1024 / 1024).toFixed(2) + ' MB',
                 sizeRaw: parseInt(f.size),
                 url: `https://archive.org/download/${ARCHIVE_ID}/${f.name}`,
                 id: f.name
             };
         });
-        // Ініціалізуємо колекції (розділи гри та авторів)
-        if (typeof initCollections === 'function') {
-            initCollections(allBooks);
-        } else {
-            renderTable(allBooks);
-        }
 
-        // Автоматичний пошук з URL-параметрів (наприклад: library.html?search=Каспаров)
-        const urlParams = new URLSearchParams(window.location.search);
-        const searchParam = urlParams.get('search');
-        if (searchParam) {
-            const searchInput = document.getElementById('lib-search-input');
-            if (searchInput) {
-                searchInput.value = searchParam;
-                if (typeof renderFilteredBooks === 'function') {
-                    renderFilteredBooks();
+        if (freshBooks.length > 0) {
+            // Зберігаємо свіжі дані в localStorage
+            try {
+                localStorage.setItem('chess_vault_books_cache', JSON.stringify(freshBooks));
+            } catch (e) {}
+
+            // Якщо кількість книг або стан змінився, оновлюємо UI
+            const countChanged = freshBooks.length !== allBooks.length;
+            allBooks = freshBooks;
+
+            if (!hasLoadedCache || countChanged) {
+                if (typeof initCollections === 'function') {
+                    initCollections(allBooks);
                 } else {
-                    searchInput.dispatchEvent(new Event('input'));
+                    renderTable(allBooks);
                 }
+                updateLibraryStats(allBooks);
+                applyUrlSearch();
             }
         }
 
@@ -100,19 +184,29 @@ async function fetchArchiveData() {
             autoScrapeNewBooks(allBooks).catch(e => console.warn('autoScrape error:', e));
         }
 
-        // — Статистика —
-        const totalCount = allBooks.length;
-        const totalBytes = allBooks.reduce((sum, b) => sum + (b.sizeRaw || 0), 0);
-        const totalGB = totalBytes / 1024 / 1024 / 1024;
-        const sizeStr = totalGB >= 1
-            ? totalGB.toFixed(2) + ' ГБ'
-            : (totalBytes / 1024 / 1024).toFixed(0) + ' МБ';
-        const statsEl = document.getElementById('lib-stats');
-        if (statsEl) statsEl.textContent = `📚 ${totalCount} файлів · 💾 ${sizeStr}`;
     } catch (err) {
-        console.error('Помилка завантаження:', err);
+        clearTimeout(timeoutId);
+        console.warn('Зв’язок з сервером Archive.org тимчасово обмежено:', err.message);
+
+        // Якщо книги ВЖЕ відображено з локального кешу — не ламаємо інтерфейс!
+        if (hasLoadedCache && allBooks.length > 0) {
+            console.log(`ℹ️ Каталог успішно завантажено з автономного кешу (${allBooks.length} книг).`);
+            return;
+        }
+
+        // Якщо ж кеш відсутній і мережа недоступна — дружнє повідомлення з кнопкою
         const body = document.getElementById('books-table-body');
-        if (body) body.innerHTML = `<tr><td colspan="6" class="loading-row">❌ Помилка завантаження.</td></tr>`;
+        if (body) {
+            body.innerHTML = `
+                <tr>
+                    <td colspan="7" class="loading-row" style="padding: 40px 20px; text-align: center;">
+                        <div style="font-size: 1.3rem; margin-bottom: 8px;">⚠️ Сервери Internet Archive тимчасово недоступні (перевантаження)</div>
+                        <div style="font-size: 0.95rem; opacity: 0.7; margin-bottom: 16px;">Помилка: ${err.message || '502 Bad Gateway / Offline'}</div>
+                        <button onclick="fetchArchiveData()" class="sort-btn" style="padding: 8px 20px; cursor: pointer; font-size: 1rem;">🔄 Спробувати знову</button>
+                    </td>
+                </tr>
+            `;
+        }
     }
 }
 

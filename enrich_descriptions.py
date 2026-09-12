@@ -436,8 +436,13 @@ def main():
         
         time.sleep(0.12)
 
-    # Фінальне збереження
-    save_descriptions(new_db)
+    # Оновлюємо автономний кеш бібліотеки
+    try:
+        import generate_books_cache
+        generate_books_cache.main()
+    except Exception as e:
+        print(f'Попередження при генерації books-cache: {e}')
+
     print('\n' + '=' * 70)
     print(f'🏁 УСПІШНО ЗАВЕРШЕНО!')
     print(f'   • Всього книг у базі: {len(new_db)}')
@@ -445,7 +450,7 @@ def main():
     print(f'   • Додано нових описів: {new_added}')
     if pages_added:
         print(f'   • Додано пропущених сторінок до старих книг: {pages_added}')
-    print(f'\nФайли оновлено:\n  • {DESCRIPTIONS_JSON}\n  • {DESCRIPTIONS_JS}')
+    print(f'\nФайли оновлено:\n  • {DESCRIPTIONS_JSON}\n  • {DESCRIPTIONS_JS}\n  • books-cache.js\n  • books-cache.json')
     print('=' * 70)
 
 if __name__ == '__main__':
