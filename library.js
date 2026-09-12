@@ -96,8 +96,13 @@ function getLocalCachedBooks() {
 }
 
 // =============================================
-// ЗАВАНТАЖЕННЯ ДАНИХ З ARCHIVE.ORG + OFFLINE-FALLBACK
+// ЗАВАНТАЖЕННЯ ДАНИХ З INTERNET ARCHIVE (ТОМ 1 + ТОМ 2)
 // =============================================
+const ARCHIVE_ITEMS = [
+    { id: '1971_20260223', name: 'Том 1' },
+    { id: '1971_20260223_vol2', name: 'Том 2' }
+];
+
 async function fetchArchiveData() {
     // ЕТАП 1: Миттєво відображаємо збережений каталог (0 секунд затримки)
     const cached = getLocalCachedBooks();
@@ -115,58 +120,82 @@ async function fetchArchiveData() {
         applyUrlSearch();
     }
 
-    // ЕТАП 2: У фоновому режимі перевіряємо свіжі оновлення з Internet Archive
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 7000);
-
+    // ЕТАП 2: Опитуємо всі доступні томи Internet Archive паралельно
     try {
-        const response = await fetch(`https://archive.org/metadata/${ARCHIVE_ID}?_=${Date.now()}`, {
-            signal: controller.signal,
-            headers: { 'Accept': 'application/json' }
-        });
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        if (!data || !Array.isArray(data.files)) {
-            throw new Error('Некоректний формат відповіді від сервера Archive.org');
-        }
+        const fetchResults = await Promise.allSettled(
+            ARCHIVE_ITEMS.map(async (vol) => {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 7000);
+                try {
+                    const response = await fetch(`https://archive.org/metadata/${vol.id}?_=${Date.now()}`, {
+                        signal: controller.signal,
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    clearTimeout(timeoutId);
+                    if (!response.ok) return { volId: vol.id, files: [] };
+                    const data = await response.json();
+                    if (!data || !Array.isArray(data.files)) return { volId: vol.id, files: [] };
+                    return { volId: vol.id, files: data.files };
+                } catch (e) {
+                    clearTimeout(timeoutId);
+                    return { volId: vol.id, files: [] };
+                }
+            })
+        );
 
         const ALLOWED = ['.pdf', '.djvu', '.epub', '.cbr', '.cbz', '.txt', '.doc', '.docx'];
-        const files = data.files.filter(f => ALLOWED.some(ext => f.name.toLowerCase().endsWith(ext)));
+        const booksMap = new Map();
 
-        const freshBooks = files.map(f => {
-            const fileName = f.name.replace(/\.[^/.]+$/, '');
-            const match = fileName.match(/(.*?)\s*-\s*(.*)\s*\((\d{4})\)/);
-            const bookId = f.name;
-            const pages = (window.CHESS_PAGE_COUNTS && (window.CHESS_PAGE_COUNTS[bookId] || window.CHESS_PAGE_COUNTS[bookId.toLowerCase()]))
-                || (window.CHESS_DESCRIPTIONS && (window.CHESS_DESCRIPTIONS[bookId]?.pages || window.CHESS_DESCRIPTIONS[bookId.toLowerCase()]?.pages))
-                || null;
-            return {
-                author: match ? match[1].trim() : fileName.split('-')[0].trim(),
-                title: match ? match[2].trim() : fileName,
-                year: match ? match[3] : '---',
-                pages: pages ? parseInt(pages, 10) : null,
-                format: f.name.split('.').pop().toLowerCase(),
-                sizeDisplay: (f.size / 1024 / 1024).toFixed(2) + ' MB',
-                sizeRaw: parseInt(f.size),
-                url: `https://archive.org/download/${ARCHIVE_ID}/${f.name}`,
-                id: f.name
-            };
+        // 1. Спочатку заповнюємо вже завантаженими з кешу, щоб нічого не втратити
+        if (hasLoadedCache && Array.isArray(cached)) {
+            cached.forEach(b => {
+                if (b && b.id) booksMap.set(b.id.toLowerCase(), b);
+            });
+        }
+
+        // 2. Додаємо/оновлюємо дані з усіх відповідей серверів
+        let anyNetworkSuccess = false;
+        fetchResults.forEach(res => {
+            if (res.status === 'fulfilled' && res.value && res.value.files && res.value.files.length > 0) {
+                anyNetworkSuccess = true;
+                const volId = res.value.volId;
+                const validFiles = res.value.files.filter(f => ALLOWED.some(ext => f.name.toLowerCase().endsWith(ext)));
+
+                validFiles.forEach(f => {
+                    const fileName = f.name.replace(/\.[^/.]+$/, '');
+                    const match = fileName.match(/(.*?)\s*-\s*(.*)\s*\((\d{4})\)/);
+                    const bookId = f.name;
+                    const pages = (window.CHESS_PAGE_COUNTS && (window.CHESS_PAGE_COUNTS[bookId] || window.CHESS_PAGE_COUNTS[bookId.toLowerCase()]))
+                        || (window.CHESS_DESCRIPTIONS && (window.CHESS_DESCRIPTIONS[bookId]?.pages || window.CHESS_DESCRIPTIONS[bookId.toLowerCase()]?.pages))
+                        || null;
+
+                    const bookObj = {
+                        author: match ? match[1].trim() : fileName.split('-')[0].trim(),
+                        title: match ? match[2].trim() : fileName,
+                        year: match ? match[3] : '---',
+                        pages: pages ? parseInt(pages, 10) : null,
+                        format: f.name.split('.').pop().toLowerCase(),
+                        sizeDisplay: (f.size / 1024 / 1024).toFixed(2) + ' MB',
+                        sizeRaw: parseInt(f.size) || 0,
+                        url: `https://archive.org/download/${volId}/${f.name}`,
+                        id: f.name,
+                        archiveVolume: volId
+                    };
+                    booksMap.set(bookId.toLowerCase(), bookObj);
+                });
+            }
         });
 
-        if (freshBooks.length > 0) {
-            // Зберігаємо свіжі дані в localStorage
+        const unifiedBooks = Array.from(booksMap.values());
+
+        if (unifiedBooks.length > 0) {
+            // Зберігаємо актуальний об'єднаний каталог
             try {
-                localStorage.setItem('chess_vault_books_cache', JSON.stringify(freshBooks));
+                localStorage.setItem('chess_vault_books_cache', JSON.stringify(unifiedBooks));
             } catch (e) {}
 
-            // Якщо кількість книг або стан змінився, оновлюємо UI
-            const countChanged = freshBooks.length !== allBooks.length;
-            allBooks = freshBooks;
+            const countChanged = unifiedBooks.length !== allBooks.length;
+            allBooks = unifiedBooks;
 
             if (!hasLoadedCache || countChanged) {
                 if (typeof initCollections === 'function') {
@@ -179,22 +208,18 @@ async function fetchArchiveData() {
             }
         }
 
-        // Фоновий авто-скрапер: обробляємо нові книги (яких ще немає в кеші)
+        // Фоновий авто-скрапер для нових книг
         if (typeof autoScrapeNewBooks === 'function') {
             autoScrapeNewBooks(allBooks).catch(e => console.warn('autoScrape error:', e));
         }
 
     } catch (err) {
-        clearTimeout(timeoutId);
-        console.warn('Зв’язок з сервером Archive.org тимчасово обмежено:', err.message);
-
-        // Якщо книги ВЖЕ відображено з локального кешу — не ламаємо інтерфейс!
+        console.warn('Помилка фонового опитування архівів:', err.message);
         if (hasLoadedCache && allBooks.length > 0) {
             console.log(`ℹ️ Каталог успішно завантажено з автономного кешу (${allBooks.length} книг).`);
             return;
         }
 
-        // Якщо ж кеш відсутній і мережа недоступна — дружнє повідомлення з кнопкою
         const body = document.getElementById('books-table-body');
         if (body) {
             body.innerHTML = `

@@ -60,11 +60,16 @@ def find_flash_drive_path(custom_path=None):
             return p
     return None
 
-def fetch_archive_books(archive_id=DEFAULT_ARCHIVE_ID):
+ARCHIVE_VOLUMES = [
+    ('1971_20260223', 'Том 1'),
+    ('1971_20260223_vol2', 'Том 2')
+]
+
+def fetch_archive_books():
     """
-    Отримує множину назв файлів, які вже завантажені в Internet Archive.
-    Спочатку робить запит до live API. Якщо сервери архіву недоступні (502/503),
-    безпечно використовує локальну базу (descriptions.json / books-cache.json).
+    Отримує множину назв файлів з усіх томів Internet Archive (Том 1 + Том 2).
+    Спочатку робить запити до live API. Якщо сервери недоступні, безпечно
+    використовує локальну базу.
     """
     base_dir = os.path.dirname(os.path.abspath(__file__))
     desc_path = os.path.join(base_dir, 'descriptions.json')
@@ -73,65 +78,51 @@ def fetch_archive_books(archive_id=DEFAULT_ARCHIVE_ID):
 
     archive_files = set()
     archive_normalized = set()
-    source_info = ""
+    sources = []
 
-    # Спроба отримати з live API archive.org
-    url = f"https://archive.org/metadata/{archive_id}"
-    print(f"🌐 Опитування Internet Archive ({url})...")
-    req = urllib.request.Request(url, headers={'User-Agent': 'ChessVaultInventory/2.0'})
-    
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-            for f in data.get('files', []):
-                fname = f.get('name', '')
-                if fname.lower().endswith(ALLOWED_EXTENSIONS):
-                    archive_files.add(fname)
-                    archive_normalized.add(normalize_name(fname))
-            source_info = f"Internet Archive Live API ({len(archive_files)} файлів)"
-            print(f"✅ Успішно отримано з Internet Archive: {len(archive_files)} книг")
-    except Exception as e:
-        print(f"⚠️  Live API Archive.org недоступний ({e}). Використовуємо локальну базу...")
-        
-        # Fallback 1: descriptions.json
-        if os.path.exists(desc_path):
-            try:
-                with open(desc_path, 'r', encoding='utf-8') as f:
-                    desc_data = json.load(f)
-                    for k in desc_data.keys():
-                        archive_files.add(k)
-                        archive_normalized.add(normalize_name(k))
-                source_info = f"Локальна база descriptions.json ({len(archive_files)} книг)"
-            except Exception as ex:
-                print(f"Помилка читання descriptions.json: {ex}")
+    for archive_id, vol_label in ARCHIVE_VOLUMES:
+        url = f"https://archive.org/metadata/{archive_id}"
+        print(f"🌐 Опитування {vol_label} ({url})...")
+        req = urllib.request.Request(url, headers={'User-Agent': 'ChessVaultInventory/2.0'})
+        vol_count = 0
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                for f in data.get('files', []):
+                    fname = f.get('name', '')
+                    if fname.lower().endswith(ALLOWED_EXTENSIONS):
+                        archive_files.add(fname)
+                        archive_normalized.add(normalize_name(fname))
+                        vol_count += 1
+            sources.append(f"{vol_label}: {vol_count} книг (Live API)")
+            print(f"✅ {vol_label}: знайдено {vol_count} книг")
+        except Exception as e:
+            print(f"⚠️  Live API {vol_label} недоступний ({e}).")
+            if archive_id == '1971_20260223':
+                # Fallback для Тому 1
+                local_count = 0
+                if os.path.exists(desc_path):
+                    try:
+                        with open(desc_path, 'r', encoding='utf-8') as f:
+                            for k in json.load(f).keys():
+                                archive_files.add(k)
+                                archive_normalized.add(normalize_name(k))
+                                local_count += 1
+                    except Exception:
+                        pass
+                sources.append(f"{vol_label}: {local_count} книг (локальна база)")
 
-        # Fallback 2: books-cache.json
-        if not archive_files and os.path.exists(cache_path):
-            try:
-                with open(cache_path, 'r', encoding='utf-8') as f:
-                    cache_data = json.load(f)
-                    for item in cache_data:
-                        fname = item.get('id', '')
-                        if fname:
-                            archive_files.add(fname)
-                            archive_normalized.add(normalize_name(fname))
-                source_info = f"Локальна база books-cache.json ({len(archive_files)} книг)"
-            except Exception as ex:
-                print(f"Помилка читання books-cache.json: {ex}")
+    # Додатково підтягуємо upload_progress.json, якщо є
+    if os.path.exists(prog_path):
+        try:
+            with open(prog_path, 'r', encoding='utf-8') as f:
+                for k in json.load(f):
+                    archive_files.add(k)
+                    archive_normalized.add(normalize_name(k))
+        except Exception:
+            pass
 
-        # Fallback 3: upload_progress.json
-        if os.path.exists(prog_path):
-            try:
-                with open(prog_path, 'r', encoding='utf-8') as f:
-                    prog_data = json.load(f)
-                    for k in prog_data:
-                        archive_files.add(k)
-                        archive_normalized.add(normalize_name(k))
-            except Exception:
-                pass
-
-        print(f"ℹ️  Завантажено з резервного сховища: {len(archive_files)} книг")
-
+    source_info = " | ".join(sources) if sources else f"Всього в архівах: {len(archive_files)} книг"
     return archive_normalized, source_info, len(archive_files)
 
 def scan_flash_drive(flash_root):
@@ -326,8 +317,8 @@ def main():
 
     print(f"📍 Виявлено шлях: {flash_root}")
 
-    # 2. Опитування Internet Archive
-    archive_normalized, source_info, archive_count = fetch_archive_books(DEFAULT_ARCHIVE_ID)
+    # 2. Опитування Internet Archive (Том 1 + Том 2)
+    archive_normalized, source_info, archive_count = fetch_archive_books()
 
     # 3. Сканування файлів на флешці
     folders_dict, total_books, total_bytes, format_counter = scan_flash_drive(flash_root)
