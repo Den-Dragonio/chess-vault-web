@@ -360,23 +360,27 @@ window.addEventListener('chessVaultLanguageChanged', () => {
 function formatDate(ts) {
     if (!ts) return '';
     const d = ts.toDate ? ts.toDate() : new Date(ts);
-    return d.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const lang = (window.i18n && window.i18n.currentLang === 'uk') ? 'uk-UA' : 'en-US';
+    return d.toLocaleDateString(lang, { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function renderNewsList(docs) {
     const list = document.getElementById('news-list-dynamic');
     if (!list) return;
     if (docs.length === 0) {
-        list.innerHTML = '<div class="news-item"><p>Новин поки немає...</p></div>';
+        const emptyText = (window.i18n && window.i18n.t) ? window.i18n.t('home_news_empty') : 'Новин поки немає...';
+        list.innerHTML = `<div class="news-item"><p>${emptyText}</p></div>`;
         return;
     }
+    const currentLang = (window.i18n && window.i18n.currentLang) ? window.i18n.currentLang : 'en';
     list.innerHTML = docs.map(d => {
         const data = d.data();
         const isDownload = data.type === 'download';
+        const text = (currentLang === 'uk' ? (data.text_uk || data.text) : (data.text_en || data.text)) || data.text;
         return `
             <div class="news-item${isDownload ? ' news-item-download' : ''}">
                 <span class="news-date">${formatDate(data.timestamp)}</span>
-                <p>${data.text}</p>
+                <p>${text}</p>
             </div>`;
     }).join('');
 }
@@ -384,8 +388,34 @@ function renderNewsList(docs) {
 // Сідуємо системні новини в Firestore (з фіксованими ID — не дублюються)
 async function seedSystemNews() {
     const systemNews = [
-        { id: 'section-b', text: 'Було додано розділ "Б" (Автори на літеру Б) до Бібліотеки.', date: new Date('2026-02-23') },
-        { id: 'section-a', text: 'Було додано розділ "А" (Автори на літеру А) до Бібліотеки.', date: new Date('2026-02-23') },
+        { 
+            id: 'library-transfer-completed', 
+            text: 'Шахову бібліотеку повністю перенесено в сховище Internet Archive — усі 1879 рідкісних книг збережено та доступно для вивчення!',
+            text_uk: 'Шахову бібліотеку повністю перенесено в сховище Internet Archive — усі 1879 рідкісних книг збережено та доступно для вивчення!',
+            text_en: 'Chess library migration completed! All 1,879 rare books and treatises are safely archived and ready to explore.',
+            date: new Date() 
+        },
+        { 
+            id: 'champions-gallery-added', 
+            text: 'Додано інтерактивну залу та повний список чемпіонів світу з шахів — від Вільгельма Стейніца до Дін Ліженя з біографіями та цікавими фактами!',
+            text_uk: 'Додано інтерактивну залу та повний список чемпіонів світу з шахів — від Вільгельма Стейніца до Дін Ліженя з біографіями та цікавими фактами!',
+            text_en: 'World Chess Champions gallery added! Explore all 22 official world champions from Wilhelm Steinitz to Ding Liren with rich biographies and facts.',
+            date: new Date() 
+        },
+        { 
+            id: 'section-b', 
+            text: 'Було додано розділ "Б" (Автори на літеру Б) до Бібліотеки.',
+            text_uk: 'Було додано розділ "Б" (Автори на літеру Б) до Бібліотеки.',
+            text_en: 'Section "B" (Authors starting with B) has been added to the Library.',
+            date: new Date('2026-02-23') 
+        },
+        { 
+            id: 'section-a', 
+            text: 'Було додано розділ "А" (Автори на літеру А) до Бібліотеки.',
+            text_uk: 'Було додано розділ "А" (Автори на літеру А) до Бібліотеки.',
+            text_en: 'Section "A" (Authors starting with A) has been added to the Library.',
+            date: new Date('2026-02-23') 
+        },
     ];
     for (const item of systemNews) {
         const ref = db.collection('news').doc(item.id);
@@ -393,20 +423,40 @@ async function seedSystemNews() {
         if (!snap.exists) {
             await ref.set({
                 text: item.text,
+                text_uk: item.text_uk,
+                text_en: item.text_en,
                 timestamp: firebase.firestore.Timestamp.fromDate(item.date),
                 type: 'system'
             });
             console.log('[Seed] Додано системну новину:', item.id);
+        } else {
+            // Оновлюємо переклади, якщо новина вже існує
+            await ref.set({
+                text: item.text,
+                text_uk: item.text_uk,
+                text_en: item.text_en,
+            }, { merge: true });
         }
     }
 }
 seedSystemNews();
 
+// Збереження списку документів новин для рендеру при перемиканні мови
+let latestNewsDocs = [];
+window.addEventListener('chessVaultLanguageChanged', () => {
+    if (latestNewsDocs.length > 0) {
+        renderNewsList(latestNewsDocs);
+    }
+});
+
 // Підписка в реальному часі — всі новини, новіші зверху
 db.collection('news')
     .orderBy('timestamp', 'desc')
     .limit(20)
-    .onSnapshot(snap => renderNewsList(snap.docs), () => renderNewsList([]));
+    .onSnapshot(snap => {
+        latestNewsDocs = snap.docs;
+        renderNewsList(snap.docs);
+    }, () => renderNewsList([]));
 
 
 // =============================================
