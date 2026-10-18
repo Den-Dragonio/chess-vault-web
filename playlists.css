@@ -294,8 +294,11 @@ html.dark .pl-card-count {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    animation: plCardIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     box-sizing: border-box;
+}
+
+.pl-modal-card.pl-modal-card-enter {
+    animation: plCardIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes plCardIn {

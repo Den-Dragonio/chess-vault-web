@@ -461,6 +461,11 @@ function plOpenPlaylistModal(playlistId) {
         document.body.appendChild(overlay);
     }
 
+    overlay.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'pl-modal-card pl-modal-card-enter';
+    overlay.appendChild(card);
+
     overlay.style.display = 'flex';
     plRenderPlaylistModalContent(pl);
 
@@ -547,44 +552,50 @@ function plRenderPlaylistModalContent(pl) {
         booksHtml += `</div>`;
     }
 
-    overlay.innerHTML = `
-        <div class="pl-modal-card">
-            <div class="pl-modal-header">
-                <div class="pl-modal-header-left">
-                    <span class="pl-modal-icon">${pl.icon || '📋'}</span>
-                    <div>
-                        ${isEditing && !isDefault ? `
-                            <div class="pl-modal-rename-wrap">
-                                <input type="text" id="pl-modal-rename-input" class="pl-modal-rename-field" value="${plEsc(displayName)}" maxlength="40">
-                                <button type="button" id="pl-modal-rename-save-btn" class="pl-modal-rename-save">💾</button>
-                            </div>
-                        ` : `
-                            <h3 class="pl-modal-title">${plEsc(displayName)}</h3>
-                        `}
-                        <span class="pl-modal-count-badge">${books.length} ${booksWord}</span>
-                    </div>
-                </div>
-                <div class="pl-modal-header-actions">
-                    <!-- Кнопка Редагувати (показується тільки у режимі перегляду) -->
-                    ${!isEditing ? `
-                        <button type="button" class="pl-modal-tool-btn" id="pl-modal-edit-btn" title="${isEn ? 'Edit' : 'Редагувати'}">
-                            ✏️ ${isEn ? 'Edit' : 'Редагувати'}
-                        </button>
-                    ` : ''}
-                    <!-- Кнопка Видалити (ТІЛЬКИ для кастомних, заборонено для "Улюблені" та "Читати потім") -->
-                    ${!isDefault ? `
-                        <button type="button" class="pl-modal-tool-btn pl-modal-tool-danger" id="pl-modal-delete-btn" title="${isEn ? 'Delete playlist' : 'Видалити плейлист'}">
-                            🗑️ ${isEn ? 'Delete' : 'Видалити'}
-                        </button>
-                    ` : ''}
-                    <button type="button" class="pl-modal-close-btn" id="pl-modal-close" title="${isEn ? 'Close' : 'Закрити'}">✕</button>
-                </div>
-            </div>
+    let card = overlay.querySelector('.pl-modal-card');
+    if (!card) {
+        card = document.createElement('div');
+        card.className = 'pl-modal-card';
+        overlay.appendChild(card);
+    }
+    card.classList.remove('pl-modal-card-enter');
 
-            <div class="pl-modal-body">
-                ${addBookHTML}
-                ${booksHtml}
+    card.innerHTML = `
+        <div class="pl-modal-header">
+            <div class="pl-modal-header-left">
+                <span class="pl-modal-icon">${pl.icon || '📋'}</span>
+                <div>
+                    ${isEditing && !isDefault ? `
+                        <div class="pl-modal-rename-wrap">
+                            <input type="text" id="pl-modal-rename-input" class="pl-modal-rename-field" value="${plEsc(displayName)}" maxlength="40">
+                            <button type="button" id="pl-modal-rename-save-btn" class="pl-modal-rename-save">💾</button>
+                        </div>
+                    ` : `
+                        <h3 class="pl-modal-title">${plEsc(displayName)}</h3>
+                    `}
+                    <span class="pl-modal-count-badge">${books.length} ${booksWord}</span>
+                </div>
             </div>
+            <div class="pl-modal-header-actions">
+                <!-- Кнопка Редагувати (показується тільки у режимі перегляду) -->
+                ${!isEditing ? `
+                    <button type="button" class="pl-modal-tool-btn" id="pl-modal-edit-btn" title="${isEn ? 'Edit' : 'Редагувати'}">
+                        ✏️ ${isEn ? 'Edit' : 'Редагувати'}
+                    </button>
+                ` : ''}
+                <!-- Кнопка Видалити (ТІЛЬКИ для кастомних, заборонено для "Улюблені" та "Читати потім") -->
+                ${!isDefault ? `
+                    <button type="button" class="pl-modal-tool-btn pl-modal-tool-danger" id="pl-modal-delete-btn" title="${isEn ? 'Delete playlist' : 'Видалити плейлист'}">
+                        🗑️ ${isEn ? 'Delete' : 'Видалити'}
+                    </button>
+                ` : ''}
+                <button type="button" class="pl-modal-close-btn" id="pl-modal-close" title="${isEn ? 'Close' : 'Закрити'}">✕</button>
+            </div>
+        </div>
+
+        <div class="pl-modal-body">
+            ${addBookHTML}
+            ${booksHtml}
         </div>
     `;
 
