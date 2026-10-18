@@ -1,0 +1,651 @@
+/* ====================================================
+   CHESS VAULT — PLAYLISTS STYLES
+   ==================================================== */
+
+/* ---- PLAYLIST SECTION ON PROFILE PAGE ---- */
+.pl-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.pl-title {
+    margin: 0;
+    font-size: 1.4rem;
+    color: #222;
+}
+
+html.dark .pl-title {
+    color: #eee;
+}
+
+.pl-add-btn {
+    background: linear-gradient(135deg, #d4af37 0%, #c9a027 100%);
+    color: #111;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 20px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-family: inherit;
+    box-shadow: 0 2px 8px rgba(212, 175, 55, 0.25);
+}
+
+.pl-add-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(212, 175, 55, 0.35);
+    background: linear-gradient(135deg, #e6c555 0%, #d4af37 100%);
+}
+
+html.dark .pl-add-btn {
+    background: linear-gradient(135deg, #d4af37 0%, #b8962e 100%);
+    color: #111;
+}
+
+.pl-empty {
+    text-align: center;
+    color: #999;
+    font-size: 0.95rem;
+    padding: 30px;
+}
+
+/* ---- PLAYLIST LIST ---- */
+.pl-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pl-item {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.25s ease;
+}
+
+.pl-item:hover {
+    border-color: rgba(212, 175, 55, 0.3);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.pl-item-open {
+    border-color: rgba(212, 175, 55, 0.4);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+html.dark .pl-item {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .pl-item:hover {
+    border-color: rgba(212, 175, 55, 0.25);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+html.dark .pl-item-open {
+    border-color: rgba(212, 175, 55, 0.35);
+}
+
+.pl-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    gap: 10px;
+}
+
+.pl-item-header:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+html.dark .pl-item-header:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.pl-item-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.pl-item-icon {
+    font-size: 1.3rem;
+    flex-shrink: 0;
+}
+
+.pl-item-name {
+    font-weight: 600;
+    font-size: 1rem;
+    color: #222;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+html.dark .pl-item-name {
+    color: #eee;
+}
+
+.pl-item-count {
+    font-size: 0.78rem;
+    color: #999;
+    white-space: nowrap;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px 10px;
+    border-radius: 20px;
+    flex-shrink: 0;
+}
+
+html.dark .pl-item-count {
+    background: rgba(255, 255, 255, 0.08);
+    color: #aaa;
+}
+
+.pl-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.pl-item-action-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 4px 6px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    opacity: 0.5;
+}
+
+.pl-item-header:hover .pl-item-action-btn {
+    opacity: 1;
+}
+
+.pl-item-action-btn:hover {
+    background: rgba(0, 0, 0, 0.08);
+    transform: scale(1.15);
+}
+
+html.dark .pl-item-action-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.pl-item-chevron {
+    font-size: 0.7rem;
+    color: #aaa;
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+/* ---- BOOKS INSIDE PLAYLIST ---- */
+.pl-item-books {
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    padding: 0 14px 14px;
+    animation: plSlideDown 0.25s ease;
+}
+
+html.dark .pl-item-books {
+    border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+@keyframes plSlideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.pl-books-loading,
+.pl-books-empty {
+    text-align: center;
+    color: #999;
+    font-size: 0.88rem;
+    padding: 20px 10px;
+}
+
+.pl-books-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 10px;
+}
+
+.pl-book-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    gap: 10px;
+}
+
+.pl-book-row:hover {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+html.dark .pl-book-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.pl-book-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    cursor: pointer;
+    flex: 1;
+    min-width: 0;
+}
+
+.pl-book-title {
+    font-weight: 600;
+    font-size: 0.92rem;
+    color: #222;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.2s ease;
+}
+
+.pl-book-row:hover .pl-book-title {
+    color: #0984e3;
+}
+
+html.dark .pl-book-title {
+    color: #ddd;
+}
+
+html.dark .pl-book-row:hover .pl-book-title {
+    color: #74b9ff;
+}
+
+.pl-book-author {
+    font-size: 0.8rem;
+    color: #888;
+    font-style: italic;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pl-book-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.pl-book-format {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #fff;
+    background: #888;
+    padding: 2px 8px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pl-book-remove-btn {
+    background: none;
+    border: 1px solid rgba(231, 76, 60, 0.2);
+    color: #e74c3c;
+    cursor: pointer;
+    font-size: 0.8rem;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    opacity: 0;
+}
+
+.pl-book-row:hover .pl-book-remove-btn {
+    opacity: 1;
+}
+
+.pl-book-remove-btn:hover {
+    background: #e74c3c;
+    color: #fff;
+    border-color: #e74c3c;
+    transform: scale(1.1);
+}
+
+/* ---- INPUT MODAL (CREATE / RENAME / DELETE) ---- */
+.pl-input-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: plFadeIn 0.2s ease;
+}
+
+@keyframes plFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.pl-input-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    padding: 28px 30px;
+    max-width: 420px;
+    width: 100%;
+    animation: plCardIn 0.25s ease;
+}
+
+@keyframes plCardIn {
+    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+html.dark .pl-input-card {
+    background: rgba(18, 18, 28, 0.95);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+.pl-input-title {
+    margin: 0 0 14px;
+    font-size: 1.15rem;
+    color: #111;
+    text-align: center;
+}
+
+html.dark .pl-input-title {
+    color: #eee;
+}
+
+.pl-input-message {
+    font-size: 0.9rem;
+    color: #555;
+    text-align: center;
+    margin: 0 0 18px;
+    line-height: 1.5;
+}
+
+html.dark .pl-input-message {
+    color: #bbb;
+}
+
+.pl-input-field {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1.5px solid rgba(0, 0, 0, 0.12);
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 0.95rem;
+    outline: none;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    box-sizing: border-box;
+    margin-bottom: 18px;
+}
+
+.pl-input-field:focus {
+    border-color: #d4af37;
+    box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.15);
+}
+
+html.dark .pl-input-field {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: #fff;
+}
+
+html.dark .pl-input-field:focus {
+    border-color: #d4af37;
+    box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.2);
+}
+
+.pl-input-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.pl-input-cancel-btn,
+.pl-input-confirm-btn {
+    padding: 10px 22px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    border: none;
+}
+
+.pl-input-cancel-btn {
+    background: rgba(0, 0, 0, 0.06);
+    color: #555;
+}
+
+.pl-input-cancel-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+html.dark .pl-input-cancel-btn {
+    background: rgba(255, 255, 255, 0.08);
+    color: #bbb;
+}
+
+html.dark .pl-input-cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.pl-input-confirm-btn {
+    background: #1a1a1a;
+    color: #fff;
+}
+
+.pl-input-confirm-btn:hover {
+    background: #000;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+html.dark .pl-input-confirm-btn {
+    background: #d4af37;
+    color: #111;
+}
+
+html.dark .pl-input-confirm-btn:hover {
+    background: #e6c555;
+}
+
+.pl-input-confirm-btn.pl-input-danger {
+    background: #e74c3c;
+    color: #fff;
+}
+
+.pl-input-confirm-btn.pl-input-danger:hover {
+    background: #c0392b;
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+}
+
+html.dark .pl-input-confirm-btn.pl-input-danger {
+    background: #e74c3c;
+    color: #fff;
+}
+
+/* ---- BOOK MODAL — ADD TO PLAYLIST BUTTON ---- */
+.pl-add-to-wrap {
+    position: relative;
+    display: inline-block;
+}
+
+.bd-btn-playlist {
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.12) 0%, rgba(212, 175, 55, 0.06) 100%);
+    color: #9b7e1e;
+    border: 1.5px solid rgba(212, 175, 55, 0.35);
+    border-radius: 12px;
+    padding: 10px 18px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-family: inherit;
+    white-space: nowrap;
+}
+
+.bd-btn-playlist:hover {
+    background: linear-gradient(135deg, #d4af37 0%, #c9a027 100%);
+    color: #111;
+    border-color: #d4af37;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(212, 175, 55, 0.3);
+}
+
+html.dark .bd-btn-playlist {
+    background: rgba(212, 175, 55, 0.1);
+    color: #d4af37;
+    border-color: rgba(212, 175, 55, 0.3);
+}
+
+html.dark .bd-btn-playlist:hover {
+    background: #d4af37;
+    color: #111;
+    border-color: #d4af37;
+}
+
+/* ---- PLAYLIST DROPDOWN IN MODAL ---- */
+.pl-dropdown {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    min-width: 220px;
+    max-height: 280px;
+    overflow-y: auto;
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border-radius: 14px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.18);
+    z-index: 100;
+    animation: plDropIn 0.2s ease;
+    scrollbar-width: none;
+}
+
+.pl-dropdown::-webkit-scrollbar {
+    display: none;
+}
+
+@keyframes plDropIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+html.dark .pl-dropdown {
+    background: rgba(25, 25, 35, 0.97);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5);
+}
+
+.pl-dropdown-option {
+    padding: 11px 16px;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    color: #333;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pl-dropdown-option:last-child {
+    border-bottom: none;
+}
+
+.pl-dropdown-option:hover {
+    background: rgba(212, 175, 55, 0.1);
+    color: #111;
+}
+
+html.dark .pl-dropdown-option {
+    color: #ddd;
+    border-bottom-color: rgba(255, 255, 255, 0.05);
+}
+
+html.dark .pl-dropdown-option:hover {
+    background: rgba(212, 175, 55, 0.15);
+    color: #fff;
+}
+
+.pl-dropdown-new {
+    color: #d4af37;
+    font-weight: 600;
+}
+
+.pl-dropdown-new:hover {
+    background: rgba(212, 175, 55, 0.15);
+    color: #9b7e1e;
+}
+
+html.dark .pl-dropdown-new {
+    color: #d4af37;
+}
+
+html.dark .pl-dropdown-new:hover {
+    color: #e6c555;
+}
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 600px) {
+    .pl-item-header {
+        padding: 12px 14px;
+    }
+
+    .pl-item-name {
+        font-size: 0.92rem;
+    }
+
+    .pl-book-row {
+        padding: 8px 10px;
+    }
+
+    .pl-book-remove-btn {
+        opacity: 1;
+    }
+
+    .pl-item-action-btn {
+        opacity: 1;
+    }
+
+    .pl-dropdown {
+        min-width: 180px;
+        bottom: auto;
+        top: calc(100% + 4px);
+    }
+
+    .pl-input-card {
+        padding: 22px 18px;
+        border-radius: 16px;
+    }
+}

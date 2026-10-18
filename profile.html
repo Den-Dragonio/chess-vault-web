@@ -9,6 +9,7 @@
     <link rel="apple-touch-icon" href="img/icon.png">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="book-modal.css?v=5">
+    <link rel="stylesheet" href="playlists.css?v=1">
     <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
     <script src="dark-mode-init.js"></script>
     <script src="analytics.js?v=1"></script>
@@ -786,6 +787,13 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- ПЛЕЙЛИСТИ -->
+        <div class="history-card" id="playlists-card" style="flex-basis:100%; max-width:100%;">
+            <div id="playlists-section">
+                <p class="pl-empty" style="color:#bbb;">⏳ Завантаження плейлистів...</p>
+            </div>
+        </div>
     </div>
 
     <!-- МОДАЛКА НАЛАШТУВАНЬ -->
@@ -874,6 +882,7 @@
     <script src="descriptions.js"></script>
     <script src="books-cache.js?v=6"></script>
     <script src="book-modal.js?v=8"></script>
+    <script src="playlists.js?v=1"></script>
     <script>
         // Фон
         (function () {
@@ -1263,6 +1272,11 @@
             const isAdmin = window.isChessAdmin && window.isChessAdmin(user);
             const navAdmin = document.getElementById('nav-admin-link');
             if (navAdmin) navAdmin.style.display = isAdmin ? 'inline-block' : 'none';
+
+            // Плейлисти
+            if (typeof plRenderProfileSection === 'function') {
+                plRenderProfileSection().catch(e => console.warn('Playlists load error:', e));
+            }
 
             // Виходи
             document.getElementById('logout-profile-btn').onclick = async () => { await auth.signOut(); window.location.href = 'index.html'; };
