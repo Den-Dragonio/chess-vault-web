@@ -420,6 +420,8 @@ function openChampionModal(champ) {
     const authorColTitle = isEn ? `Authored Books (${champ.authorBooksCount})` : `Книги авторства (${champ.authorBooksCount})`;
     const aboutColTitle = isEn ? `Books About Him & Matches (${champ.aboutBooksCount})` : `Книги про нього та матчі (${champ.aboutBooksCount})`;
 
+    const eloDigits = champ.peakElo || (champ.peakEloDisplay ? String(champ.peakEloDisplay).replace(/\D+/g, '') : '');
+
     modalBody.innerHTML = `
         <!-- ВЕРХНЯ ЧАСТИНА: фото 200x280 (як обкладинка книги) + інформація -->
         <div class="chm-top">
@@ -436,10 +438,10 @@ function openChampionModal(champ) {
                     <span>${reignLabel}: <strong>${escapeHtml(cd.years)}</strong></span>
                 </div>
                 <div class="chm-counts-summary">
-                    ${champ.peakEloDisplay ? `
-                    <div class="chm-count-pill">
+                    ${eloDigits ? `
+                    <div class="chm-count-pill" title="${peakEloLabel} ${eloDigits}">
                         <span>⚡ ${peakEloLabel}</span>
-                        <strong class="chm-elo-val">${champ.peakEloDisplay}</strong>
+                        <strong class="chm-elo-val">${eloDigits}</strong>
                     </div>` : ''}
                     <div class="chm-count-pill">
                         <span>✍️ ${authorBooksLabel}</span>
@@ -489,6 +491,9 @@ function openChampionModal(champ) {
         });
     });
 
+    if (championModalOverlay) {
+        championModalOverlay.scrollTop = 0;
+    }
     championModalOverlay.classList.add('active');
     document.body.style.overflow = 'hidden';
 }

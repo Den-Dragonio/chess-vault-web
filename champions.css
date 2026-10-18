@@ -174,6 +174,15 @@
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+#champion-modal-overlay::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 
 #champion-modal-overlay.active {
@@ -622,6 +631,10 @@ html.dark .champion-row:hover .champ-row-arrow {
 }
 
 /* Модалка в темній темі */
+html.dark #champion-modal-overlay {
+    background: rgba(0, 0, 0, 0.65);
+}
+
 html.dark #champion-modal-card {
     background: rgba(18, 20, 26, 0.88);
     border-color: rgba(255, 255, 255, 0.1);
@@ -741,15 +754,20 @@ html.dark .chm-elo-val {
     }
 }
 
-@media (max-width: 650px) {
+@media (max-width: 768px) {
     .champions-section {
         max-width: calc(100% - 24px);
-        margin: 20px auto 60px;
+        margin: 20px auto 100px;
     }
     .champions-header {
         padding: 16px 18px;
         border-radius: 18px;
         margin-bottom: 16px;
+        background: rgba(255, 255, 255, 0.75);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
     }
     .champions-title {
         font-size: 1.6rem;
@@ -759,16 +777,22 @@ html.dark .chm-elo-val {
         border-radius: 16px;
         gap: 12px;
         flex-wrap: wrap;
+        background: rgba(255, 255, 255, 0.78);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
     }
     .champ-row-portrait-wrap {
         width: 52px;
         height: 52px;
+        background: rgba(0, 0, 0, 0.04);
     }
     .champ-row-main {
         min-width: 0;
     }
     .champ-row-name {
-        font-size: 1.1rem;
+        font-size: 1.12rem;
     }
     .champ-row-reign {
         font-size: 0.85rem;
@@ -776,17 +800,202 @@ html.dark .chm-elo-val {
     .champ-row-stats {
         width: 100%;
         justify-content: flex-start;
-        padding-top: 6px;
+        padding-top: 8px;
         border-top: 1px dashed rgba(0, 0, 0, 0.08);
+        gap: 8px;
+    }
+    .champ-pill {
+        padding: 5px 10px;
+        font-size: 0.82rem;
     }
     .champ-row-arrow {
         display: none;
     }
-    #champion-modal-card {
-        width: 95vw;
-        max-width: 95vw;
-        max-height: 90vh;
-        padding: 24px 16px;
-        border-radius: 18px;
+
+    /* Модальне вікно чемпіона: 1 в 1 як book-detail-card на мобілці */
+    #champion-modal-overlay.active {
+        padding: 0;
+        align-items: stretch;
     }
+    #champion-modal-card {
+        width: 100%;
+        max-width: 100%;
+        min-height: 100vh;
+        min-height: 100dvh;
+        max-height: none !important;
+        border-radius: 0;
+        border: none;
+        padding: 60px 18px 40px;
+        gap: 28px;
+        background: rgba(255, 255, 255, 0.96);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        box-shadow: none;
+        -webkit-overflow-scrolling: touch;
+    }
+    #champion-modal-close {
+        top: 14px;
+        right: 14px;
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        z-index: 10;
+    }
+    .chm-top {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 18px;
+    }
+    .chm-photo-wrap {
+        width: auto;
+    }
+    .chm-photo {
+        width: 140px;
+        height: 196px;
+        border-radius: 14px;
+    }
+    .chm-hero-info {
+        align-items: center;
+        width: 100%;
+        gap: 10px;
+    }
+    .chm-badge-row {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+    }
+    .chm-name {
+        font-size: 1.65rem;
+        line-height: 1.25;
+        text-align: center;
+    }
+    .chm-reign-badge {
+        align-self: center;
+        font-size: 0.95rem;
+        padding: 5px 14px;
+    }
+    .chm-counts-summary {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 4px;
+    }
+    .chm-count-pill {
+        font-size: 0.88rem;
+        padding: 6px 12px;
+    }
+    .chm-section {
+        gap: 10px;
+    }
+    .chm-section-title {
+        font-size: 1.2rem;
+    }
+    .chm-bio-text {
+        font-size: 0.98rem;
+        line-height: 1.6;
+    }
+    .chm-facts-list li {
+        font-size: 0.95rem;
+        line-height: 1.5;
+        padding-left: 26px;
+    }
+    .chm-books-columns {
+        grid-template-columns: 1fr;
+        gap: 24px;
+    }
+    .chm-books-scroll-list {
+        max-height: none;
+        overflow-y: visible;
+        padding-right: 0;
+    }
+    .chm-book-item {
+        padding: 9px 12px;
+    }
+    .chm-book-title {
+        font-size: 0.92rem;
+    }
+
+    /* Темна тема для мобільної версії */
+    html.dark .champions-header {
+        background: rgba(22, 24, 32, 0.78);
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+    html.dark .champion-row {
+        background: rgba(24, 27, 36, 0.82);
+        border-color: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    }
+    html.dark .champ-row-portrait-wrap {
+        background: rgba(255, 255, 255, 0.04);
+    }
+    html.dark .champ-row-stats {
+        border-top: 1px dashed rgba(255, 255, 255, 0.09);
+    }
+    html.dark #champion-modal-card {
+        background: rgba(14, 16, 24, 0.96);
+        border: none;
+        box-shadow: none;
+    }
+    html.dark .chm-count-pill {
+        background: rgba(255, 255, 255, 0.06) !important;
+        color: #ced6e0;
+    }
+}
+
+@media (max-width: 480px) {
+    .champ-row-name {
+        font-size: 1.05rem;
+    }
+    .champ-row-reign {
+        font-size: 0.8rem;
+    }
+    .champ-pill {
+        padding: 4px 8px;
+        font-size: 0.78rem;
+    }
+    #champion-modal-card {
+        padding: 56px 14px 36px;
+        gap: 22px;
+    }
+    .chm-name {
+        font-size: 1.45rem;
+    }
+    .chm-photo {
+        width: 120px;
+        height: 168px;
+    }
+    .chm-count-pill {
+        font-size: 0.82rem;
+        padding: 5px 10px;
+    }
+}
+
+/* Відключення зсуву hover на сенсорних екранах для уникнення застрягання transform */
+@media (hover: none) {
+    .champion-row:hover {
+        transform: none;
+        background: rgba(255, 255, 255, 0.78);
+        border-color: rgba(0, 0, 0, 0.06);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+    }
+    html.dark .champion-row:hover {
+        transform: none;
+        background: rgba(24, 27, 36, 0.82);
+        border-color: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    }
+}
+
+.champion-row:active {
+    transform: scale(0.985);
+    background: rgba(255, 255, 255, 0.92);
+}
+html.dark .champion-row:active {
+    background: rgba(32, 36, 48, 0.92);
 }
