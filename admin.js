@@ -147,7 +147,7 @@
                     landing_page: null,
                     timezone: 'UTC',
                     device: 'desktop',
-                    platform: 'Other',
+                    platform: null,
                     ip: null,
                     country: null,
                     city: null,
@@ -309,8 +309,9 @@
             const adm = getOrCreateUser('admin');
             if (!adm.createdAt) adm.createdAt = new Date('2026-02-23T20:30:00Z');
 
-            // Якщо поточний авторизований користувач переглядає адмінку - позначаємо його активним та присвоюємо IP/гео
+            // Якщо поточний авторизований користувач переглядає адмінку - позначаємо його активним та присвоюємо IP/гео/платформу
             const currentAuth = firebase.auth().currentUser;
+            const myClientPlatform = getClientPlatform();
             if (currentAuth) {
                 const curEmail = (currentAuth.email || '').toLowerCase();
                 const curName = (currentAuth.displayName || (currentAuth.email ? currentAuth.email.split('@')[0] : '')).toLowerCase();
@@ -323,6 +324,8 @@
 
                     if (isCurrent) {
                         u.last_active_at = new Date();
+                        u.platform = myClientPlatform;
+                        u.device = (/mobile|tablet/i.test(myClientPlatform) || (typeof navigator !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent))) ? 'mobile' : 'desktop';
                         if (currentGeo) {
                             if (currentGeo.ip) u.ip = currentGeo.ip;
                             if (currentGeo.country) u.country = currentGeo.country;
@@ -332,20 +335,22 @@
                     }
                 });
 
-                // Гарантуємо запис IP та геоданих поточного адміна у Firestore
+                // Гарантуємо запис IP, платформи та геоданих поточного адміна у Firestore
+                const geoPayload = {
+                    last_active_at: firebase.firestore.FieldValue.serverTimestamp(),
+                    platform: myClientPlatform,
+                    device: (/mobile|tablet/i.test(myClientPlatform) || (typeof navigator !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent))) ? 'mobile' : 'desktop'
+                };
                 if (currentGeo && currentGeo.ip) {
-                    const geoPayload = {
-                        ip: currentGeo.ip,
-                        country: currentGeo.country || '',
-                        city: currentGeo.city || '',
-                        country_flag: currentGeo.country_flag || '',
-                        last_active_at: firebase.firestore.FieldValue.serverTimestamp()
-                    };
-                    db.collection('users').doc(currentAuth.uid).set(geoPayload, { merge: true }).catch(() => {});
-                    db.collection('usernames').doc('admin').set(geoPayload, { merge: true }).catch(() => {});
-                    if (curName && curName !== 'admin') {
-                        db.collection('usernames').doc(curName).set(geoPayload, { merge: true }).catch(() => {});
-                    }
+                    geoPayload.ip = currentGeo.ip;
+                    geoPayload.country = currentGeo.country || '';
+                    geoPayload.city = currentGeo.city || '';
+                    geoPayload.country_flag = currentGeo.country_flag || '';
+                }
+                db.collection('users').doc(currentAuth.uid).set(geoPayload, { merge: true }).catch(() => {});
+                db.collection('usernames').doc('admin').set(geoPayload, { merge: true }).catch(() => {});
+                if (curName && curName !== 'admin') {
+                    db.collection('usernames').doc(curName).set(geoPayload, { merge: true }).catch(() => {});
                 }
             }
 
@@ -555,7 +560,12 @@
             const ipBadge = u.ip 
                 ? `<span class="user-ip-badge" title="IP: ${esc(u.ip)}">${esc(u.ip)}</span>` 
                 : `<span style="color:#64748b;font-size:0.72rem;">IP невідомий</span>`;
-            const devText = `${devIcon} ${u.platform || (u.device === 'mobile' ? 'Mobile' : 'Десктоп')}`;
+
+            let platName = formatPlatformName(u.platform);
+            if (!platName) {
+                platName = (u.device === 'mobile' || u.device === 'tablet') ? 'Мобільний' : 'Десктоп';
+            }
+            const devText = `${devIcon} ${platName}`;
 
             const landing = u.landing_page ? `<a href="${esc(u.landing_page)}" target="_blank" class="landing-url-link" title="${esc(u.landing_page)}">${formatLandingUrl(u.landing_page)}</a>` : '<span style="color:#586069;">-</span>';
             const dlCount = u.downloads_count || 0;
@@ -716,6 +726,10 @@
             ? `${user.country_flag || '🌐'} ${user.city}, ${user.country}` 
             : (user.country ? `${user.country_flag || '🌐'} ${user.country}` : (user.timezone || 'Невідомо'));
         const ipDetail = user.ip ? `<span class="ip-code">${esc(user.ip)}</span>` : '<span style="color:#64748b;">Не зафіксовано</span>';
+        let modalPlat = formatPlatformName(user.platform);
+        if (!modalPlat) {
+            modalPlat = (user.device === 'mobile' || user.device === 'tablet') ? 'Мобільний' : 'Десктоп';
+        }
 
         modalMeta.innerHTML = `
             <div class="user-meta-item">
@@ -736,7 +750,7 @@
             </div>
             <div class="user-meta-item">
                 <span class="user-meta-label">Таймзона / ОС</span>
-                <span class="user-meta-val">${user.timezone || 'Невідомо'} (${user.platform || 'Other'})</span>
+                <span class="user-meta-val">${user.timezone || 'Невідомо'} (${esc(modalPlat)})</span>
             </div>
             <div class="user-meta-item">
                 <span class="user-meta-label">Дата реєстрації</span>
@@ -906,6 +920,26 @@
                 </div>
             </div>
         `;
+    }
+
+    function formatPlatformName(platformStr, userAgentStr = '') {
+        const raw = String(platformStr || userAgentStr || '').toLowerCase();
+        if (/iphone|ipad|ipod/i.test(raw)) return 'iOS';
+        if (/macintosh|mac os x|macintel|darwin|mac/i.test(raw)) return 'macOS';
+        if (/windows|win32|win64/i.test(raw)) return 'Windows';
+        if (/android/i.test(raw)) return 'Android';
+        if (/linux/i.test(raw)) return 'Linux';
+        return null;
+    }
+
+    function getClientPlatform() {
+        try {
+            const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
+            const plat = (typeof navigator !== 'undefined' && navigator.platform) ? navigator.platform : '';
+            return formatPlatformName(plat, ua) || (/Mobi|Android/i.test(ua) ? 'Mobile' : 'Десктоп');
+        } catch (_) {
+            return 'Десктоп';
+        }
     }
 
     function formatLandingUrl(urlStr) {

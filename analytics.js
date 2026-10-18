@@ -151,14 +151,15 @@
     function getPlatform() {
         try {
             const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
-            if (/windows/i.test(ua)) return 'Windows';
-            if (/macintosh|mac os x/i.test(ua)) return 'macOS';
-            if (/iphone|ipad|ipod/i.test(ua)) return 'iOS';
+            const plat = (typeof navigator !== 'undefined' && navigator.platform) ? navigator.platform : '';
+            if (/iphone|ipad|ipod/i.test(ua) || (plat === 'MacIntel' && typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1)) return 'iOS';
+            if (/macintosh|mac os x|macintel|darwin|mac/i.test(ua) || /mac/i.test(plat)) return 'macOS';
+            if (/windows|win32|win64/i.test(ua) || /win/i.test(plat)) return 'Windows';
             if (/android/i.test(ua)) return 'Android';
-            if (/linux/i.test(ua)) return 'Linux';
-            return 'Other';
+            if (/linux/i.test(ua) || /linux/i.test(plat)) return 'Linux';
+            return 'Десктоп';
         } catch (_) {
-            return 'Other';
+            return 'Десктоп';
         }
     }
 

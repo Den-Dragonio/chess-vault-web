@@ -134,8 +134,16 @@
             try {
                 payload.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
                 const ua = navigator.userAgent || '';
-                payload.device = /Mobi|Android|iPhone|iPad/i.test(ua) ? 'mobile' : 'desktop';
-                payload.platform = navigator.platform || (ua.includes('Mac') ? 'macOS' : ua.includes('Win') ? 'Windows' : 'Linux');
+                const plat = navigator.platform || '';
+                let detectedPlat = 'Десктоп';
+                if (/iphone|ipad|ipod/i.test(ua) || (plat === 'MacIntel' && navigator.maxTouchPoints > 1)) detectedPlat = 'iOS';
+                else if (/macintosh|mac os x|macintel|darwin|mac/i.test(ua) || /mac/i.test(plat)) detectedPlat = 'macOS';
+                else if (/windows|win32|win64/i.test(ua) || /win/i.test(plat)) detectedPlat = 'Windows';
+                else if (/android/i.test(ua)) detectedPlat = 'Android';
+                else if (/linux/i.test(ua) || /linux/i.test(plat)) detectedPlat = 'Linux';
+
+                payload.device = (/Mobi|Android|iPhone|iPad/i.test(ua) || detectedPlat === 'iOS' || detectedPlat === 'Android') ? 'mobile' : 'desktop';
+                payload.platform = detectedPlat;
             } catch (_) {}
 
             // Оновлюємо users doc (за UID)
