@@ -14,6 +14,7 @@ const I18N_TRANSLATIONS = {
         nav_login: "Log In",
         nav_register: "Sign Up",
         nav_logout: "Log Out",
+        nav_admin_panel: "Admin Panel",
         scroll_to_top: "Scroll to top",
 
         // Home Page (index.html)
@@ -41,19 +42,35 @@ const I18N_TRANSLATIONS = {
         reg_link_login: "Log In",
 
         auth_err_empty_username: "Please enter a username.",
-        auth_err_len: "Username must be between 4 and 20 characters.",
-        auth_err_chars: "Username may only contain Latin letters, numbers, hyphens (-) and spaces.",
-        auth_err_letter: "Username must contain at least one Latin letter.",
-        auth_err_taken: "This username is already taken.",
+        auth_err_len: "Username must be between 2 and 14 letters.",
+        auth_err_chars: "Username must contain only English letters.",
+        auth_err_letters_only: "Username must contain only English letters (a-z, A-Z).",
+        auth_err_max_14: "Username maximum length is 14 letters.",
+        auth_err_min_len: "Username must be at least 2 letters.",
+        auth_err_letter: "Username must contain at least one English letter.",
+        auth_err_taken: "This username is already taken. Please choose another.",
         auth_err_diff: "Enter a username different from your current one.",
         auth_welcome: "Welcome, {username}!",
         auth_bye: "Goodbye!",
         auth_created: "Account created! Welcome, {username}!",
         auth_invalid_cred: "Invalid username or password.",
-        auth_email_taken: "This username is already taken.",
+        auth_email_taken: "This username is already taken. Please choose another.",
         auth_weak_pass: "Password is too short (min 6 characters).",
         auth_too_many: "Too many attempts. Please try again later.",
         auth_generic_err: "An error occurred. Please try again.",
+
+        // Registration Cheat-sheet
+        cheat_sheet_title: "📋 Login Requirements:",
+        cheat_rule_letters: "English letters only (a-z, A-Z)",
+        cheat_rule_length: "Maximum 14 characters",
+        cheat_rule_unique: "Unique individual login",
+
+        // User Statuses / Ranks
+        status_creator: "👑 Creator",
+        status_grandmaster: "♚ Vault Grandmaster",
+        status_master: "♜ Vault Master",
+        status_adept: "♞ Chess Adept",
+        status_member: "♟ Chess Vault Member",
 
         // Library Page (library.html)
         lib_title: "Chess Vault - Library",
@@ -129,7 +146,7 @@ const I18N_TRANSLATIONS = {
         // Settings Modal
         settings_title: "Account Settings",
         settings_username_section: "Change username / name",
-        settings_username_hint: "4 to 20 characters. Latin letters, numbers, hyphens (-) and spaces only.",
+        settings_username_hint: "Up to 14 characters. English letters only (a-z, A-Z). Must be unique.",
         settings_username_ph: "New username",
         settings_btn_update: "Update",
         settings_password_section: "Change password",
@@ -152,6 +169,11 @@ const I18N_TRANSLATIONS = {
         settings_delete_confirm: "Are you sure you want to delete your account? This action cannot be undone!",
         settings_saved_theme: "Theme switched to: {theme}",
         settings_saved_lang: "Language switched to: {lang}",
+        settings_date_format_section: "Date Format",
+        settings_date_format_hint: "Choose your preferred date display format (default is DD/MM/YYYY).",
+        settings_date_format_ddmmyyyy: "DD/MM/YYYY",
+        settings_date_format_mmddyyyy: "MM/DD/YYYY",
+        settings_saved_date_format: "Date format switched to: {format}",
         settings_username_updated: "Username successfully updated!",
         settings_password_updated: "Password successfully updated!",
 
@@ -176,6 +198,8 @@ const I18N_TRANSLATIONS = {
         topic_magazines_sub: "Periodical editions: «64», «Chess in USSR», bulletins",
         topic_history_title: "History & Culture",
         topic_history_sub: "Chess history, stories, legends and cultural impact of the game",
+        topic_general_title: "Theory & General Works",
+        topic_general_sub: "Handbooks, encyclopedias, rules and general chess literature",
 
         // Statistics tab in library
         stats_header_title: "Vault Database Analytics",
@@ -205,6 +229,7 @@ const I18N_TRANSLATIONS = {
         nav_login: "Вхід",
         nav_register: "Реєстрація",
         nav_logout: "Вийти",
+        nav_admin_panel: "Адмін-панель",
         scroll_to_top: "Нагору",
 
         // Home Page (index.html)
@@ -232,19 +257,35 @@ const I18N_TRANSLATIONS = {
         reg_link_login: "Увійти",
 
         auth_err_empty_username: "Введіть логін.",
-        auth_err_len: "Логін має бути довшим за 3 символи (від 4 до 20).",
-        auth_err_chars: "Логін може містити лише англійські літери, цифри, дефіс (-) та пробіл.",
-        auth_err_letter: "Логін повинен містити хоча б одну англійську літеру.",
+        auth_err_len: "Логін має бути від 2 до 14 літер.",
+        auth_err_chars: "Логін може містити виключно англійські літери.",
+        auth_err_letters_only: "Логін повинен містити виключно англійські літери (a-z, A-Z).",
+        auth_err_max_14: "Максимальна довжина логіна — 14 символів.",
+        auth_err_min_len: "Логін повинен містити щонайменше 2 літери.",
+        auth_err_letter: "Логін повинен містити виключно англійські літери.",
         auth_err_taken: "Цей логін вже зайнятий іншим користувачем.",
         auth_err_diff: "Введіть логін, відмінний від поточного.",
         auth_welcome: "Ласкаво просимо, {username}!",
         auth_bye: "До побачення!",
         auth_created: "Аккаунт створено! Ласкаво просимо, {username}!",
         auth_invalid_cred: "Невірний логін або пароль.",
-        auth_email_taken: "Цей логін вже зайнятий.",
+        auth_email_taken: "Цей логін вже зайнятий іншим користувачем.",
         auth_weak_pass: "Пароль занадто короткий (мін. 6 символів).",
         auth_too_many: "Забагато спроб. Спробуйте пізніше.",
         auth_generic_err: "Помилка. Спробуйте ще раз.",
+
+        // Реєстраційна шпаргалка
+        cheat_sheet_title: "📋 Вимоги до логіна:",
+        cheat_rule_letters: "Лише англійські літери (a-z, A-Z)",
+        cheat_rule_length: "Максимум 14 символів",
+        cheat_rule_unique: "Індивідуальний логін",
+
+        // Ранги та статуси користувачів
+        status_creator: "👑 Творець",
+        status_grandmaster: "♚ Гросмейстер Chess Vault",
+        status_master: "♜ Майстер Chess Vault",
+        status_adept: "♞ Знавець Chess Vault",
+        status_member: "♟ Учасник Chess Vault",
 
         // Library Page (library.html)
         lib_title: "Chess Vault - Бібліотека",
@@ -320,7 +361,7 @@ const I18N_TRANSLATIONS = {
         // Settings Modal
         settings_title: "Налаштування аккаунту",
         settings_username_section: "Зміна логіну / імені",
-        settings_username_hint: "Від 4 до 20 символів. Лише англійські літери, цифри, дефіс (-) та пробіл.",
+        settings_username_hint: "До 14 символів. Виключно англійські літери (a-z, A-Z). Логін має бути унікальним.",
         settings_username_ph: "Новий логін",
         settings_btn_update: "Оновити",
         settings_password_section: "Зміна пароля",
@@ -343,6 +384,11 @@ const I18N_TRANSLATIONS = {
         settings_delete_confirm: "Ви точно впевнені, що хочете видалити свій аккаунт? Цю дію неможливо скасувати!",
         settings_saved_theme: "Тему переключено на: {theme}",
         settings_saved_lang: "Мову переключено на: {lang}",
+        settings_date_format_section: "Формат дати",
+        settings_date_format_hint: "Оберіть формат відображення дат на сайті (за замовчуванням ДД/ММ/РРРР).",
+        settings_date_format_ddmmyyyy: "ДД/ММ/РРРР",
+        settings_date_format_mmddyyyy: "ММ/ДД/РРРР",
+        settings_saved_date_format: "Формат дати змінено на: {format}",
         settings_username_updated: "Логін успішно оновлено!",
         settings_password_updated: "Пароль успішно змінено!",
 
@@ -367,6 +413,8 @@ const I18N_TRANSLATIONS = {
         topic_magazines_sub: "Періодичні видання: «64», «Шахматы в СССР», вісники",
         topic_history_title: "Історія та культура",
         topic_history_sub: "Історія шахів, спогади, легенди та культурний вплив гри",
+        topic_general_title: "Теорія та загальні праці",
+        topic_general_sub: "Довідники, енциклопедії, кодекси та загальна шахова література",
 
         // Statistics tab in library
         stats_header_title: "Аналітика шахової бази",
@@ -447,6 +495,54 @@ const i18n = {
         }
     },
 
+    getDateFormat() {
+        try {
+            return localStorage.getItem('chess_date_format') || 'DD/MM/YYYY';
+        } catch (_) {
+            return 'DD/MM/YYYY';
+        }
+    },
+
+    setDateFormat(fmt, saveToCloud = true) {
+        if (fmt !== 'DD/MM/YYYY' && fmt !== 'MM/DD/YYYY') fmt = 'DD/MM/YYYY';
+        try {
+            localStorage.setItem('chess_date_format', fmt);
+        } catch (_) {}
+
+        // Dispatch date format change event
+        window.dispatchEvent(new CustomEvent('chessVaultDateFormatChanged', { detail: { dateFormat: fmt } }));
+
+        // If user is authenticated, sync to Firestore
+        if (saveToCloud && window.auth && window.auth.currentUser && window.db) {
+            try {
+                window.db.collection('user_preferences').doc(window.auth.currentUser.uid).set({
+                    dateFormat: fmt,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true }).catch(() => {});
+            } catch (_) {}
+        }
+    },
+
+    formatDate(dateObj, includeTime = false) {
+        if (!dateObj) return '—';
+        const d = dateObj.toDate ? dateObj.toDate() : (dateObj instanceof Date ? dateObj : new Date(dateObj));
+        if (isNaN(d.getTime())) return '—';
+
+        const fmt = this.getDateFormat();
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+
+        const dateStr = (fmt === 'MM/DD/YYYY') ? `${month}/${day}/${year}` : `${day}/${month}/${year}`;
+
+        if (includeTime) {
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            return `${dateStr} ${hours}:${minutes}`;
+        }
+        return dateStr;
+    },
+
     translatePage() {
         // Elements with data-i18n
         document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -513,3 +609,199 @@ const i18n = {
 // Initialize immediately so currentLang is ready for sync execution
 i18n.init();
 window.i18n = i18n;
+
+window.formatAppDate = function (dateObj, includeTime = false) {
+    if (window.i18n && window.i18n.formatDate) {
+        return window.i18n.formatDate(dateObj, includeTime);
+    }
+    const d = dateObj && dateObj.toDate ? dateObj.toDate() : (dateObj instanceof Date ? dateObj : new Date(dateObj));
+    if (!d || isNaN(d.getTime())) return '—';
+    const fmt = localStorage.getItem('chess_date_format') || 'DD/MM/YYYY';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const dateStr = (fmt === 'MM/DD/YYYY') ? `${month}/${day}/${year}` : `${day}/${month}/${year}`;
+    if (includeTime) {
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${dateStr} ${hours}:${minutes}`;
+    }
+    return dateStr;
+};
+
+// Global Creator & Admin Helpers (admin, denys)
+window.CREATOR_LOGINS = ['admin', 'denys', 'админ', 'denysdraha'];
+// Тільки головний адміністратор admin має доступ до дашборду
+window.ALLOWED_ADMINS = ['admin', 'админ'];
+
+window.isChessAdmin = function (user) {
+    if (!user) return false;
+    const name = (user.displayName || (user.email ? user.email.split('@')[0] : '')).toLowerCase().trim();
+    const email = (user.email || '').toLowerCase().trim();
+    return (window.ALLOWED_ADMINS || []).some(adm => {
+        const a = adm.toLowerCase().trim();
+        return name === a || email === `${a}@chess-lib.local` || email === a;
+    });
+};
+
+// ========================================================
+// ЖОРСТКА ВАЛІДАЦІЯ ЛОГІНА
+// Тільки англійські літери (a-z, A-Z), максимум 14 символів
+// ========================================================
+window.validateChessUsername = function (username) {
+    const t = (k) => window.i18n ? window.i18n.t(k) : k;
+    if (!username || !username.trim()) {
+        return {
+            valid: false,
+            error: t('auth_err_empty_username'),
+            ruleLetters: false,
+            ruleLength: false
+        };
+    }
+    const trimmed = username.trim();
+    const isLettersOnly = /^[a-zA-Z]+$/.test(trimmed);
+    const isWithinLength = trimmed.length >= 2 && trimmed.length <= 14;
+
+    if (!isLettersOnly) {
+        return {
+            valid: false,
+            error: t('auth_err_letters_only'),
+            ruleLetters: false,
+            ruleLength: isWithinLength
+        };
+    }
+    if (trimmed.length > 14) {
+        return {
+            valid: false,
+            error: t('auth_err_max_14'),
+            ruleLetters: true,
+            ruleLength: false
+        };
+    }
+    if (trimmed.length < 2) {
+        return {
+            valid: false,
+            error: t('auth_err_min_len'),
+            ruleLetters: true,
+            ruleLength: false
+        };
+    }
+
+    return {
+        valid: true,
+        error: null,
+        ruleLetters: true,
+        ruleLength: true
+    };
+};
+
+// ========================================================
+// ДИНАМІЧНИЙ РОЗРАХУНОК РАНГУ / СТАТУСУ КОРИСТУВАЧА
+// - admin та denys -> статус "Творець" (Creator)
+// - Прогресія:
+//     • Ранг 0: Учасник (< 1 міс. або < 5 скачувань)
+//     • Ранг 1: Знавець (≥ 1 місяць та ≥ 5 скачувань)
+//     • Ранг 2: Майстер (≥ 6 місяців та ≥ 10 скачувань)
+//     • Ранг 3: Гросмейстер (≥ 1 рік та ≥ 20 скачувань)
+// ========================================================
+window.getUserRank = function (userOrData, downloadsCount = 0, creationDate = null) {
+    const isEn = window.i18n && window.i18n.currentLang === 'en';
+
+    // 1. Отримуємо ім'я
+    let username = '';
+    if (typeof userOrData === 'string') {
+        username = userOrData;
+    } else if (userOrData) {
+        username = userOrData.username || userOrData.displayName || (userOrData.email ? userOrData.email.split('@')[0] : '');
+    }
+    username = (username || '').toLowerCase().trim();
+
+    // 2. Статус Создателя / Творца (admin, denys)
+    const isCreator = (window.CREATOR_LOGINS || ['admin', 'denys']).some(c => c.toLowerCase() === username);
+    if (isCreator) {
+        return {
+            id: 'creator',
+            title: isEn ? 'Creator' : 'Творець',
+            fullLabel: isEn ? '👑 Creator' : '👑 Творець',
+            icon: '👑',
+            badgeClass: 'badge-creator',
+            badgeStyle: 'background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(217, 119, 6, 0.35)); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.6); font-weight: 700; box-shadow: 0 0 10px rgba(245, 158, 11, 0.25);',
+            isCreator: true,
+            hint: isEn ? 'Special Creator Status' : 'Особливий статус засновника'
+        };
+    }
+
+    // 3. Розрахунок віку аккаунта в днях
+    let createdMs = 0;
+    if (creationDate) {
+        createdMs = creationDate.getTime ? creationDate.getTime() : new Date(creationDate).getTime();
+    } else if (userOrData && userOrData.createdAt) {
+        const ca = userOrData.createdAt;
+        createdMs = ca.toMillis ? ca.toMillis() : (ca.toDate ? ca.toDate().getTime() : new Date(ca).getTime());
+    } else if (userOrData && userOrData.metadata && userOrData.metadata.creationTime) {
+        createdMs = new Date(userOrData.metadata.creationTime).getTime();
+    }
+
+    const nowMs = Date.now();
+    const daysOld = createdMs > 0 ? Math.max(0, Math.floor((nowMs - createdMs) / (1000 * 60 * 60 * 24))) : 0;
+    const dl = Number(downloadsCount) || 0;
+
+    // 4. Трьохетапна шкала досягнень:
+
+    // Ласт апгрейд: через 1 рік (365 днів) та 20 скачувань
+    if (daysOld >= 365 && dl >= 20) {
+        return {
+            id: 'grandmaster',
+            title: isEn ? 'Vault Grandmaster' : 'Гросмейстер',
+            fullLabel: isEn ? '♚ Vault Grandmaster' : '♚ Гросмейстер Chess Vault',
+            icon: '♚',
+            badgeClass: 'badge-grandmaster',
+            badgeStyle: 'background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(236, 72, 153, 0.25)); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.55); font-weight: 700; box-shadow: 0 0 10px rgba(168, 85, 247, 0.25);',
+            hint: isEn ? 'Highest mastery rank achieved!' : 'Найвищий ранг майстерності досягнуто!'
+        };
+    }
+
+    // Слід апгрейд: через 6 місяців (180 днів) та 10 скачувань
+    if (daysOld >= 180 && dl >= 10) {
+        const daysLeft = Math.max(0, 365 - daysOld);
+        const dlLeft = Math.max(0, 20 - dl);
+        return {
+            id: 'master',
+            title: isEn ? 'Vault Master' : 'Майстер',
+            fullLabel: isEn ? '♜ Vault Master' : '♜ Майстер Chess Vault',
+            icon: '♜',
+            badgeClass: 'badge-master',
+            badgeStyle: 'background: linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(6, 182, 212, 0.25)); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.55); font-weight: 700;',
+            hint: isEn ? `Next: ♚ Grandmaster (${daysLeft}d & ${dlLeft} downloads left)` : `Наступний: ♚ Гросмейстер (залишилось ${daysLeft} дн. та ${dlLeft} скачувань)`
+        };
+    }
+
+    // Перший апгрейд: через 1 місяць (30 днів) та 5 скачувань
+    if (daysOld >= 30 && dl >= 5) {
+        const daysLeft = Math.max(0, 180 - daysOld);
+        const dlLeft = Math.max(0, 10 - dl);
+        return {
+            id: 'adept',
+            title: isEn ? 'Chess Adept' : 'Знавець',
+            fullLabel: isEn ? '♞ Chess Adept' : '♞ Знавець Chess Vault',
+            icon: '♞',
+            badgeClass: 'badge-adept',
+            badgeStyle: 'background: linear-gradient(135deg, rgba(59, 130, 246, 0.22), rgba(99, 102, 241, 0.25)); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.55); font-weight: 700;',
+            hint: isEn ? `Next: ♜ Master (${daysLeft}d & ${dlLeft} downloads left)` : `Наступний: ♜ Майстер (залишилось ${daysLeft} дн. та ${dlLeft} скачувань)`
+        };
+    }
+
+    // Базовий рівень: Учасник
+    const daysLeft = Math.max(0, 30 - daysOld);
+    const dlLeft = Math.max(0, 5 - dl);
+    return {
+        id: 'member',
+        title: isEn ? 'Member' : 'Учасник',
+        fullLabel: isEn ? '♟ Chess Vault Member' : '♟ Учасник Chess Vault',
+        icon: '♟',
+        badgeClass: 'badge-member',
+        badgeStyle: 'background: rgba(255, 255, 255, 0.08); color: #94a3b8; border: 1px solid rgba(255, 255, 255, 0.15);',
+        hint: isEn ? `Next: ♞ Adept (${daysLeft}d & ${dlLeft} downloads left)` : `Наступний: ♞ Знавець (залишилось ${daysLeft} дн. та ${dlLeft} скачувань)`
+    };
+};
+

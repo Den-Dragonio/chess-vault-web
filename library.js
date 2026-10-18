@@ -1,7 +1,12 @@
 const ARCHIVE_ID = '1971_20260223';
 let allBooks = [];
-let sortDirections = { author: 1, year: 1, pages: 1, sizeRaw: 1 };
+let sortDirections = { author: 1, year: 1, pages: 1, sizeRaw: -1 };
 let currentUser = null;
+
+function sortBooksBySizeDesc(books) {
+    if (!Array.isArray(books)) return books;
+    return books.sort((a, b) => (Number(b.sizeRaw) || 0) - (Number(a.sizeRaw) || 0));
+}
 
 // =============================================
 // FIREBASE — compat SDK (вже ініціалізовано в auth-shared.js)
@@ -113,13 +118,14 @@ async function fetchArchiveData() {
     let hasLoadedCache = false;
 
     if (cached && cached.length > 0) {
-        allBooks = cached;
+        allBooks = sortBooksBySizeDesc([...cached]);
         hasLoadedCache = true;
         if (typeof initCollections === 'function') {
             initCollections(allBooks);
         } else {
             renderTable(allBooks);
         }
+        updateSortButtonsUI('sizeRaw', -1);
         updateLibraryStats(allBooks);
         applyUrlSearch();
     }
@@ -193,7 +199,7 @@ async function fetchArchiveData() {
             }
         });
 
-        const unifiedBooks = Array.from(booksMap.values());
+        const unifiedBooks = sortBooksBySizeDesc(Array.from(booksMap.values()));
 
         if (unifiedBooks.length > 0) {
             // Зберігаємо актуальний об'єднаний каталог
@@ -210,6 +216,7 @@ async function fetchArchiveData() {
                 } else {
                     renderTable(allBooks);
                 }
+                updateSortButtonsUI('sizeRaw', -1);
                 updateLibraryStats(allBooks);
                 applyUrlSearch();
             }
@@ -324,17 +331,42 @@ document.getElementById('lib-search-input').addEventListener('input', e => {
     }
 });
 
+function updateSortButtonsUI(activeKey, dir) {
+    document.querySelectorAll('.sort-controls .sort-btn').forEach(btn => {
+        const onclickAttr = btn.getAttribute('onclick') || '';
+        const isThis = onclickAttr.includes(`'${activeKey}'`) || onclickAttr.includes(`"${activeKey}"`);
+        btn.classList.toggle('active', isThis);
+        const arrowEl = btn.querySelector('.sort-arrow');
+        if (isThis) {
+            const arrow = dir === -1 ? ' ↓' : ' ↑';
+            if (arrowEl) {
+                arrowEl.textContent = arrow;
+            } else {
+                const sp = document.createElement('span');
+                sp.className = 'sort-arrow';
+                sp.textContent = arrow;
+                btn.appendChild(sp);
+            }
+        } else if (arrowEl) {
+            arrowEl.remove();
+        }
+    });
+}
+window.updateSortButtonsUI = updateSortButtonsUI;
+
 function sortBooks(key) {
     sortDirections[key] *= -1;
     const dir = sortDirections[key];
     const sorter = (a, b) => {
         let valA = a[key];
         let valB = b[key];
-        if (key === 'pages') {
-            valA = valA || 0;
-            valB = valB || 0;
+        if (key === 'pages' || key === 'sizeRaw') {
+            valA = Number(valA) || 0;
+            valB = Number(valB) || 0;
             return (valA - valB) * dir;
         }
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
         if (valA < valB) return -1 * dir;
         if (valA > valB) return 1 * dir;
         return 0;
@@ -343,6 +375,7 @@ function sortBooks(key) {
     if (typeof collectionsState !== 'undefined' && collectionsState.allBooks) {
         collectionsState.allBooks.sort(sorter);
     }
+    updateSortButtonsUI(key, dir);
     if (typeof renderFilteredBooks === 'function') {
         renderFilteredBooks();
     } else {
@@ -358,6 +391,19 @@ window.addEventListener('chessVaultLanguageChanged', () => {
     }
     if (allBooks && allBooks.length > 0) {
         updateLibraryStats(allBooks);
+    }
+});
+
+// Escape повертає на головну сторінку, якщо всі модалки закриті
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' || e.key === 'Esc') {
+        const bookOverlay = document.getElementById('book-detail-overlay');
+        if (bookOverlay && bookOverlay.classList.contains('active')) return;
+
+        const champOverlay = document.getElementById('champion-modal-overlay');
+        if (champOverlay && champOverlay.classList.contains('active')) return;
+
+        window.location.href = 'index.html';
     }
 });
 

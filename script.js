@@ -121,6 +121,11 @@ function closeModal(m) {
     const e2 = document.getElementById('reg-error');
     if (e1) e1.textContent = '';
     if (e2) e2.textContent = '';
+    hasAttemptedReg = false;
+    const sheet = document.getElementById('reg-rules-cheat-sheet');
+    if (sheet) sheet.style.display = 'none';
+    const regInput = document.getElementById('reg-name');
+    if (regInput) regInput.classList.remove('input-error');
 }
 
 function bindLoginTrigger() {
@@ -139,6 +144,12 @@ document.getElementById('close-reg').onclick = () => closeModal(regModal);
 document.getElementById('switch-to-reg').onclick = e => { e.preventDefault(); closeModal(loginModal); openModal(regModal); };
 document.getElementById('switch-to-login').onclick = e => { e.preventDefault(); closeModal(regModal); openModal(loginModal); };
 window.onclick = e => { if (e.target.classList.contains('modal-overlay')) closeModal(e.target); };
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' || e.key === 'Esc') {
+        if (loginModal && loginModal.style.display === 'flex') closeModal(loginModal);
+        if (regModal && regModal.style.display === 'flex') closeModal(regModal);
+    }
+});
 
 // =============================================
 // 5. ПОМИЛКИ FIREBASE
@@ -209,22 +220,114 @@ document.getElementById('auth-form').addEventListener('submit', async e => {
     const t = (k, p) => window.i18n ? window.i18n.t(k, p) : k;
     if (!username) { errEl.textContent = t('auth_err_empty_username'); return; }
     try {
-        await auth.signInWithEmailAndPassword(toFakeEmail(username), password);
+        const cred = await auth.signInWithEmailAndPassword(toFakeEmail(username), password);
+        if (window.cvAnalytics) {
+            window.cvAnalytics.clearAttribution();
+        }
+        try {
+            if (cred && cred.user) {
+                if (window.trackUserPresence) {
+                    window.trackUserPresence(cred.user);
+                }
+                db.collection('users').doc(cred.user.uid).set({
+                    last_active_at: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true }).catch(() => {});
+                db.collection('user_preferences').doc(cred.user.uid).set({
+                    last_active_at: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true }).catch(() => {});
+            }
+        } catch (_) {}
         closeModal(loginModal);
         showToast(t('auth_welcome', { username: username }));
     } catch (err) { errEl.textContent = translateError(err.code); }
 });
 
-function validateUsernameStrict(username) {
-    const t = (k) => window.i18n ? window.i18n.t(k) : k;
-    if (!username) return t('auth_err_empty_username');
-    if (username.length <= 3) return t('auth_err_len');
-    if (username.length > 20) return t('auth_err_len');
-    if (!/^[a-zA-Z0-9 -]+$/.test(username)) {
-        return t('auth_err_chars');
+let hasAttemptedReg = false;
+
+function updateRegCheatSheetUI(valResult, isTaken = false) {
+    const sheet = document.getElementById('reg-rules-cheat-sheet');
+    const nameInput = document.getElementById('reg-name');
+    if (!sheet) return;
+
+    if (!hasAttemptedReg) {
+        sheet.style.display = 'none';
+        if (nameInput) nameInput.classList.remove('input-error');
+        return;
     }
-    if (!/[a-zA-Z]/.test(username)) {
-        return t('auth_err_letter');
+
+    sheet.style.display = 'block';
+
+    const ruleLetters = document.getElementById('rule-letters');
+    const ruleLength = document.getElementById('rule-length');
+    const ruleUnique = document.getElementById('rule-unique');
+
+    const stateLetters = document.getElementById('state-letters');
+    const stateLength = document.getElementById('state-length');
+    const stateUnique = document.getElementById('state-unique');
+
+    // 1. Правило: тільки англійські літери
+    if (ruleLetters && stateLetters) {
+        if (valResult.ruleLetters) {
+            ruleLetters.className = 'rule-passed';
+            stateLetters.textContent = '✅';
+        } else {
+            ruleLetters.className = 'rule-failed';
+            stateLetters.textContent = '❌';
+        }
+    }
+
+    // 2. Правило: максимум 14 символів
+    if (ruleLength && stateLength) {
+        if (valResult.ruleLength) {
+            ruleLength.className = 'rule-passed';
+            stateLength.textContent = '✅';
+        } else {
+            ruleLength.className = 'rule-failed';
+            stateLength.textContent = '❌';
+        }
+    }
+
+    // 3. Правило: унікальний логін
+    if (ruleUnique && stateUnique) {
+        if (isTaken) {
+            ruleUnique.className = 'rule-failed';
+            stateUnique.textContent = '❌';
+        } else if (valResult.valid) {
+            ruleUnique.className = 'rule-passed';
+            stateUnique.textContent = '✅';
+        } else {
+            ruleUnique.className = '';
+            stateUnique.textContent = '⚪';
+        }
+    }
+
+    if (nameInput) {
+        if (valResult.valid && !isTaken) {
+            nameInput.classList.remove('input-error');
+        } else {
+            nameInput.classList.add('input-error');
+        }
+    }
+}
+
+// Живе оновлення шпаргалки під час введення (активується ТІЛЬКИ після першої невдалої спроби)
+const regNameInputEl = document.getElementById('reg-name');
+if (regNameInputEl) {
+    regNameInputEl.addEventListener('input', () => {
+        if (hasAttemptedReg) {
+            const raw = regNameInputEl.value.trim();
+            const val = window.validateChessUsername ? window.validateChessUsername(raw) : { valid: true, ruleLetters: true, ruleLength: true };
+            updateRegCheatSheetUI(val, false);
+            const errEl = document.getElementById('reg-error');
+            if (errEl) errEl.textContent = val.error || '';
+        }
+    });
+}
+
+function validateUsernameStrict(username) {
+    if (window.validateChessUsername) {
+        const res = window.validateChessUsername(username);
+        return res.valid ? null : res.error;
     }
     return null;
 }
@@ -234,24 +337,32 @@ function validateUsernameStrict(username) {
 // =============================================
 document.getElementById('signup-form').addEventListener('submit', async e => {
     e.preventDefault();
-    const username = document.getElementById('reg-name').value.trim();
+    const nameInput = document.getElementById('reg-name');
+    const username = nameInput.value.trim();
     const password = document.getElementById('reg-password').value;
     const errEl = document.getElementById('reg-error');
     errEl.textContent = '';
     const t = (k, p) => window.i18n ? window.i18n.t(k, p) : k;
-    
-    const valErr = validateUsernameStrict(username);
-    if (valErr) {
-        errEl.textContent = valErr;
+
+    // Жорстка валідація логіна: тільки англ літери, макс 14 символів
+    const valResult = window.validateChessUsername ? window.validateChessUsername(username) : { valid: true, ruleLetters: true, ruleLength: true };
+    if (!valResult.valid) {
+        hasAttemptedReg = true;
+        updateRegCheatSheetUI(valResult, false);
+        errEl.textContent = valResult.error;
+        nameInput.focus();
         return;
     }
 
     try {
-        // Перевірка унікальності логіну
+        // Перевірка індивідуальності (унікальності) логіну в базі
         try {
-            const snap = await db.collection('usernames').doc(username.toLowerCase().replace(/\s+/g, '_')).get();
+            const snap = await db.collection('usernames').doc(username.toLowerCase()).get();
             if (snap.exists) {
+                hasAttemptedReg = true;
+                updateRegCheatSheetUI(valResult, true);
                 errEl.textContent = t('auth_err_taken');
+                nameInput.focus();
                 return;
             }
         } catch (_) {}
@@ -259,20 +370,103 @@ document.getElementById('signup-form').addEventListener('submit', async e => {
         const cred = await auth.createUserWithEmailAndPassword(toFakeEmail(username), password);
         await cred.user.updateProfile({ displayName: username });
 
+        // Успішна реєстрація - ховаємо шпаргалку
+        hasAttemptedReg = false;
+        updateRegCheatSheetUI({ valid: true, ruleLetters: true, ruleLength: true }, false);
+
+        // Отримуємо збережені дані веб-аналітики першого заходу
+        const attribution = (window.cvAnalytics && window.cvAnalytics.getAttribution()) || {
+            referrer: (typeof document !== 'undefined' && document.referrer ? document.referrer.trim() : '') || 'Прямой заход / Закладки',
+            utm_source: null,
+            landing_page: window.location.href
+        };
+
+        const referrer = attribution.referrer || 'Прямой заход / Закладки';
+        const utmSource = attribution.utm_source || null;
+        const utmMedium = attribution.utm_medium || null;
+        const utmCampaign = attribution.utm_campaign || null;
+        const landingPage = attribution.landing_page || window.location.href;
+        const timezone = attribution.timezone || 'UTC';
+        const device = attribution.device || 'desktop';
+        const platform = attribution.platform || 'Other';
+        const browserLanguage = attribution.language || 'en';
+        const screenRes = attribution.screen || null;
+
+        // Отримуємо GeoIP (IP, місто, країна, прапор)
+        let geoInfo = null;
+        if (window.getClientGeoIp) {
+            try { geoInfo = await window.getClientGeoIp(); } catch (_) {}
+        }
+        const userIp = (geoInfo && geoInfo.ip) || attribution.ip || null;
+        const userCountry = (geoInfo && geoInfo.country) || attribution.country || null;
+        const userCity = (geoInfo && geoInfo.city) || attribution.city || null;
+        const userCountryFlag = (geoInfo && geoInfo.country_flag) || attribution.country_flag || null;
+
+        // Зберігаємо веб-аналітику в профіль користувача (колекція 'users')
+        try {
+            await db.collection('users').doc(cred.user.uid).set({
+                uid: cred.user.uid,
+                username: username,
+                referrer: referrer,
+                utm_source: utmSource,
+                landing_page: landingPage,
+                timezone: timezone,
+                device: device,
+                platform: platform,
+                browser_language: browserLanguage,
+                screen: screenRes,
+                downloads_count: 0,
+                ip: userIp,
+                country: userCountry,
+                city: userCity,
+                country_flag: userCountryFlag,
+                last_active_at: firebase.firestore.FieldValue.serverTimestamp(),
+                ...(utmMedium ? { utm_medium: utmMedium } : {}),
+                ...(utmCampaign ? { utm_campaign: utmCampaign } : {}),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+        } catch (_) {}
+
         // Фіксуємо унікальний логін
         try {
             await db.collection('usernames').doc(username.toLowerCase().replace(/\s+/g, '_')).set({
                 uid: cred.user.uid,
                 username: username,
+                referrer: referrer,
+                utm_source: utmSource,
+                landing_page: landingPage,
+                timezone: timezone,
+                device: device,
+                platform: platform,
+                ip: userIp,
+                country: userCountry,
+                city: userCity,
+                country_flag: userCountryFlag,
+                last_active_at: firebase.firestore.FieldValue.serverTimestamp(),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
         } catch (_) {}
 
-        // Зберігаємо дефолтні налаштування користувача (поточну мову та тему)
+        // Зберігаємо дефолтні налаштування користувача (поточну мову, тему та дані атрибуції)
         try {
             await db.collection('user_preferences').doc(cred.user.uid).set({
                 language: window.i18n ? window.i18n.getLanguage() : 'en',
                 theme: localStorage.getItem('chess_theme') || 'system',
+                dateFormat: window.i18n ? window.i18n.getDateFormat() : (localStorage.getItem('chess_date_format') || 'DD/MM/YYYY'),
+                referrer: referrer,
+                utm_source: utmSource,
+                landing_page: landingPage,
+                timezone: timezone,
+                device: device,
+                platform: platform,
+                downloads_count: 0,
+                ip: userIp,
+                country: userCountry,
+                city: userCity,
+                country_flag: userCountryFlag,
+                last_active_at: firebase.firestore.FieldValue.serverTimestamp(),
+                ...(utmMedium ? { utm_medium: utmMedium } : {}),
+                ...(utmCampaign ? { utm_campaign: utmCampaign } : {}),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
         } catch (_) {}
@@ -286,9 +480,27 @@ document.getElementById('signup-form').addEventListener('submit', async e => {
             });
         } catch (_) { /* не критично */ }
 
+        // Відстежуємо присутність
+        if (window.trackUserPresence) {
+            window.trackUserPresence(cred.user);
+        }
+
+        // Очищаємо атрибуцію після успішної реєстрації
+        if (window.cvAnalytics) {
+            window.cvAnalytics.clearAttribution();
+        }
+
         closeModal(regModal);
-        showToast(t('auth_created', { username: username }));
-    } catch (err) { errEl.textContent = translateError(err.code); }
+    } catch (err) {
+        hasAttemptedReg = true;
+        if (err.code === 'auth/email-already-in-use') {
+            updateRegCheatSheetUI(valResult, true);
+            errEl.textContent = t('auth_err_taken');
+        } else {
+            errEl.textContent = translateError(err.code);
+        }
+        nameInput.focus();
+    }
 });
 
 // =============================================
@@ -298,7 +510,13 @@ function updateHeaderAuthUI(user) {
     const accBtn = document.getElementById('acc-btn');
     const accDropdown = document.getElementById('acc-dropdown');
     const myAccountLink = document.getElementById('nav-my-account');
+    const adminLink = document.getElementById('nav-admin-link');
     const t = (k) => window.i18n ? window.i18n.t(k) : k;
+
+    const isAdmin = window.isChessAdmin && window.isChessAdmin(user);
+    if (adminLink) {
+        adminLink.style.display = isAdmin ? 'inline-block' : 'none';
+    }
 
     if (user) {
         const name = user.displayName || user.email.split('@')[0];
@@ -308,12 +526,17 @@ function updateHeaderAuthUI(user) {
             myAccountLink.textContent = t('nav_my_account');
         }
         if (accDropdown) {
-            accDropdown.innerHTML = `<a href="#" id="logout-btn">🚪 ${t('nav_logout')}</a>`;
-            document.getElementById('logout-btn').onclick = async e => {
-                e.preventDefault();
-                await auth.signOut();
-                showToast(t('auth_bye'));
-            };
+            accDropdown.innerHTML = `
+                <a href="#" id="logout-btn">🚪 ${t('nav_logout')}</a>
+            `;
+            const logoutEl = document.getElementById('logout-btn');
+            if (logoutEl) {
+                logoutEl.onclick = async e => {
+                    e.preventDefault();
+                    await auth.signOut();
+                    showToast(t('auth_bye'));
+                };
+            }
         }
     } else {
         if (accBtn) accBtn.textContent = `${t('nav_account')} ▾`;
@@ -321,7 +544,8 @@ function updateHeaderAuthUI(user) {
         if (accDropdown) {
             accDropdown.innerHTML = `
                 <a href="#" id="login-trigger">🔑 ${t('nav_login')}</a>
-                <a href="#" id="reg-trigger">📝 ${t('nav_register')}</a>`;
+                <a href="#" id="reg-trigger">📝 ${t('nav_register')}</a>
+            `;
             bindLoginTrigger();
             bindRegTrigger();
         }
@@ -342,10 +566,25 @@ auth.onAuthStateChanged(async user => {
                 if (prefs.language && window.i18n) {
                     window.i18n.setLanguage(prefs.language, false);
                 }
+                if (prefs.dateFormat && window.i18n) {
+                    window.i18n.setDateFormat(prefs.dateFormat, false);
+                }
             }
         } catch (err) {
             console.warn('Could not load user preferences:', err);
         }
+
+        // Оновлення мітки активності (heartbeat)
+        try {
+            const now = Date.now();
+            const lastPing = parseInt(sessionStorage.getItem('cv_last_active_ping') || '0', 10);
+            if (now - lastPing > 3 * 60 * 1000) {
+                sessionStorage.setItem('cv_last_active_ping', String(now));
+                db.collection('users').doc(user.uid).set({
+                    last_active_at: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true }).catch(() => {});
+            }
+        } catch (_) {}
     }
     updateHeaderAuthUI(user);
 });
@@ -360,8 +599,7 @@ window.addEventListener('chessVaultLanguageChanged', () => {
 function formatDate(ts) {
     if (!ts) return '';
     const d = ts.toDate ? ts.toDate() : new Date(ts);
-    const lang = (window.i18n && window.i18n.currentLang === 'uk') ? 'uk-UA' : 'en-US';
-    return d.toLocaleDateString(lang, { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return window.formatAppDate ? window.formatAppDate(d) : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth()+1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
 function renderNewsList(docs) {
@@ -458,6 +696,11 @@ seedSystemNews();
 // Збереження списку документів новин для рендеру при перемиканні мови
 let latestNewsDocs = [];
 window.addEventListener('chessVaultLanguageChanged', () => {
+    if (latestNewsDocs.length > 0) {
+        renderNewsList(latestNewsDocs);
+    }
+});
+window.addEventListener('chessVaultDateFormatChanged', () => {
     if (latestNewsDocs.length > 0) {
         renderNewsList(latestNewsDocs);
     }

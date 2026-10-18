@@ -170,7 +170,15 @@ if (document.readyState === 'loading') {
 } else {
     ensureBookModalElements();
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBookModal(); });
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' || e.key === 'Esc') {
+        const overlay = document.getElementById('book-detail-overlay');
+        if (overlay && overlay.classList.contains('active')) {
+            closeBookModal();
+            e.stopImmediatePropagation();
+        }
+    }
+});
 
 // =============================================
 // SKELETON
@@ -880,6 +888,13 @@ async function onDownloadClick(btn) {
                 repeatCount: firebase.firestore.FieldValue.increment(1)
             }, { merge: true });
 
+            firestoreDb.collection('users').doc(user.uid).set({
+                last_active_at: now
+            }, { merge: true }).catch(() => {});
+            firestoreDb.collection('user_preferences').doc(user.uid).set({
+                last_active_at: now
+            }, { merge: true }).catch(() => {});
+
             const repeatMsg = isEn ? '📥 Book downloaded again' : '📥 Книгу завантажено знову (повторне завантаження)';
             if (typeof showLibToast === 'function') showLibToast(repeatMsg);
             else if (typeof showToast === 'function') showToast(repeatMsg);
@@ -919,6 +934,18 @@ async function onDownloadClick(btn) {
             timestamp: now,
             type: 'download'
         });
+
+        // 4. Оновлюємо лічильник скачувань у профілі користувача
+        const userProfileRef = firestoreDb.collection('users').doc(user.uid);
+        batch.set(userProfileRef, {
+            downloads_count: firebase.firestore.FieldValue.increment(1),
+            last_active_at: now
+        }, { merge: true });
+        const userPrefRef = firestoreDb.collection('user_preferences').doc(user.uid);
+        batch.set(userPrefRef, {
+            downloads_count: firebase.firestore.FieldValue.increment(1),
+            last_active_at: now
+        }, { merge: true });
 
         await batch.commit();
 

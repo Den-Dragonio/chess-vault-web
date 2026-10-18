@@ -7,15 +7,17 @@
     <title>Chess Vault - Бібліотека</title>
     <link rel="icon" href="img/icon.png" type="image/png" sizes="64x64">
     <link rel="apple-touch-icon" href="img/icon.png">
-    <link rel="stylesheet" href="library.css">
+    <link rel="stylesheet" href="library.css?v=8">
     <link rel="stylesheet" href="book-modal.css">
     <link rel="stylesheet" href="collections.css">
     <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
     <script src="dark-mode-init.js"></script>
-    <script src="i18n.js?v=1"></script>
+    <script src="analytics.js?v=1"></script>
+    <script src="i18n.js?v=9"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="presence.js?v=1"></script>
 </head>
 
 <body class="library-page">
@@ -26,6 +28,7 @@
             <a href="index.html" data-i18n="nav_home">Головна</a>
             <a href="profile.html" id="nav-my-account" style="display:none;" data-i18n="nav_my_account">Мій Аккаунт</a>
             <a href="library.html" class="active-link" data-i18n="nav_library">Бібліотека</a>
+            <a href="admin.html" id="nav-admin-link" style="display:none; color: #f59e0b; font-weight: 700;">👑 <span data-i18n="nav_admin_panel">Адмін-панель</span></a>
             <div class="dropdown">
                 <a class="dropbtn" id="acc-btn"><span data-i18n="nav_account">Аккаунт</span> ▾</a>
                 <div class="dropdown-content" id="acc-dropdown">
@@ -132,14 +135,14 @@
     </div>
 
 
-    <script src="auth-shared.js?v=6"></script>
+    <script src="auth-shared.js?v=9"></script>
     <script src="page_counts.js?v=6"></script>
     <script src="descriptions.js?v=6"></script>
-    <script src="book-modal.js?v=6"></script>
+    <script src="book-modal.js?v=7"></script>
     <script src="collections-data.js?v=6"></script>
-    <script src="collections.js?v=6"></script>
+    <script src="collections.js?v=9"></script>
     <script src="books-cache.js?v=6"></script>
-    <script src="library.js?v=6"></script>
+    <script src="library.js?v=10"></script>
 </body>
 
 </html>

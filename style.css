@@ -241,13 +241,95 @@ html {
     border-bottom: none;
 }
 
-/* Помилка авторизації */
+/* Помилка авторизації та валідація */
 .auth-error {
-    margin-top: 12px;
+    margin-top: 10px;
     font-size: 0.88rem;
-    color: #c0392b;
+    color: #ef4444;
     min-height: 1.2em;
     text-align: center;
+    font-weight: 500;
+}
+
+input.input-error {
+    border-color: #ef4444 !important;
+    background-color: rgba(239, 68, 68, 0.05) !important;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2) !important;
+}
+
+/* Шпаргалка вимог до логіна (показується тільки при спробі створення аккаунта з порушенням) */
+.reg-cheat-sheet {
+    background: rgba(239, 68, 68, 0.06);
+    border: 1px solid rgba(239, 68, 68, 0.28);
+    border-radius: 14px;
+    padding: 10px 14px;
+    margin: -4px 0 4px;
+    text-align: left;
+    font-size: 0.8rem;
+    animation: fadeInCheat 0.25s ease-out forwards;
+}
+
+@keyframes fadeInCheat {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.cheat-sheet-title {
+    font-weight: 700;
+    color: #ef4444;
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+}
+
+.cheat-sheet-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.cheat-sheet-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    color: #64748b;
+    font-size: 0.78rem;
+    transition: all 0.2s ease;
+}
+
+.cheat-sheet-list li .rule-state {
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.cheat-sheet-list li.rule-passed {
+    color: #10b981;
+    font-weight: 600;
+}
+
+.cheat-sheet-list li.rule-failed {
+    color: #ef4444;
+    font-weight: 600;
+}
+
+html.dark .reg-cheat-sheet {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+html.dark .cheat-sheet-list li {
+    color: #94a3b8;
+}
+
+html.dark .cheat-sheet-list li.rule-passed {
+    color: #34d399;
+}
+
+html.dark .cheat-sheet-list li.rule-failed {
+    color: #f87171;
 }
 
 /* --- МОДАЛКИ --- */

@@ -407,7 +407,8 @@ function getBookAuthorClean(book) {
 
 // --- 4. ІНІЦІАЛІЗАЦІЯ КОЛЕКЦІЙ ---
 function initCollections(books) {
-    collectionsState.allBooks = books.map(b => ({
+    const sorted = [...books].sort((a, b) => (Number(b.sizeRaw) || 0) - (Number(a.sizeRaw) || 0));
+    collectionsState.allBooks = sorted.map(b => ({
         ...b,
         topicId: classifyBookTopic(b),
         cleanAuthor: getBookAuthorClean(b)
@@ -469,7 +470,9 @@ function updateViewDisplay() {
         } else {
             // Показати список книг обраного розділу
             const topic = CHESS_TOPICS.find(t => t.id === activeTopicId) || { id: 'all', title: 'Розділ', icon: '♟️' };
-            const topicTitle = window.i18n ? window.i18n.t(`topic_${topic.id}_title`) : topic.title;
+            const titleKey = `topic_${topic.id}_title`;
+            const translatedTitle = window.i18n ? window.i18n.t(titleKey) : topic.title;
+            const topicTitle = (translatedTitle && translatedTitle !== titleKey) ? translatedTitle : topic.title;
             const count = collectionsState.allBooks.filter(b => b.topicId === activeTopicId).length;
             const backText = isEn ? '← All sections' : '← Всі розділи';
             if (topicsWrap) topicsWrap.style.display = 'none';
@@ -551,17 +554,27 @@ function renderTopicsGrid() {
     const grid = document.getElementById('collections-topics-grid');
     if (!grid) return;
 
+    const isEn = window.i18n && window.i18n.currentLang === 'en';
+    const booksWord = isEn ? 'books' : 'книг';
+
     grid.innerHTML = CHESS_TOPICS.map(topic => {
         const count = collectionsState.allBooks.filter(b => b.topicId === topic.id).length;
+        const titleKey = `topic_${topic.id}_title`;
+        const subKey = `topic_${topic.id}_sub`;
+        const translatedTitle = window.i18n ? window.i18n.t(titleKey) : topic.title;
+        const translatedSub = window.i18n ? window.i18n.t(subKey) : topic.subtitle;
+        const title = (translatedTitle && translatedTitle !== titleKey) ? translatedTitle : topic.title;
+        const subtitle = (translatedSub && translatedSub !== subKey) ? translatedSub : topic.subtitle;
+
         return `
             <div class="category-card" onclick="openTopic('${topic.id}')">
                 <div class="category-card-top">
                     <span class="category-card-icon">${topic.icon}</span>
-                    <span class="category-card-badge">${count} книг</span>
+                    <span class="category-card-badge">${count} ${booksWord}</span>
                 </div>
                 <div>
-                    <h3 class="category-card-title">${topic.title}</h3>
-                    <p class="category-card-desc">${topic.subtitle}</p>
+                    <h3 class="category-card-title">${escapeHtml(title)}</h3>
+                    <p class="category-card-desc">${escapeHtml(subtitle)}</p>
                 </div>
             </div>
         `;
@@ -574,6 +587,10 @@ function renderAuthorsGrid() {
     const alphabetBar = document.getElementById('authors-alphabet-bar');
     if (!authorsGrid) return;
 
+    const isEn = window.i18n && window.i18n.currentLang === 'en';
+    const booksWord = isEn ? 'books' : 'книг';
+    const allLabel = isEn ? 'All' : 'Всі';
+
     // Групуємо книги за автором
     const authorCounts = {};
     collectionsState.allBooks.forEach(b => {
@@ -585,13 +602,13 @@ function renderAuthorsGrid() {
 
     // Рендер алфавітної панелі
     if (alphabetBar) {
-        const letters = ['Всі', 'А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Э', 'Ю', 'Я'];
+        const letters = [allLabel, 'А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Э', 'Ю', 'Я'];
         alphabetBar.innerHTML = letters.map(letter => {
-            const isActive = (letter === 'Всі' && collectionsState.selectedLetter === 'ALL') || (letter === collectionsState.selectedLetter);
-            const hasAuthors = letter === 'Всі' || authorsList.some(a => a.toUpperCase().startsWith(letter));
+            const isActive = (letter === allLabel && collectionsState.selectedLetter === 'ALL') || (letter === collectionsState.selectedLetter);
+            const hasAuthors = letter === allLabel || authorsList.some(a => a.toUpperCase().startsWith(letter));
             return `
                 <button class="alpha-btn ${isActive ? 'active' : ''} ${!hasAuthors ? 'disabled' : ''}" 
-                        onclick="filterAuthorsLetter('${letter === 'Всі' ? 'ALL' : letter}')">
+                        onclick="filterAuthorsLetter('${letter === allLabel ? 'ALL' : letter}')">
                     ${letter}
                 </button>
             `;
@@ -608,7 +625,7 @@ function renderAuthorsGrid() {
     }
 
     if (authorsList.length === 0) {
-        authorsGrid.innerHTML = `<div class="collections-empty" style="grid-column: 1/-1;">Авторів не знайдено</div>`;
+        authorsGrid.innerHTML = `<div class="collections-empty" style="grid-column: 1/-1;">${isEn ? 'No authors found' : 'Авторів не знайдено'}</div>`;
         return;
     }
 
@@ -620,7 +637,7 @@ function renderAuthorsGrid() {
                 <div class="author-avatar">${initials || '♟'}</div>
                 <div class="author-info">
                     <h4 class="author-name" title="${escapeHtmlAttr(author)}">${escapeHtml(author)}</h4>
-                    <span class="author-count">${count} книг</span>
+                    <span class="author-count">${count} ${booksWord}</span>
                 </div>
             </div>
         `;
@@ -715,7 +732,13 @@ function renderStatsDashboard() {
     const peakDecade = yearBuckets.reduce((max, b) => b.count > max.count ? b : max, yearBuckets[0]);
 
     // 3. РОЗПОДІЛ ЗА КІЛЬКІСТЮ СТОРІНОК (МАЛЕНЬКІ vs ДОВГІ)
-    const pageTiers = [
+    const pageTiers = isEn ? [
+        { id: 'tiny', name: 'Short / Booklets', range: 'up to 120 pages', min: 1, max: 119, count: 0, color: '#3b82f6', desc: 'Opening booklets, regulations, brief overviews' },
+        { id: 'compact', name: 'Compact Books', range: '120 – 249 pages', min: 120, max: 249, count: 0, color: '#10b981', desc: 'Core tutorials, selected games collections' },
+        { id: 'standard', name: 'Standard Volumes', range: '250 – 399 pages', min: 250, max: 399, count: 0, color: '#f59e0b', desc: 'Classic textbooks, fundamental theory' },
+        { id: 'long', name: 'Monographs & Analyses', range: '400 – 599 pages', min: 400, max: 599, count: 0, color: '#ec4899', desc: 'Deep analyses, extensive monographs' },
+        { id: 'huge', name: 'Encyclopedias & Tomes', range: '600+ pages', min: 600, max: 99999, count: 0, color: '#8b5cf6', desc: 'Encyclopedias, compendiums, full sets' }
+    ] : [
         { id: 'tiny', name: 'Маленькі / Брошури', range: 'до 120 стор.', min: 1, max: 119, count: 0, color: '#3b82f6', desc: 'Дебютні буклети, регламенти, короткі огляди' },
         { id: 'compact', name: 'Компактні книги', range: '120 – 249 стор.', min: 120, max: 249, count: 0, color: '#10b981', desc: 'Базові курси, збірники вибраних партій' },
         { id: 'standard', name: 'Середні / Стандартні', range: '250 – 399 стор.', min: 250, max: 399, count: 0, color: '#f59e0b', desc: 'Класичні підручники, фундаментальна теорія' },
@@ -836,14 +859,12 @@ function renderStatsDashboard() {
 
                 <div class="pages-dist-list">
                     ${pageTiers.map(t => {
-                        const isWinner = t === winnerTier;
-                        const tierName = isEn ? (t.id === 'micro' ? 'Short brochures' : (t.id === 'compact' ? 'Compact editions' : (t.id === 'medium' ? 'Standard monographs' : (t.id === 'large' ? 'Voluminous textbooks' : 'Multivolume tomes')))) : t.name;
+                        const tierName = t.name;
                         return `
                             <div class="pages-dist-item">
                                 <div class="pages-dist-header">
                                     <div style="display:flex; align-items:center; gap:8px;">
                                         <span>${tierName} <small style="opacity:0.75; font-weight:normal;">(${t.range})</small></span>
-                                        ${isWinner ? `<span class="pages-dist-highlight">🏆 ${mostInDbText} (${t.pct}%)</span>` : ''}
                                     </div>
                                     <span style="font-weight:700;">${t.count} ${booksWord} <span style="opacity:0.6; font-size:0.85em;">(${t.pct}%)</span></span>
                                 </div>
@@ -853,22 +874,6 @@ function renderStatsDashboard() {
                             </div>
                         `;
                     }).join('')}
-                </div>
-
-                <div class="pages-summary-banner">
-                    <span style="font-size:1.4rem;">💡</span>
-                    <div>
-                        <strong>${verdictTitle}</strong>
-                        ${isEn
-                            ? (totalShort > totalLong
-                                ? `The database is dominated by <strong>compact and short books</strong> (under 249 pages — <strong>${shortPct}%</strong> vs ${longPct}% long books). `
-                                : `The database is dominated by <strong>solid monographs and comprehensive textbooks</strong> (over 250 pages — <strong>${longPct}%</strong> vs ${shortPct}% short brochures). `)
-                            : (totalShort > totalLong
-                                ? `У базі переважають <strong>компактні та короткі книги</strong> (до 249 стор. — <strong>${shortPct}%</strong> бази проти ${longPct}% довгих книг). `
-                                : `У базі переважають <strong>солідні монографії та підручники</strong> (від 250 стор. — <strong>${longPct}%</strong> бази проти ${shortPct}% коротких брошур). `)
-                        }
-                        ${isEn ? `Average volume per book is <strong>${avgPages} pages</strong>.` : `Середній обсяг однієї книги становить <strong>${avgPages} сторінок</strong>.`}
-                    </div>
                 </div>
             </div>
 
@@ -992,9 +997,10 @@ function renderFilteredBooks() {
     // Оновлюємо статистику
     const statsEl = document.getElementById('lib-stats');
     if (statsEl) {
+        const isEn = window.i18n && window.i18n.currentLang === 'en';
         const totalBytes = list.reduce((sum, b) => sum + (b.sizeRaw || 0), 0);
         const totalMB = (totalBytes / 1024 / 1024).toFixed(1);
-        statsEl.innerText = `Всього: ${list.length} книг (~${totalMB} MB)`;
+        statsEl.innerText = isEn ? `Total: ${list.length} books (~${totalMB} MB)` : `Всього: ${list.length} книг (~${totalMB} MB)`;
     }
 }
 
@@ -1055,6 +1061,11 @@ if (typeof module !== 'undefined' && module.exports) {
 
 if (typeof window !== 'undefined') {
     window.addEventListener('chessVaultLanguageChanged', () => {
+        renderTopicsGrid();
+        renderAuthorsGrid();
+        if (typeof renderStatsDashboard === 'function') {
+            renderStatsDashboard();
+        }
         if (typeof switchCollectionView === 'function' && collectionsState && collectionsState.currentView) {
             switchCollectionView(collectionsState.currentView);
         }

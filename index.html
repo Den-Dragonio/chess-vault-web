@@ -12,10 +12,12 @@
     <link rel="stylesheet" href="champions.css">
     <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
     <script src="dark-mode-init.js"></script>
-    <script src="i18n.js?v=1"></script>
+    <script src="analytics.js?v=1"></script>
+    <script src="i18n.js?v=9"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="presence.js?v=1"></script>
 </head>
 
 <body>
@@ -27,6 +29,7 @@
             <a href="index.html" data-i18n="nav_home">Головна</a>
             <a href="profile.html" id="nav-my-account" style="display:none;" data-i18n="nav_my_account">Мій Аккаунт</a>
             <a href="library.html" data-i18n="nav_library">Бібліотека</a>
+            <a href="admin.html" id="nav-admin-link" style="display:none; color: #f59e0b; font-weight: 700;">👑 <span data-i18n="nav_admin_panel">Адмін-панель</span></a>
             <div class="dropdown">
                 <a class="dropbtn" id="acc-btn"><span data-i18n="nav_account">Аккаунт</span> ▾</a>
                 <div class="dropdown-content" id="acc-dropdown">
@@ -121,7 +124,25 @@
             <button class="modal-close" id="close-reg">✕</button>
             <h1 data-i18n="reg_title">Реєстрація</h1>
             <form id="signup-form" class="modal-form">
-                <input type="text" id="reg-name" placeholder="Придумай логін" data-i18n-placeholder="reg_username_ph" required autocomplete="username">
+                <input type="text" id="reg-name" placeholder="Придумай логін" data-i18n-placeholder="reg_username_ph" required autocomplete="username" maxlength="20">
+                <!-- Шпаргалка з вимогами до логіна: показується ТІЛЬКИ при спробі створити аккаунт з порушенням правил -->
+                <div id="reg-rules-cheat-sheet" class="reg-cheat-sheet" style="display: none;">
+                    <div class="cheat-sheet-title" data-i18n="cheat_sheet_title">📋 Вимоги до логіна:</div>
+                    <ul class="cheat-sheet-list">
+                        <li id="rule-letters">
+                            <span><span class="rule-icon">🔤</span> <span data-i18n="cheat_rule_letters">Лише англійські літери (a-z, A-Z)</span></span>
+                            <span class="rule-state" id="state-letters">⚪</span>
+                        </li>
+                        <li id="rule-length">
+                            <span><span class="rule-icon">📏</span> <span data-i18n="cheat_rule_length">Максимум 14 символів</span></span>
+                            <span class="rule-state" id="state-length">⚪</span>
+                        </li>
+                        <li id="rule-unique">
+                            <span><span class="rule-icon">👤</span> <span data-i18n="cheat_rule_unique">Індивідуальний логін</span></span>
+                            <span class="rule-state" id="state-unique">⚪</span>
+                        </li>
+                    </ul>
+                </div>
                 <input type="password" id="reg-password" placeholder="Придумай пароль (мін. 6 символів)" data-i18n-placeholder="reg_password_ph" required
                     autocomplete="new-password">
                 <button type="submit" class="login-btn" data-i18n="reg_btn">Створити аккаунт</button>
@@ -146,7 +167,7 @@
     <script src="book-modal.js?v=6"></script>
     <script src="champions-data.js?v=6"></script>
     <script src="champions.js?v=6"></script>
-    <script src="script.js?v=6"></script>
+    <script src="script.js?v=9"></script>
 </body>
 
 </html>

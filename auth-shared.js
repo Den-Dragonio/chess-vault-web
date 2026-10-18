@@ -30,7 +30,13 @@ function updateSharedAuthUI(user) {
     const accBtn = document.getElementById('acc-btn');
     const accDropdown = document.getElementById('acc-dropdown');
     const myAccountLink = document.getElementById('nav-my-account');
+    const adminLink = document.getElementById('nav-admin-link');
     const t = (k) => window.i18n ? window.i18n.t(k) : k;
+
+    const isAdmin = window.isChessAdmin && window.isChessAdmin(user);
+    if (adminLink) {
+        adminLink.style.display = isAdmin ? 'inline-block' : 'none';
+    }
 
     if (user) {
         const name = user.displayName || user.email.split('@')[0];
@@ -40,11 +46,16 @@ function updateSharedAuthUI(user) {
             myAccountLink.textContent = t('nav_my_account');
         }
         if (accDropdown) {
-            accDropdown.innerHTML = `<a href="#" id="logout-btn">🚪 ${t('nav_logout')}</a>`;
-            document.getElementById('logout-btn').onclick = async (e) => {
-                e.preventDefault();
-                await auth.signOut();
-            };
+            accDropdown.innerHTML = `
+                <a href="#" id="logout-btn">🚪 ${t('nav_logout')}</a>
+            `;
+            const logoutEl = document.getElementById('logout-btn');
+            if (logoutEl) {
+                logoutEl.onclick = async (e) => {
+                    e.preventDefault();
+                    await auth.signOut();
+                };
+            }
         }
     } else {
         if (accBtn) accBtn.textContent = `${t('nav_account')} ▾`;
@@ -74,10 +85,25 @@ auth.onAuthStateChanged(async (user) => {
                 if (prefs.language && window.i18n) {
                     window.i18n.setLanguage(prefs.language, false);
                 }
+                if (prefs.dateFormat && window.i18n) {
+                    window.i18n.setDateFormat(prefs.dateFormat, false);
+                }
             }
         } catch (err) {
             console.warn('Could not load user preferences:', err);
         }
+
+        // Оновлення мітки активності (heartbeat)
+        try {
+            const now = Date.now();
+            const lastPing = parseInt(sessionStorage.getItem('cv_last_active_ping') || '0', 10);
+            if (now - lastPing > 3 * 60 * 1000) {
+                sessionStorage.setItem('cv_last_active_ping', String(now));
+                window.db.collection('users').doc(user.uid).set({
+                    last_active_at: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true }).catch(() => {});
+            }
+        } catch (_) {}
     }
     updateSharedAuthUI(user);
 });

@@ -344,15 +344,18 @@ function setupChampionModal() {
     });
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
+        if (e.key === 'Escape' || e.key === 'Esc') {
             // Якщо відкрита модалка книги, закриваємо спочатку її
             const bookOverlay = document.getElementById('book-detail-overlay');
             if (bookOverlay && bookOverlay.classList.contains('active')) {
                 if (typeof closeBookModal === 'function') closeBookModal();
+                e.stopImmediatePropagation();
                 return;
             }
-            if (championModalOverlay.classList.contains('active')) {
+            if (championModalOverlay && championModalOverlay.classList.contains('active')) {
                 closeChampionModal();
+                e.stopImmediatePropagation();
+                return;
             }
         }
     });

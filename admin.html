@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Vault — Admin Dashboard</title>
+    <link rel="icon" href="img/icon.png" type="image/png" sizes="64x64">
+    <link rel="stylesheet" href="admin.css">
+
+    <!-- Firebase SDK (compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-init.js?v=8"></script>
+    <script src="presence.js?v=1"></script>
+    <script src="i18n.js?v=9"></script>
+</head>
+
+<body>
+    <!-- Форма входу для адміністратора (відображається, якщо сесія відсутня) -->
+    <div id="auth-barrier-wrap" class="auth-barrier" style="display: none;">
+        <h2>♟️ Chess Vault Admin</h2>
+        <p>Введіть ваш логін і пароль адміністратора для доступу до аналітики</p>
+        <form id="admin-login-form">
+            <input type="text" id="admin-user" class="auth-input" placeholder="Логін" required autocomplete="username">
+            <input type="password" id="admin-pass" class="auth-input" placeholder="Пароль" required autocomplete="current-password">
+            <button type="submit" class="auth-submit-btn">Увійти в панель</button>
+            <p id="admin-auth-err" class="auth-err-msg"></p>
+            <div style="margin-top: 16px; text-align: center;">
+                <a href="index.html" style="color: #8b949e; font-size: 0.85rem; text-decoration: none;">← Повернутися на головну</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Головна панель керування -->
+    <div id="admin-dashboard-wrap" style="display: none;">
+        <header class="admin-header">
+            <div class="header-inner">
+                <div class="header-brand">
+                    <span class="brand-icon">♟️</span>
+                    <span class="brand-title">Chess Vault</span>
+                    <span class="brand-badge">Admin Dashboard</span>
+                </div>
+                <div class="header-actions">
+                    <span id="current-admin-label" style="font-size: 0.85rem; color: #8b949e;">👤 Admin</span>
+                    <button id="refresh-data-btn" class="btn-ghost" title="Оновити дані">🔄 Оновити</button>
+                    <a href="index.html" class="btn-ghost">🏠 Головна</a>
+                    <a href="library.html" class="btn-ghost" target="_blank">📚 Бібліотека ↗</a>
+                    <button id="admin-logout-btn" class="btn-ghost" style="color: #f87171;">🚪 Вийти</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="admin-container">
+            <!-- 4 картки KPI -->
+            <section class="kpi-grid">
+                <div class="kpi-card gold">
+                    <div class="kpi-top">
+                        <span class="kpi-label">Всього користувачів</span>
+                        <span class="kpi-icon">👥</span>
+                    </div>
+                    <div class="kpi-value" id="kpi-total-users">0</div>
+                    <div class="kpi-sub" id="kpi-new-users-sub">Завантаження...</div>
+                </div>
+
+                <div class="kpi-card blue">
+                    <div class="kpi-top">
+                        <span class="kpi-label">Всього скачувань</span>
+                        <span class="kpi-icon">📥</span>
+                    </div>
+                    <div class="kpi-value" id="kpi-total-downloads">0</div>
+                    <div class="kpi-sub" id="kpi-downloads-sub">Всі книги бібліотеки</div>
+                </div>
+
+                <div class="kpi-card green">
+                    <div class="kpi-top">
+                        <span class="kpi-label">Топ джерело трафіку</span>
+                        <span class="kpi-icon">🌐</span>
+                    </div>
+                    <div class="kpi-value" id="kpi-top-source" style="font-size: 1.6rem; word-break: break-word;">-</div>
+                    <div class="kpi-sub" id="kpi-source-sub">Основний канал залучення</div>
+                </div>
+
+                <div class="kpi-card purple">
+                    <div class="kpi-top">
+                        <span class="kpi-label">Активні за 7 днів</span>
+                        <span class="kpi-icon">⚡</span>
+                    </div>
+                    <div class="kpi-value" id="kpi-active-users">0</div>
+                    <div class="kpi-sub" id="kpi-active-sub">Користувачі з недавнім візитом</div>
+                </div>
+            </section>
+
+            <!-- Панель фільтрів та пошуку -->
+            <div class="toolbar-wrap">
+                <div class="search-box-wrap">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="user-search-input" class="search-input" placeholder="Пошук за іменем, джерелом (Telegram, Google), UTM або країною...">
+                </div>
+                <div class="filter-group">
+                    <select id="filter-device" class="filter-select">
+                        <option value="all">Всі пристрої</option>
+                        <option value="mobile">📱 Тільки мобільні</option>
+                        <option value="desktop">💻 Тільки десктоп</option>
+                    </select>
+
+                    <select id="filter-source" class="filter-select">
+                        <option value="all">Всі канали трафіку</option>
+                        <!-- Наповнюється динамічно -->
+                    </select>
+
+                    <select id="filter-sort" class="filter-select">
+                        <option value="newest">Спершу нові реєстрації</option>
+                        <option value="downloads">Найбільше скачувань</option>
+                        <option value="active">Нещодавня активність</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Головна сітка: CRM-таблиця зліва + Аналітика справа -->
+            <div class="dashboard-grid">
+                <!-- Ліва колонка: Таблиця користувачів -->
+                <div class="section-box">
+                    <div class="section-head">
+                        <div class="section-title">
+                            <span>👥 Користувачі та атрибуція</span>
+                            <span class="section-badge" id="users-count-badge">0</span>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Користувач</th>
+                                    <th>Джерело переходу</th>
+                                    <th>Перший Landing</th>
+                                    <th>Локація / IP / Пристрій</th>
+                                    <th>Книг</th>
+                                    <th>Реєстрація</th>
+                                    <th>Ласт онлайн</th>
+                                    <th>Дії</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <tr>
+                                    <td colspan="8" class="loading-state">⏳ Завантаження бази користувачів...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Права колонка: Аналітика джерел + Топ книг + Стрічка -->
+                <div class="sidebar-column">
+                    <!-- Розподіл джерел трафіку -->
+                    <div class="section-box">
+                        <div class="section-head">
+                            <div class="section-title">
+                                <span>📊 Джерела залучення</span>
+                            </div>
+                        </div>
+                        <div class="traffic-bars-list" id="traffic-breakdown-list">
+                            <div class="loading-state">Розрахунок часток трафіку...</div>
+                        </div>
+                    </div>
+
+                    <!-- Топ скачуваних книг -->
+                    <div class="section-box">
+                        <div class="section-head">
+                            <div class="section-title">
+                                <span>🔥 Найпопулярніші книги</span>
+                            </div>
+                        </div>
+                        <ul class="top-books-sidebar" id="admin-top-books-list">
+                            <li class="loading-state">Завантаження рейтингу...</li>
+                        </ul>
+                    </div>
+
+                    <!-- Жива стрічка подій -->
+                    <div class="section-box">
+                        <div class="section-head">
+                            <div class="section-title">
+                                <span>⚡ Останні події</span>
+                            </div>
+                        </div>
+                        <ul class="activity-feed-list" id="admin-activity-feed">
+                            <li class="loading-state">Завантаження подій...</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Модальне вікно скачувань конкретного користувача -->
+    <div id="user-details-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-user-title">👤 Скачування користувача</h3>
+                <button id="close-user-modal" class="modal-close-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="user-meta-summary" id="modal-user-meta">
+                    <!-- Заповнюється динамічно -->
+                </div>
+
+                <h4 style="color: #fff; margin-bottom: 12px; font-size: 0.95rem;">📚 Історія завантажених книг:</h4>
+                <div class="table-responsive">
+                    <table class="user-downloads-history-table">
+                        <thead>
+                            <tr>
+                                <th>Книга</th>
+                                <th>Автор</th>
+                                <th>Формат</th>
+                                <th>Дата скачування</th>
+                                <th>Повторів</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-downloads-body">
+                            <tr>
+                                <td colspan="5" class="loading-state">Завантаження історії...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js?v=9"></script>
+</body>
+
+</html>
