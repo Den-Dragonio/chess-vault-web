@@ -442,6 +442,8 @@ function plModalKeyHandler(e) {
     if (e.key === 'Escape' || e.key === 'Esc' || e.keyCode === 27) {
         const inputModal = document.getElementById('pl-input-modal-overlay');
         if (inputModal) return;
+        const bookModal = document.getElementById('book-detail-overlay');
+        if (bookModal && bookModal.classList.contains('active')) return;
         plClosePlaylistModal();
     }
 }

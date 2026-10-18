@@ -1119,9 +1119,17 @@
                     settingsModal.style.display = 'none';
                     return;
                 }
+                const plInputModal = document.getElementById('pl-input-modal-overlay');
+                if (plInputModal) return;
+
                 const bookOverlay = document.getElementById('book-detail-overlay');
                 if (bookOverlay && bookOverlay.classList.contains('active')) {
                     if (typeof closeBookModal === 'function') closeBookModal();
+                    return;
+                }
+                const plModal = document.getElementById('pl-books-modal-overlay');
+                if (plModal && plModal.style.display !== 'none') {
+                    if (typeof plClosePlaylistModal === 'function') plClosePlaylistModal();
                     return;
                 }
                 window.location.href = 'index.html';
