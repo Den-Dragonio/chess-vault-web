@@ -1,21 +1,21 @@
 /* ====================================================
-   CHESS VAULT — PLAYLISTS MODULE (ROBUST & INSTANT)
-   - Stored in user_preferences/{uid}.playlists (guaranteed permissions)
-   - Cached in localStorage for 0ms instant loading
-   - Works for both logged in users and guests (prompts login)
-   - Default playlists: "watch-later" (На потім) and "favorites" (Улюблені)
+   CHESS VAULT — PLAYLISTS MODULE
+   - Bookshelf UI on Profile page
+   - 1st item: "+ Новий плейлист" translucent card
+   - Pinned: "⭐ Улюблені" and "📖 Читати потім"
+   - User-created custom playlists
+   - Clicking opens Playlist Modal with list of books
+   - Synchronous instant load from localStorage + Firestore sync
    ==================================================== */
 
 const PL_DEFAULT_CONFIG = [
-    { id: 'watch-later', icon: '🕐', name_uk: 'На потім', name_en: 'Watch Later', isDefault: true, books: [] },
-    { id: 'favorites',   icon: '⭐', name_uk: 'Улюблені',  name_en: 'Favorites',   isDefault: true, books: [] }
+    { id: 'favorites',  icon: '⭐', name_uk: 'Улюблені',     name_en: 'Favorites',  isDefault: true, books: [] },
+    { id: 'read-later', icon: '📖', name_uk: 'Читати потім', name_en: 'Read Later', isDefault: true, books: [] }
 ];
 
-// In-memory cache
 let _plCurrentUid = null;
 let _plUserPlaylists = [];
-let _plCurrentlyOpenId = null;
-let _plInitialized = false;
+let _plActiveModalPlaylistId = null;
 
 // =============================================
 // HELPERS
@@ -57,8 +57,31 @@ function plLoadFromLocalStorage(uid) {
     try {
         const raw = localStorage.getItem(plStorageKey(uid));
         if (raw) {
-            const parsed = JSON.parse(raw);
+            let parsed = JSON.parse(raw);
             if (Array.isArray(parsed) && parsed.length > 0) {
+                // Migrate any old 'watch-later' to 'read-later' with new names
+                parsed = parsed.map(p => {
+                    if (p.id === 'watch-later' || p.id === 'read-later') {
+                        return {
+                            ...p,
+                            id: 'read-later',
+                            icon: '📖',
+                            name_uk: 'Читати потім',
+                            name_en: 'Read Later',
+                            name: plIsEn() ? 'Read Later' : 'Читати потім'
+                        };
+                    }
+                    if (p.id === 'favorites') {
+                        return {
+                            ...p,
+                            icon: '⭐',
+                            name_uk: 'Улюблені',
+                            name_en: 'Favorites',
+                            name: plIsEn() ? 'Favorites' : 'Улюблені'
+                        };
+                    }
+                    return p;
+                });
                 return parsed;
             }
         }
@@ -72,7 +95,6 @@ function plSaveToLocalStorage(uid, playlists) {
     } catch (_) {}
 }
 
-// Timeout helper for Firestore queries to prevent hanging
 function plWithTimeout(promise, ms = 3500) {
     return Promise.race([
         promise,
@@ -81,21 +103,29 @@ function plWithTimeout(promise, ms = 3500) {
 }
 
 // =============================================
-// CORE PLAYLIST STATE MANAGEMENT
+// STATE & SYNC
 // =============================================
 function plInitForUser(user) {
     const uid = user ? user.uid : 'guest';
     _plCurrentUid = uid;
     _plUserPlaylists = plLoadFromLocalStorage(uid);
 
-    // Ensure defaults exist
+    // Ensure defaults exist in exact order: favorites first, then read-later
     for (const def of PL_DEFAULT_CONFIG) {
         if (!_plUserPlaylists.some(p => p.id === def.id)) {
-            _plUserPlaylists.unshift(JSON.parse(JSON.stringify(def)));
+            _plUserPlaylists.push(JSON.parse(JSON.stringify(def)));
         }
     }
 
-    // Sync from Firestore in background if logged in
+    // Sort to put favorites first, read-later second, then custom playlists
+    _plUserPlaylists.sort((a, b) => {
+        if (a.id === 'favorites') return -1;
+        if (b.id === 'favorites') return 1;
+        if (a.id === 'read-later') return -1;
+        if (b.id === 'read-later') return 1;
+        return 0;
+    });
+
     if (user && user.uid) {
         plSyncFromFirestore(user.uid).catch(() => {});
     }
@@ -112,27 +142,34 @@ async function plSyncFromFirestore(uid) {
         if (snap && snap.exists) {
             const data = snap.data();
             if (data && Array.isArray(data.playlists) && data.playlists.length > 0) {
-                // Merge with local playlists
-                _plUserPlaylists = data.playlists;
-                // Ensure defaults
+                _plUserPlaylists = data.playlists.map(p => {
+                    if (p.id === 'watch-later' || p.id === 'read-later') {
+                        return { ...p, id: 'read-later', icon: '📖', name_uk: 'Читати потім', name_en: 'Read Later' };
+                    }
+                    return p;
+                });
                 for (const def of PL_DEFAULT_CONFIG) {
                     if (!_plUserPlaylists.some(p => p.id === def.id)) {
-                        _plUserPlaylists.unshift(JSON.parse(JSON.stringify(def)));
+                        _plUserPlaylists.push(JSON.parse(JSON.stringify(def)));
                     }
                 }
+                _plUserPlaylists.sort((a, b) => {
+                    if (a.id === 'favorites') return -1;
+                    if (b.id === 'favorites') return 1;
+                    if (a.id === 'read-later') return -1;
+                    if (b.id === 'read-later') return 1;
+                    return 0;
+                });
                 plSaveToLocalStorage(uid, _plUserPlaylists);
-                // Re-render if profile section exists
                 if (document.getElementById('playlists-section')) {
                     plRenderProfileHTML();
                 }
                 return;
             }
         }
-
-        // If no playlists in Firestore yet, write default state
         await plSyncToFirestore(uid);
     } catch (err) {
-        console.warn('[Playlists] Firestore sync warning (using local):', err.message || err);
+        console.warn('[Playlists] Firestore sync warning:', err.message || err);
     }
 }
 
@@ -142,7 +179,6 @@ async function plSyncToFirestore(uid) {
 
     try {
         const docRef = firestore.collection('user_preferences').doc(uid);
-        // Clean data for Firestore
         const cleanList = _plUserPlaylists.map(pl => ({
             id: pl.id || 'pl_' + Date.now(),
             icon: pl.icon || '📋',
@@ -177,7 +213,7 @@ function plGetPlaylists() {
 }
 
 // =============================================
-// CRUD OPERATIONS
+// CRUD
 // =============================================
 async function plAddBookToPlaylist(playlistId, book) {
     const u = plGetUser();
@@ -193,7 +229,7 @@ async function plAddBookToPlaylist(playlistId, book) {
     if (!pl.books) pl.books = [];
     const bookId = (book.id || book.title || '').trim().toLowerCase();
     const exists = pl.books.some(b => (b.id || b.title || '').trim().toLowerCase() === bookId);
-    if (exists) return false; // already in playlist
+    if (exists) return false;
 
     pl.books.unshift({
         id: book.id || '',
@@ -223,6 +259,12 @@ async function plRemoveBookFromPlaylist(playlistId, bookId) {
     const uid = u ? u.uid : 'guest';
     plSaveToLocalStorage(uid, playlists);
     if (u) plSyncToFirestore(u.uid).catch(() => {});
+
+    // Refresh modal if open
+    if (_plActiveModalPlaylistId === playlistId) {
+        plRenderPlaylistModalContent(pl);
+    }
+    plRenderProfileHTML();
 }
 
 async function plCreateCustomPlaylist(name, icon = '📋') {
@@ -268,6 +310,11 @@ async function plRenamePlaylist(playlistId, newName) {
     const uid = u ? u.uid : 'guest';
     plSaveToLocalStorage(uid, playlists);
     if (u) plSyncToFirestore(u.uid).catch(() => {});
+
+    if (_plActiveModalPlaylistId === playlistId) {
+        plRenderPlaylistModalContent(pl);
+    }
+    plRenderProfileHTML();
 }
 
 async function plDeletePlaylist(playlistId) {
@@ -280,9 +327,11 @@ async function plDeletePlaylist(playlistId) {
     const uid = u ? u.uid : 'guest';
     plSaveToLocalStorage(uid, _plUserPlaylists);
     if (u) plSyncToFirestore(u.uid).catch(() => {});
+
+    plClosePlaylistModal();
+    plRenderProfileHTML();
 }
 
-// Prompt login for guests
 function plPromptLogin() {
     const isEn = plIsEn();
     const msg = isEn ? 'Please log in to save books to playlists!' : 'Будь ласка, увійдіть в аккаунт, щоб зберігати книги в плейлисти!';
@@ -298,7 +347,7 @@ function plPromptLogin() {
 }
 
 // =============================================
-// PROFILE PAGE — RENDERING
+// BOOKSHELF UI RENDERING (PROFILE PAGE)
 // =============================================
 function plRenderProfileSection(optionalUser) {
     const user = optionalUser || plGetUser();
@@ -311,119 +360,211 @@ function plRenderProfileHTML() {
     if (!container) return;
 
     const isEn = plIsEn();
-    const titleText = isEn ? '📋 My Playlists' : '📋 Мої Плейлисти';
-    const addBtnText = isEn ? '+ New Playlist' : '+ Новий плейлист';
-    const emptyText = isEn ? 'No playlists yet' : 'Плейлистів ще немає';
+    const titleText = isEn ? '📚 My Book Playlists' : '📚 Мої плейлисти';
+    const subtitleText = isEn
+        ? '💡 Click a playlist to view its books or manage your collection'
+        : '💡 Натисніть на плейлист, щоб відкрити список книг або налаштувати підбірку';
+    const newPlaylistText = isEn ? 'New Playlist' : 'Новий плейлист';
 
     const playlists = plGetPlaylists();
 
     let html = `
-        <div class="pl-header">
-            <h2 class="pl-title">${titleText}</h2>
-            <button type="button" class="pl-add-btn" id="pl-add-btn">${addBtnText}</button>
+        <div class="pl-shelf-header">
+            <div>
+                <h2 class="pl-shelf-title">${titleText}</h2>
+                <p class="pl-shelf-subtitle">${subtitleText}</p>
+            </div>
+        </div>
+
+        <div class="pl-shelf-wrapper">
+            <div class="pl-shelf-grid">
+                <!-- 1. ПЕРША ЗЛІВА: НАПІВПРОЗОРА КАРТКА "+ НОВИЙ ПЛЕЙЛИСТ" -->
+                <div class="pl-shelf-card pl-card-create" id="pl-shelf-card-create" title="${isEn ? 'Create new playlist' : 'Створити новий плейлист'}">
+                    <div class="pl-create-icon-wrap">
+                        <span class="pl-create-plus">+</span>
+                    </div>
+                    <span class="pl-create-label">${newPlaylistText}</span>
+                </div>
+    `;
+
+    // 2. Закріплені ("Улюблені", "Читати потім") та кастомні плейлисти
+    for (const pl of playlists) {
+        const displayName = isEn ? (pl.name_en || pl.name) : (pl.name_uk || pl.name);
+        const bookCount = (pl.books || []).length;
+        const booksWord = isEn
+            ? (bookCount === 1 ? 'book' : 'books')
+            : (bookCount === 1 ? 'книга' : (bookCount >= 2 && bookCount <= 4 ? 'книги' : 'книг'));
+        const isPinned = !!pl.isDefault;
+
+        html += `
+            <div class="pl-shelf-card ${isPinned ? 'pl-card-pinned' : 'pl-card-custom'}" data-pl-id="${plEsc(pl.id)}">
+                ${!isPinned ? `
+                    <div class="pl-card-quick-actions">
+                        <button type="button" class="pl-quick-btn pl-quick-rename" data-pl-id="${plEsc(pl.id)}" title="${isEn ? 'Rename' : 'Перейменувати'}">✏️</button>
+                        <button type="button" class="pl-quick-btn pl-quick-delete" data-pl-id="${plEsc(pl.id)}" title="${isEn ? 'Delete' : 'Видалити'}">🗑️</button>
+                    </div>
+                ` : `
+                    <span class="pl-card-pin-badge" title="${isEn ? 'Pinned playlist' : 'Закріплений плейлист'}">📌</span>
+                `}
+                <div class="pl-card-icon">${pl.icon || '📋'}</div>
+                <div class="pl-card-name" title="${plEsc(displayName)}">${plEsc(displayName)}</div>
+                <div class="pl-card-count">${bookCount} ${booksWord}</div>
+            </div>
+        `;
+    }
+
+    html += `
+            </div>
+            <!-- Декоративна полиця під книгами -->
+            <div class="pl-shelf-ledge"></div>
         </div>
     `;
 
-    if (playlists.length === 0) {
-        html += `<p class="pl-empty">${emptyText}</p>`;
-    } else {
-        html += `<div class="pl-list" id="pl-list">`;
-        for (const pl of playlists) {
-            const displayName = isEn ? (pl.name_en || pl.name) : (pl.name_uk || pl.name);
-            const bookCount = (pl.books || []).length;
-            const isOpen = _plCurrentlyOpenId === pl.id;
-            const booksWord = isEn
-                ? (bookCount === 1 ? 'book' : 'books')
-                : (bookCount === 1 ? 'книга' : (bookCount >= 2 && bookCount <= 4 ? 'книги' : 'книг'));
-
-            html += `
-                <div class="pl-item ${isOpen ? 'pl-item-open' : ''}" data-pl-id="${plEsc(pl.id)}">
-                    <div class="pl-item-header" data-pl-id="${plEsc(pl.id)}">
-                        <div class="pl-item-left">
-                            <span class="pl-item-icon">${pl.icon || '📋'}</span>
-                            <span class="pl-item-name">${plEsc(displayName)}</span>
-                            <span class="pl-item-count">${bookCount} ${booksWord}</span>
-                        </div>
-                        <div class="pl-item-actions">
-                            ${!pl.isDefault ? `
-                                <button type="button" class="pl-item-action-btn pl-rename-btn" data-pl-id="${plEsc(pl.id)}" title="${isEn ? 'Rename' : 'Перейменувати'}">✏️</button>
-                                <button type="button" class="pl-item-action-btn pl-delete-btn" data-pl-id="${plEsc(pl.id)}" title="${isEn ? 'Delete' : 'Видалити'}">🗑️</button>
-                            ` : ''}
-                            <span class="pl-item-chevron">${isOpen ? '▲' : '▼'}</span>
-                        </div>
-                    </div>
-                    <div class="pl-item-books" id="pl-books-${plEsc(pl.id)}" style="display: ${isOpen ? 'block' : 'none'};">
-                        ${plRenderBooksHTML(pl)}
-                    </div>
-                </div>
-            `;
-        }
-        html += `</div>`;
-    }
-
     container.innerHTML = html;
 
-    // Attach listeners
-    const addBtn = document.getElementById('pl-add-btn');
-    if (addBtn) addBtn.onclick = plShowCreateDialog;
+    // Listeners: Create
+    const createCard = document.getElementById('pl-shelf-card-create');
+    if (createCard) createCard.onclick = plShowCreateDialog;
 
-    container.querySelectorAll('.pl-item-header').forEach(header => {
-        header.onclick = (e) => {
-            if (e.target.closest('.pl-item-action-btn')) return;
-            const plId = header.dataset.plId;
-            plTogglePlaylist(plId);
+    // Listeners: Open playlist modal
+    container.querySelectorAll('.pl-shelf-card:not(.pl-card-create)').forEach(card => {
+        card.onclick = (e) => {
+            if (e.target.closest('.pl-quick-btn')) return;
+            const plId = card.dataset.plId;
+            plOpenPlaylistModal(plId);
         };
     });
 
-    container.querySelectorAll('.pl-rename-btn').forEach(btn => {
+    // Quick rename
+    container.querySelectorAll('.pl-quick-rename').forEach(btn => {
         btn.onclick = (e) => {
             e.stopPropagation();
             plShowRenameDialog(btn.dataset.plId);
         };
     });
 
-    container.querySelectorAll('.pl-delete-btn').forEach(btn => {
+    // Quick delete
+    container.querySelectorAll('.pl-quick-delete').forEach(btn => {
         btn.onclick = (e) => {
             e.stopPropagation();
             plShowDeleteConfirm(btn.dataset.plId);
         };
     });
-
-    // Attach click to books inside playlists
-    plAttachBookEvents(container);
 }
 
-function plRenderBooksHTML(pl) {
-    const isEn = plIsEn();
-    const books = pl.books || [];
+// =============================================
+// PLAYLIST BOOKS MODAL
+// =============================================
+function plOpenPlaylistModal(playlistId) {
+    const pl = plGetPlaylists().find(p => p.id === playlistId);
+    if (!pl) return;
+    _plActiveModalPlaylistId = playlistId;
 
-    if (books.length === 0) {
-        return `<p class="pl-books-empty">${isEn ? 'No books in this playlist yet' : 'У цьому плейлисті ще немає книг'}</p>`;
+    let overlay = document.getElementById('pl-books-modal-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'pl-books-modal-overlay';
+        overlay.className = 'pl-modal-overlay';
+        document.body.appendChild(overlay);
     }
 
-    let html = `<div class="pl-books-list">`;
-    for (const book of books) {
-        const format = (book.format || 'pdf').toUpperCase();
-        const safeBookId = plEsc(book.id || book.title || '');
-        html += `
-            <div class="pl-book-row" data-book-id="${safeBookId}">
-                <div class="pl-book-info" data-book-data="${plEsc(JSON.stringify(book))}">
-                    <span class="pl-book-title">📖 ${plEsc(book.title || book.id || '—')}</span>
-                    <span class="pl-book-author">${plEsc(book.author || '—')}</span>
-                </div>
-                <div class="pl-book-actions">
-                    <span class="pl-book-format">${format}</span>
-                    <button type="button" class="pl-book-remove-btn" data-pl-id="${plEsc(pl.id)}" data-book-id="${safeBookId}" title="${isEn ? 'Remove' : 'Видалити'}">✕</button>
-                </div>
+    overlay.style.display = 'flex';
+    plRenderPlaylistModalContent(pl);
+
+    overlay.onclick = (e) => {
+        if (e.target === overlay) plClosePlaylistModal();
+    };
+}
+
+function plClosePlaylistModal() {
+    const overlay = document.getElementById('pl-books-modal-overlay');
+    if (overlay) overlay.style.display = 'none';
+    _plActiveModalPlaylistId = null;
+}
+
+function plRenderPlaylistModalContent(pl) {
+    const overlay = document.getElementById('pl-books-modal-overlay');
+    if (!overlay) return;
+
+    const isEn = plIsEn();
+    const displayName = isEn ? (pl.name_en || pl.name) : (pl.name_uk || pl.name);
+    const books = pl.books || [];
+    const booksWord = isEn
+        ? (books.length === 1 ? 'book' : 'books')
+        : (books.length === 1 ? 'книга' : (books.length >= 2 && books.length <= 4 ? 'книги' : 'книг'));
+
+    let booksHtml = '';
+    if (books.length === 0) {
+        booksHtml = `
+            <div class="pl-modal-empty">
+                <span class="pl-modal-empty-icon">📭</span>
+                <p class="pl-modal-empty-text">${isEn ? 'No books in this playlist yet.' : 'У цьому плейлисті ще немає книг.'}</p>
+                <p class="pl-modal-empty-sub">${isEn ? 'Open any book card in Library or Downloads and click "Add to Playlist"!' : 'Відкрийте будь-яку книгу у Бібліотеці або Списку завантажень та натисніть «Додати в плейлист»!'}</p>
             </div>
         `;
+    } else {
+        booksHtml = `<div class="pl-modal-books-list">`;
+        for (const book of books) {
+            const format = (book.format || 'pdf').toUpperCase();
+            const safeBookId = plEsc(book.id || book.title || '');
+            booksHtml += `
+                <div class="pl-modal-book-row" data-book-id="${safeBookId}">
+                    <div class="pl-modal-book-info" data-book-data="${plEsc(JSON.stringify(book))}">
+                        <div class="pl-modal-book-title-wrap">
+                            <span class="pl-modal-book-title">📖 ${plEsc(book.title || book.id || '—')}</span>
+                            <span class="pl-modal-book-badge">${format}</span>
+                        </div>
+                        <div class="pl-modal-book-meta">
+                            <span class="pl-modal-book-author">✍️ ${plEsc(book.author || '—')}</span>
+                            ${book.year && book.year !== '---' ? `<span class="pl-modal-book-year">📅 ${plEsc(book.year)}</span>` : ''}
+                            <span class="pl-modal-book-size">💾 ${plEsc(book.sizeDisplay || '—')}</span>
+                        </div>
+                    </div>
+                    <div class="pl-modal-book-actions">
+                        <button type="button" class="pl-modal-book-remove" data-pl-id="${plEsc(pl.id)}" data-book-id="${safeBookId}" title="${isEn ? 'Remove from playlist' : 'Видалити з плейлиста'}">✕</button>
+                    </div>
+                </div>
+            `;
+        }
+        booksHtml += `</div>`;
     }
-    html += `</div>`;
-    return html;
-}
 
-function plAttachBookEvents(container) {
-    container.querySelectorAll('.pl-book-info').forEach(info => {
+    overlay.innerHTML = `
+        <div class="pl-modal-card">
+            <div class="pl-modal-header">
+                <div class="pl-modal-header-left">
+                    <span class="pl-modal-icon">${pl.icon || '📋'}</span>
+                    <div>
+                        <h3 class="pl-modal-title">${plEsc(displayName)}</h3>
+                        <span class="pl-modal-count-badge">${books.length} ${booksWord}</span>
+                    </div>
+                </div>
+                <div class="pl-modal-header-actions">
+                    ${!pl.isDefault ? `
+                        <button type="button" class="pl-modal-tool-btn" id="pl-modal-rename-btn" title="${isEn ? 'Rename' : 'Перейменувати'}">✏️</button>
+                        <button type="button" class="pl-modal-tool-btn pl-modal-tool-danger" id="pl-modal-delete-btn" title="${isEn ? 'Delete' : 'Видалити'}">🗑️</button>
+                    ` : ''}
+                    <button type="button" class="pl-modal-close-btn" id="pl-modal-close">✕</button>
+                </div>
+            </div>
+
+            <div class="pl-modal-body">
+                ${booksHtml}
+            </div>
+        </div>
+    `;
+
+    // Modal Events
+    document.getElementById('pl-modal-close').onclick = plClosePlaylistModal;
+
+    const renameBtn = document.getElementById('pl-modal-rename-btn');
+    if (renameBtn) renameBtn.onclick = () => plShowRenameDialog(pl.id);
+
+    const deleteBtn = document.getElementById('pl-modal-delete-btn');
+    if (deleteBtn) deleteBtn.onclick = () => plShowDeleteConfirm(pl.id);
+
+    // Book click -> open book detail modal
+    overlay.querySelectorAll('.pl-modal-book-info').forEach(info => {
         info.onclick = () => {
             try {
                 const bookData = JSON.parse(info.dataset.bookData);
@@ -436,28 +577,18 @@ function plAttachBookEvents(container) {
         };
     });
 
-    container.querySelectorAll('.pl-book-remove-btn').forEach(btn => {
+    // Remove book click
+    overlay.querySelectorAll('.pl-modal-book-remove').forEach(btn => {
         btn.onclick = async (e) => {
             e.stopPropagation();
             const plId = btn.dataset.plId;
             const bookId = btn.dataset.bookId;
             await plRemoveBookFromPlaylist(plId, bookId);
-            const isEn = plIsEn();
             if (typeof showToast === 'function') {
-                showToast(isEn ? 'Book removed from playlist' : 'Книгу видалено з плейлиста', 'ok');
+                showToast(isEn ? 'Book removed' : 'Книгу видалено', 'ok');
             }
-            plRenderProfileHTML();
         };
     });
-}
-
-function plTogglePlaylist(playlistId) {
-    if (_plCurrentlyOpenId === playlistId) {
-        _plCurrentlyOpenId = null;
-    } else {
-        _plCurrentlyOpenId = playlistId;
-    }
-    plRenderProfileHTML();
 }
 
 // =============================================
@@ -476,8 +607,8 @@ function plShowCreateDialog() {
                 if (typeof showToast === 'function') {
                     showToast(isEn ? `Playlist "${name.trim()}" created!` : `Плейлист "${name.trim()}" створено!`, 'ok');
                 }
-                _plCurrentlyOpenId = newId;
                 plRenderProfileHTML();
+                plOpenPlaylistModal(newId);
             }
         }
     });
@@ -500,7 +631,6 @@ function plShowRenameDialog(playlistId) {
             if (typeof showToast === 'function') {
                 showToast(isEn ? 'Playlist renamed!' : 'Плейлист перейменовано!', 'ok');
             }
-            plRenderProfileHTML();
         }
     });
 }
@@ -521,11 +651,9 @@ function plShowDeleteConfirm(playlistId) {
         noInput: true,
         onConfirm: async () => {
             await plDeletePlaylist(playlistId);
-            if (_plCurrentlyOpenId === playlistId) _plCurrentlyOpenId = null;
             if (typeof showToast === 'function') {
                 showToast(isEn ? 'Playlist deleted' : 'Плейлист видалено', 'ok');
             }
-            plRenderProfileHTML();
         }
     });
 }
@@ -578,7 +706,7 @@ function plShowInputModal({ title, placeholder, defaultValue, confirmText, messa
 }
 
 // =============================================
-// BOOK MODAL — "ADD TO PLAYLIST" (SYNCHRONOUS & RELIABLE)
+// BOOK MODAL BUTTON & DROPDOWN
 // =============================================
 function plGetModalButtonHTML(book) {
     const isEn = plIsEn();
@@ -619,7 +747,6 @@ function plAttachModalListeners(book) {
             return;
         }
 
-        // Refresh dropdown options in case playlists changed
         const isEn = plIsEn();
         const playlists = plGetPlaylists();
         let optionsHtml = '';
@@ -637,7 +764,6 @@ function plAttachModalListeners(book) {
         plAttachDropdownOptionListeners(book, dropdown);
     };
 
-    // Close on outside click
     document.addEventListener('click', function _closePlDropdown(e) {
         if (!wrap.contains(e.target)) {
             dropdown.style.display = 'none';
@@ -698,3 +824,5 @@ window.plRenderProfileSection = plRenderProfileSection;
 window.plGetModalButtonHTML = plGetModalButtonHTML;
 window.plAttachModalListeners = plAttachModalListeners;
 window.plInitForUser = plInitForUser;
+window.plOpenPlaylistModal = plOpenPlaylistModal;
+window.plClosePlaylistModal = plClosePlaylistModal;

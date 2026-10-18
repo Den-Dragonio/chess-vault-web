@@ -145,9 +145,11 @@ const I18N_TRANSLATIONS = {
         profile_th_author: "Author",
         profile_th_date: "Date",
         pl_title: "My Playlists",
-        pl_watch_later: "Watch Later",
+        pl_read_later: "Read Later",
+        pl_watch_later: "Read Later",
         pl_favorites: "Favorites",
         pl_btn_add: "+ New Playlist",
+        pl_new_playlist: "New Playlist",
         pl_add_to_modal: "Add to Playlist",
 
         // Settings Modal
@@ -367,9 +369,11 @@ const I18N_TRANSLATIONS = {
         profile_th_author: "Автор",
         profile_th_date: "Дата",
         pl_title: "Мої Плейлисти",
-        pl_watch_later: "На потім",
+        pl_read_later: "Читати потім",
+        pl_watch_later: "Читати потім",
         pl_favorites: "Улюблені",
         pl_btn_add: "+ Новий плейлист",
+        pl_new_playlist: "Новий плейлист",
         pl_add_to_modal: "Додати в плейлист",
 
         // Settings Modal

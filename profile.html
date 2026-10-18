@@ -9,7 +9,7 @@
     <link rel="apple-touch-icon" href="img/icon.png">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="book-modal.css?v=5">
-    <link rel="stylesheet" href="playlists.css?v=1">
+    <link rel="stylesheet" href="playlists.css?v=3">
     <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
     <script src="dark-mode-init.js"></script>
     <script src="analytics.js?v=1"></script>
@@ -51,13 +51,22 @@
             position: relative;
             z-index: 10;
             display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            flex-wrap: wrap;
+            flex-direction: column;
+            align-items: center;
             gap: 30px;
             padding: 100px 40px 60px;
             min-height: 100vh;
             box-sizing: border-box;
+            width: 100%;
+        }
+
+        .profile-top-row {
+            display: flex;
+            justify-content: center;
+            align-items: stretch;
+            gap: 30px;
+            width: 100%;
+            max-width: 1100px;
         }
 
         /* ---- КАРТКА ПРОФІЛЮ ---- */
@@ -69,10 +78,12 @@
             text-align: center;
             border: 1px solid rgba(255, 255, 255, 0.85);
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
-            min-width: 300px;
+            min-width: 320px;
             max-width: 350px;
             flex-shrink: 0;
-            align-self: flex-start;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
         }
 
         .profile-avatar {
@@ -202,8 +213,61 @@
             border: 1px solid rgba(255, 255, 255, 0.8);
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.07);
             flex-grow: 1;
-            max-width: 720px;
-            align-self: flex-start;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        .history-table-wrap {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 380px;
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+        }
+
+        .history-table-wrap::-webkit-scrollbar {
+            display: none !important;
+        }
+
+        .playlists-shelf-card {
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(20px);
+            border-radius: 28px;
+            padding: 35px 40px;
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.07);
+            width: 100%;
+            max-width: 1100px;
+            box-sizing: border-box;
+        }
+
+        html.dark .playlists-shelf-card {
+            background: rgba(20, 20, 30, 0.6);
+            border-color: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+        }
+
+        @media (max-width: 850px) {
+            .profile-top-row {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .profile-card,
+            .history-card {
+                max-width: 100%;
+                width: 100%;
+            }
+
+            .profile-wrapper {
+                padding: 90px 20px 40px;
+            }
+
+            .playlists-shelf-card {
+                padding: 25px 20px;
+            }
         }
 
         .history-card h2 {
@@ -748,48 +812,52 @@
     <div id="bg-grid-container"></div>
 
     <div class="profile-wrapper">
-        <!-- Ліва картка -->
-        <div class="profile-card">
-            <div class="profile-avatar" id="profile-avatar">♟</div>
-            <h1 class="profile-name" id="profile-name">...</h1>
-            <div class="profile-badge" id="profile-badge">♟ Учасник Chess Vault</div>
-            <div class="profile-rank-hint" id="profile-rank-hint"></div>
-            <div class="profile-reg-date" id="profile-reg-date">Дата реєстрації: —</div>
+        <div class="profile-top-row">
+            <!-- Ліва картка -->
+            <div class="profile-card">
+                <div class="profile-avatar" id="profile-avatar">♟</div>
+                <h1 class="profile-name" id="profile-name">...</h1>
+                <div class="profile-badge" id="profile-badge">♟ Учасник Chess Vault</div>
+                <div class="profile-rank-hint" id="profile-rank-hint"></div>
+                <div class="profile-reg-date" id="profile-reg-date">Дата реєстрації: —</div>
 
-            <div class="profile-stats">
-                <div class="stat-item">
-                    <span class="stat-value" id="stat-downloads">0</span>
-                    <span class="stat-label" data-i18n="profile_stat_downloads">Завантажень</span>
+                <div class="profile-stats">
+                    <div class="stat-item">
+                        <span class="stat-value" id="stat-downloads">0</span>
+                        <span class="stat-label" data-i18n="profile_stat_downloads">Завантажень</span>
+                    </div>
                 </div>
+
+                <hr class="profile-divider">
+                <button class="settings-profile-btn" id="settings-profile-btn" data-i18n="profile_btn_settings">⚙️ Налаштування</button>
+                <button class="logout-profile-btn" id="logout-profile-btn" data-i18n="profile_btn_logout">🚪 Вийти</button>
             </div>
 
-            <hr class="profile-divider">
-            <button class="settings-profile-btn" id="settings-profile-btn" data-i18n="profile_btn_settings">⚙️ Налаштування</button>
-            <button class="logout-profile-btn" id="logout-profile-btn" data-i18n="profile_btn_logout">🚪 Вийти</button>
-        </div>
-
-        <!-- Права картка: Історія -->
-        <div class="history-card">
-            <h2 data-i18n="profile_history_title">📚 Мої завантаження</h2>
-            <p style="font-size: 0.86rem; color: #777; margin: -14px 0 20px;" data-i18n="profile_history_hint">💡 Натисніть на книгу, щоб прочитати опис і завантажити знову</p>
-            <table class="history-table">
-                <thead>
-                    <tr>
-                        <th data-i18n="profile_th_title">Назва</th>
-                        <th data-i18n="profile_th_author">Автор</th>
-                        <th data-i18n="profile_th_date">Дата</th>
-                    </tr>
-                </thead>
-                <tbody id="history-body">
-                    <tr>
-                        <td colspan="3" class="history-empty" data-i18n="lib_loading">⏳ Завантаження...</td>
-                    </tr>
-                </tbody>
-            </table>
+            <!-- Права картка: Історія -->
+            <div class="history-card">
+                <h2 data-i18n="profile_history_title">📚 Мої завантаження</h2>
+                <p style="font-size: 0.86rem; color: #777; margin: -14px 0 20px;" data-i18n="profile_history_hint">💡 Натисніть на книгу, щоб прочитати опис і завантажити знову</p>
+                <div class="history-table-wrap">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="profile_th_title">Назва</th>
+                                <th data-i18n="profile_th_author">Автор</th>
+                                <th data-i18n="profile_th_date">Дата</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-body">
+                            <tr>
+                                <td colspan="3" class="history-empty" data-i18n="lib_loading">⏳ Завантаження...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <!-- ПЛЕЙЛИСТИ -->
-        <div class="history-card" id="playlists-card" style="flex-basis:100%; max-width:100%;">
+        <div class="playlists-shelf-card" id="playlists-card">
             <div id="playlists-section"></div>
         </div>
     </div>
@@ -879,7 +947,7 @@
     <script src="page_counts.js"></script>
     <script src="descriptions.js"></script>
     <script src="books-cache.js?v=6"></script>
-    <script src="playlists.js?v=2"></script>
+    <script src="playlists.js?v=3"></script>
     <script src="book-modal.js?v=9"></script>
     <script>
         // Ініціалізація плейлистів миттєво
