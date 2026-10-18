@@ -752,6 +752,13 @@ function getLocalizedNewsText(data, currentLang) {
             : 'Додано англійську мову інтерфейсу! Тепер у налаштуваннях профілю можна обирати мову (English / Українська).';
     }
 
+    // Playlists feature announcement
+    if (/Додано власні плейлисти|Playlists added/i.test(rawText)) {
+        return isEn
+            ? 'Playlists added! Create custom reading lists, save favorites and "Read Later" in your profile.'
+            : 'Додано власні плейлисти! Створюйте тематичні списки книг, зберігайте «Читати потім» та «Улюблені» на сторінці профілю.';
+    }
+
     // 5. Fallback
     return (isEn ? (data.text_en || rawText) : (data.text_uk || rawText)) || rawText;
 }
@@ -780,6 +787,13 @@ function renderNewsList(docs) {
 // Сідуємо системні новини в Firestore (з фіксованими ID — не дублюються)
 async function seedSystemNews() {
     const systemNews = [
+        { 
+            id: 'playlists-feature-added',
+            text: 'Додано власні плейлисти! Створюйте тематичні списки книг, зберігайте «Читати потім» та «Улюблені» на сторінці профілю.',
+            text_uk: 'Додано власні плейлисти! Створюйте тематичні списки книг, зберігайте «Читати потім» та «Улюблені» на сторінці профілю.',
+            text_en: 'Playlists added! Create custom reading lists, save favorites and "Read Later" in your profile.',
+            date: new Date('2026-10-19T02:00:00Z')
+        },
         { 
             id: 'english-language-added',
             text: 'Додано англійську мову інтерфейсу! Тепер у налаштуваннях профілю можна обирати мову (English / Українська).',
