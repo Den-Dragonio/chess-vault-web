@@ -22,7 +22,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "Індія",
     "flag": "🇮🇳",
     "peakElo": 2794,
-    \"peakEloDisplay\": \"2794\"
+    "peakEloDisplay": "2794"
   },
   {
     "id": "ding",
@@ -42,7 +42,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "Китай",
     "flag": "🇨🇳",
     "peakElo": 2816,
-    \"peakEloDisplay\": \"2816\"
+    "peakEloDisplay": "2816"
   },
   {
     "id": "carlsen",
@@ -64,7 +64,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "Норвегія",
     "flag": "🇳🇴",
     "peakElo": 2882,
-    \"peakEloDisplay\": \"2882\"
+    "peakEloDisplay": "2882"
   },
   {
     "id": "anand",
@@ -109,7 +109,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "Індія",
     "flag": "🇮🇳",
     "peakElo": 2817,
-    \"peakEloDisplay\": \"2817\"
+    "peakEloDisplay": "2817"
   },
   {
     "id": "kramnik",
@@ -137,7 +137,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "Росія",
     "flag": "🇷🇺",
     "peakElo": 2817,
-    \"peakEloDisplay\": \"2817\"
+    "peakEloDisplay": "2817"
   },
   {
     "id": "topalov",
@@ -157,7 +157,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "Болгарія",
     "flag": "🇧🇬",
     "peakElo": 2816,
-    \"peakEloDisplay\": \"2816\"
+    "peakEloDisplay": "2816"
   },
   {
     "id": "kasimdzhanov",
@@ -177,7 +177,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "Узбекистан",
     "flag": "🇺🇿",
     "peakElo": 2715,
-    \"peakEloDisplay\": \"2715\"
+    "peakEloDisplay": "2715"
   },
   {
     "id": "ponomariov",
@@ -197,7 +197,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "Україна",
     "flag": "🇺🇦",
     "peakElo": 2764,
-    \"peakEloDisplay\": \"2764\"
+    "peakEloDisplay": "2764"
   },
   {
     "id": "khalifman",
@@ -251,7 +251,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "Росія",
     "flag": "🇷🇺",
     "peakElo": 2702,
-    \"peakEloDisplay\": \"2702\"
+    "peakEloDisplay": "2702"
   },
   {
     "id": "karpov",
@@ -322,7 +322,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "СРСР",
     "flag": "img/flags/ussr.svg",
     "peakElo": 2780,
-    \"peakEloDisplay\": \"2780\"
+    "peakEloDisplay": "2780"
   },
   {
     "id": "kasparov",
@@ -385,7 +385,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "СРСР",
     "flag": "img/flags/ussr.svg",
     "peakElo": 2851,
-    \"peakEloDisplay\": \"2851\"
+    "peakEloDisplay": "2851"
   },
   {
     "id": "fischer",
@@ -434,7 +434,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "США",
     "flag": "🇺🇸",
     "peakElo": 2785,
-    \"peakEloDisplay\": \"2785\"
+    "peakEloDisplay": "2785"
   },
   {
     "id": "spassky",
@@ -466,7 +466,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "СРСР",
     "flag": "img/flags/ussr.svg",
     "peakElo": 2690,
-    \"peakEloDisplay\": \"2690\"
+    "peakEloDisplay": "2690"
   },
   {
     "id": "petrosian",
@@ -503,7 +503,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "СРСР",
     "flag": "img/flags/ussr.svg",
     "peakElo": 2645,
-    \"peakEloDisplay\": \"2645\"
+    "peakEloDisplay": "2645"
   },
   {
     "id": "tal",
@@ -555,7 +555,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "СРСР",
     "flag": "img/flags/ussr.svg",
     "peakElo": 2705,
-    \"peakEloDisplay\": \"2705\"
+    "peakEloDisplay": "2705"
   },
   {
     "id": "smyslov",
@@ -596,7 +596,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "СРСР",
     "flag": "img/flags/ussr.svg",
     "peakElo": 2620,
-    \"peakEloDisplay\": \"2620\"
+    "peakEloDisplay": "2620"
   },
   {
     "id": "botvinnik",
@@ -684,7 +684,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "СРСР",
     "flag": "img/flags/ussr.svg",
     "peakElo": 2630,
-    \"peakEloDisplay\": \"2630\"
+    "peakEloDisplay": "2630"
   },
   {
     "id": "euwe",
@@ -721,7 +721,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "Нідерланди",
     "flag": "🇳🇱",
     "peakElo": 2769,
-    \"peakEloDisplay\": \"2769\"
+    "peakEloDisplay": "2769"
   },
   {
     "id": "alekhine",
@@ -776,7 +776,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "Франція",
     "flag": "🇫🇷",
     "peakElo": 2859,
-    \"peakEloDisplay\": \"2859\"
+    "peakEloDisplay": "2859"
   },
   {
     "id": "capablanca",
@@ -824,7 +824,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "Куба",
     "flag": "🇨🇺",
     "peakElo": 2877,
-    \"peakEloDisplay\": \"2877\"
+    "peakEloDisplay": "2877"
   },
   {
     "id": "lasker",
@@ -865,7 +865,7 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "Німеччина",
     "flag": "🇩🇪",
     "peakElo": 2878,
-    \"peakEloDisplay\": \"2878\"
+    "peakEloDisplay": "2878"
   },
   {
     "id": "steinitz",
@@ -891,6 +891,6 @@ const WORLD_CHAMPIONS_DATA = [
     "country": "Австрія / США",
     "flag": "🇦🇹 🇺🇸",
     "peakElo": 2826,
-    \"peakEloDisplay\": \"2826\"
+    "peakEloDisplay": "2826"
   }
 ];
