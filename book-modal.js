@@ -694,9 +694,7 @@ function renderModalFull(book, meta) {
         </div>` : '';
 
     let extBtnHTML = '';
-    if (meta?.wikiUrl) {
-        extBtnHTML = `<a class="bd-btn-openlibrary" href="${escHtml(meta.wikiUrl)}" target="_blank" rel="noopener">🌐 ${wikiLabel}</a>`;
-    } else if (olKey) {
+    if (olKey) {
         extBtnHTML = `<a class="bd-btn-openlibrary" href="https://openlibrary.org${olKey}" target="_blank" rel="noopener">🌐 Open Library</a>`;
     }
 
