@@ -114,18 +114,29 @@ spawnPiece('giant-right');
 const loginModal = document.getElementById('login-modal');
 const regModal = document.getElementById('reg-modal');
 
-function openModal(m) { m.style.display = 'flex'; }
+function openModal(m) {
+    if (typeof m === 'string') {
+        m = document.getElementById(m.endsWith('-modal') ? m : m + '-modal');
+    }
+    if (m) m.style.display = 'flex';
+}
+
 function closeModal(m) {
-    m.style.display = 'none';
-    const e1 = document.getElementById('auth-error');
-    const e2 = document.getElementById('reg-error');
-    if (e1) e1.textContent = '';
-    if (e2) e2.textContent = '';
-    hasAttemptedReg = false;
-    const sheet = document.getElementById('reg-rules-cheat-sheet');
-    if (sheet) sheet.style.display = 'none';
-    const regInput = document.getElementById('reg-name');
-    if (regInput) regInput.classList.remove('input-error');
+    if (typeof m === 'string') {
+        m = document.getElementById(m.endsWith('-modal') ? m : m + '-modal');
+    }
+    if (m) {
+        m.style.display = 'none';
+        const e1 = document.getElementById('auth-error');
+        const e2 = document.getElementById('reg-error');
+        if (e1) e1.textContent = '';
+        if (e2) e2.textContent = '';
+        hasAttemptedReg = false;
+        const sheet = document.getElementById('reg-rules-cheat-sheet');
+        if (sheet) sheet.style.display = 'none';
+        const regInput = document.getElementById('reg-name');
+        if (regInput) regInput.classList.remove('input-error');
+    }
 }
 
 function bindLoginTrigger() {
@@ -150,6 +161,16 @@ document.addEventListener('keydown', e => {
         if (regModal && regModal.style.display === 'flex') closeModal(regModal);
     }
 });
+
+// Автоматичне відкриття модалки при вході через посилання з іншої сторінки (?auth=login / ?auth=reg)
+try {
+    const urlAuth = new URLSearchParams(window.location.search).get('auth');
+    if (urlAuth === 'login' || window.location.hash === '#login') {
+        openModal(loginModal);
+    } else if (urlAuth === 'reg' || window.location.hash === '#reg') {
+        openModal(regModal);
+    }
+} catch (_) {}
 
 // =============================================
 // 5. ПОМИЛКИ FIREBASE
@@ -511,19 +532,29 @@ function updateHeaderAuthUI(user) {
     const accDropdown = document.getElementById('acc-dropdown');
     const myAccountLink = document.getElementById('nav-my-account');
     const adminLink = document.getElementById('nav-admin-link');
+    const authTabWrap = accBtn ? accBtn.closest('.auth-tab-wrap') : null;
     const t = (k) => window.i18n ? window.i18n.t(k) : k;
 
     const isAdmin = window.isChessAdmin && window.isChessAdmin(user);
     if (adminLink) {
-        adminLink.style.display = isAdmin ? 'inline-block' : 'none';
+        adminLink.style.display = isAdmin ? '' : 'none';
     }
 
     if (user) {
+        document.body.classList.add('user-logged-in');
+        if (authTabWrap) authTabWrap.classList.add('logged-in');
+
         const name = user.displayName || user.email.split('@')[0];
-        if (accBtn) accBtn.textContent = `👤 ${name} ▾`;
+        if (accBtn) {
+            accBtn.innerHTML = `
+                <span class="nav-text nav-text-desktop">👤 ${name}</span>
+                <span class="nav-arrow"> ▾</span>
+            `;
+        }
         if (myAccountLink) {
-            myAccountLink.style.display = 'inline';
-            myAccountLink.textContent = t('nav_my_account');
+            myAccountLink.style.display = '';
+            const accText = myAccountLink.querySelector('.nav-text');
+            if (accText) accText.textContent = t('nav_my_account');
         }
         if (accDropdown) {
             accDropdown.innerHTML = `
@@ -539,7 +570,17 @@ function updateHeaderAuthUI(user) {
             }
         }
     } else {
-        if (accBtn) accBtn.textContent = `${t('nav_account')} ▾`;
+        document.body.classList.remove('user-logged-in');
+        if (authTabWrap) authTabWrap.classList.remove('logged-in');
+
+        if (accBtn) {
+            accBtn.innerHTML = `
+                <span class="nav-icon">🔑</span>
+                <span class="nav-text nav-text-desktop" data-i18n="nav_account">${t('nav_account')}</span>
+                <span class="nav-text nav-text-mobile" data-i18n="nav_login">${t('nav_login')}</span>
+                <span class="nav-arrow"> ▾</span>
+            `;
+        }
         if (myAccountLink) myAccountLink.style.display = 'none';
         if (accDropdown) {
             accDropdown.innerHTML = `
@@ -549,6 +590,19 @@ function updateHeaderAuthUI(user) {
             bindLoginTrigger();
             bindRegTrigger();
         }
+    }
+
+    if (accBtn && !accBtn.dataset.mobileBound) {
+        accBtn.dataset.mobileBound = 'true';
+        accBtn.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768) {
+                if (!auth || !auth.currentUser) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openModal(loginModal);
+                }
+            }
+        });
     }
 }
 
@@ -773,3 +827,15 @@ if (document.readyState === 'loading') {
 } else {
     initScrollToTop();
 }
+
+// Закриття мобільного меню при кліку поза ним або на посилання
+document.addEventListener('click', (e) => {
+    const nav = document.querySelector('.nav-menu');
+    if (!nav || !nav.classList.contains('open')) return;
+    if (e.target.closest('.hamburger')) return;
+    const isInsideNav = nav.contains(e.target);
+    const isLink = e.target.closest('a');
+    if (!isInsideNav || isLink) {
+        nav.classList.remove('open');
+    }
+});

@@ -26,12 +26,17 @@
     <header class="main-header">
         <nav class="nav-menu">
             <button class="hamburger" onclick="this.closest('nav').classList.toggle('open')">☰</button>
-            <a href="index.html" data-i18n="nav_home">Головна</a>
-            <a href="profile.html" id="nav-my-account" style="display:none;" data-i18n="nav_my_account">Мій Аккаунт</a>
-            <a href="library.html" data-i18n="nav_library">Бібліотека</a>
-            <a href="admin.html" id="nav-admin-link" style="display:none; color: #f59e0b; font-weight: 700;">👑 <span data-i18n="nav_admin_panel">Адмін-панель</span></a>
-            <div class="dropdown">
-                <a class="dropbtn" id="acc-btn"><span data-i18n="nav_account">Аккаунт</span> ▾</a>
+            <a href="index.html" class="nav-tab active-link"><span class="nav-icon">🏠</span><span class="nav-text" data-i18n="nav_home">Головна</span></a>
+            <a href="library.html" class="nav-tab"><span class="nav-icon">📚</span><span class="nav-text" data-i18n="nav_library">Бібліотека</span></a>
+            <a href="profile.html" id="nav-my-account" class="nav-tab" style="display:none;"><span class="nav-icon">👤</span><span class="nav-text" data-i18n="nav_my_account">Мій Аккаунт</span></a>
+            <a href="admin.html" id="nav-admin-link" class="nav-tab nav-admin-tab" style="display:none; color: #f59e0b; font-weight: 700;"><span class="nav-icon">👑</span><span class="nav-text" data-i18n="nav_admin_panel">Адмін-панель</span></a>
+            <div class="dropdown nav-tab auth-tab-wrap">
+                <a class="dropbtn" id="acc-btn">
+                    <span class="nav-icon">🔑</span>
+                    <span class="nav-text nav-text-desktop" data-i18n="nav_account">Аккаунт</span>
+                    <span class="nav-text nav-text-mobile" data-i18n="nav_login">Вхід</span>
+                    <span class="nav-arrow"> ▾</span>
+                </a>
                 <div class="dropdown-content" id="acc-dropdown">
                     <a href="#" id="login-trigger">🔑 <span data-i18n="nav_login">Вхід</span></a>
                     <a href="#" id="reg-trigger">📝 <span data-i18n="nav_register">Реєстрація</span></a>

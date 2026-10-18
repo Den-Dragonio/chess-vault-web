@@ -19,11 +19,11 @@ window.db = firebase.firestore();
 
 function bindLoginTrigger() {
     const el = document.getElementById('login-trigger');
-    if (el) el.onclick = (e) => { e.preventDefault(); window.location.href = 'index.html'; };
+    if (el) el.onclick = (e) => { e.preventDefault(); window.location.href = 'index.html?auth=login'; };
 }
 function bindRegTrigger() {
     const el = document.getElementById('reg-trigger');
-    if (el) el.onclick = (e) => { e.preventDefault(); window.location.href = 'index.html'; };
+    if (el) el.onclick = (e) => { e.preventDefault(); window.location.href = 'index.html?auth=reg'; };
 }
 
 function updateSharedAuthUI(user) {
@@ -31,19 +31,29 @@ function updateSharedAuthUI(user) {
     const accDropdown = document.getElementById('acc-dropdown');
     const myAccountLink = document.getElementById('nav-my-account');
     const adminLink = document.getElementById('nav-admin-link');
+    const authTabWrap = accBtn ? accBtn.closest('.auth-tab-wrap') : null;
     const t = (k) => window.i18n ? window.i18n.t(k) : k;
 
     const isAdmin = window.isChessAdmin && window.isChessAdmin(user);
     if (adminLink) {
-        adminLink.style.display = isAdmin ? 'inline-block' : 'none';
+        adminLink.style.display = isAdmin ? '' : 'none';
     }
 
     if (user) {
+        document.body.classList.add('user-logged-in');
+        if (authTabWrap) authTabWrap.classList.add('logged-in');
+
         const name = user.displayName || user.email.split('@')[0];
-        if (accBtn) accBtn.textContent = `👤 ${name} ▾`;
+        if (accBtn) {
+            accBtn.innerHTML = `
+                <span class="nav-text nav-text-desktop">👤 ${name}</span>
+                <span class="nav-arrow"> ▾</span>
+            `;
+        }
         if (myAccountLink) {
-            myAccountLink.style.display = 'inline';
-            myAccountLink.textContent = t('nav_my_account');
+            myAccountLink.style.display = '';
+            const accText = myAccountLink.querySelector('.nav-text');
+            if (accText) accText.textContent = t('nav_my_account');
         }
         if (accDropdown) {
             accDropdown.innerHTML = `
@@ -58,7 +68,17 @@ function updateSharedAuthUI(user) {
             }
         }
     } else {
-        if (accBtn) accBtn.textContent = `${t('nav_account')} ▾`;
+        document.body.classList.remove('user-logged-in');
+        if (authTabWrap) authTabWrap.classList.remove('logged-in');
+
+        if (accBtn) {
+            accBtn.innerHTML = `
+                <span class="nav-icon">🔑</span>
+                <span class="nav-text nav-text-desktop" data-i18n="nav_account">${t('nav_account')}</span>
+                <span class="nav-text nav-text-mobile" data-i18n="nav_login">${t('nav_login')}</span>
+                <span class="nav-arrow"> ▾</span>
+            `;
+        }
         if (myAccountLink) myAccountLink.style.display = 'none';
         if (accDropdown) {
             accDropdown.innerHTML = `
@@ -68,6 +88,19 @@ function updateSharedAuthUI(user) {
             bindLoginTrigger();
             bindRegTrigger();
         }
+    }
+
+    if (accBtn && !accBtn.dataset.mobileBound) {
+        accBtn.dataset.mobileBound = 'true';
+        accBtn.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768) {
+                if (!auth || !auth.currentUser) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.location.href = 'index.html?auth=login';
+                }
+            }
+        });
     }
 }
 
@@ -110,5 +143,17 @@ auth.onAuthStateChanged(async (user) => {
 
 window.addEventListener('chessVaultLanguageChanged', () => {
     updateSharedAuthUI(auth.currentUser);
+});
+
+// Закриття мобільного меню при кліку поза ним або на посилання
+document.addEventListener('click', (e) => {
+    const nav = document.querySelector('.nav-menu');
+    if (!nav || !nav.classList.contains('open')) return;
+    if (e.target.closest('.hamburger')) return;
+    const isInsideNav = nav.contains(e.target);
+    const isLink = e.target.closest('a');
+    if (!isInsideNav || isLink) {
+        nav.classList.remove('open');
+    }
 });
 

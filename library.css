@@ -3,6 +3,15 @@
     /* Використовуємо Marker Felt та Permanent Marker як страховку */
     font-family: "Marker Felt Thin", "Marker Felt", "Permanent Marker", cursive !important;
     box-sizing: border-box;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+*::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
 }
 
 /* Фікс для паролів та плейсхолдерів, щоб шрифт не злітав */
@@ -20,6 +29,16 @@ html {
     min-height: 100%;
     background: #ffffff;
     color: #222;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
 }
 
 html.library-html,
@@ -28,6 +47,8 @@ body.library-page {
     overflow-x: hidden !important;
     height: auto !important;
     min-height: 100% !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
 }
 
 /* --- 2. ХЕДЕР ТА НАВІГАЦІЯ --- */
@@ -118,6 +139,32 @@ body.library-page {
     background: #1a1a1a;
     color: #fff;
     padding-left: 30px;
+}
+
+/* Навігаційні іконки та текст для мобільної/десктопної версій */
+.nav-icon {
+    display: none;
+}
+
+.nav-admin-tab .nav-icon {
+    display: inline;
+    margin-right: 4px;
+}
+
+.nav-text-mobile {
+    display: none;
+}
+
+.nav-text-desktop {
+    display: inline;
+}
+
+.nav-arrow {
+    display: inline;
+}
+
+.hamburger {
+    display: none;
 }
 
 /* --- 4. КОНТЕЙНЕР БІБЛІОТЕКИ (TABLE VIEW) --- */
@@ -428,16 +475,14 @@ input {
     max-height: 65vh;
     padding-right: 10px;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
 }
 
-/* Скроллбар в стиле проекта */
 .table-area::-webkit-scrollbar {
-    width: 6px;
-}
-
-.table-area::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 
 /* Кнопки сортировки */
@@ -716,60 +761,182 @@ body.library-page {
         overflow-x: hidden;
         overflow-y: auto;
         height: auto;
+        width: 100%;
     }
 
-    /* Header */
+    /* Header - Фіксований нижній бар (Mobile Tab Bar / Dock) */
     .main-header {
-        height: auto;
-        padding: 0 14px;
-        justify-content: flex-start;
-        position: sticky;
-        top: 0;
+        position: fixed !important;
+        top: auto !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        height: 62px !important;
+        min-height: 62px !important;
+        padding: 0 8px !important;
+        margin: 0 !important;
+        background: rgba(255, 255, 255, 0.94) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+        border-bottom: none !important;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06) !important;
+        z-index: 9999 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
 
-    /* Nav */
+    /* Навігаційний ряд */
     .nav-menu {
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: 0;
-        width: 100%;
-        padding: 8px 0;
-        align-items: center;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-around !important;
+        width: 100% !important;
+        max-width: 520px !important;
+        height: 100% !important;
+        padding: 0 !important;
+        margin: 0 auto !important;
+        gap: 2px !important;
     }
 
+    /* Повне приховування гамбургера та випадаючого списку на мобілці */
     .hamburger {
-        display: inline-flex;
-        margin-right: 12px;
+        display: none !important;
     }
 
-    .nav-menu>a,
-    .nav-menu>.dropdown {
-        display: none;
-        width: 100%;
-        padding: 10px 16px;
-        border-top: 1px solid rgba(0, 0, 0, 0.05);
-        font-size: 1.05rem;
+    .dropdown-content {
+        display: none !important;
     }
 
-    .nav-menu.open>a,
-    .nav-menu.open>.dropdown {
-        display: block;
+    /* Кнопки-вкладки з іконками для мобільних */
+    .nav-menu a,
+    .nav-menu .dropbtn,
+    .nav-menu .dropdown {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-decoration: none !important;
+        padding: 6px 4px !important;
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        min-height: 48px !important;
+        border-radius: 12px !important;
+        transition: background 0.2s ease, transform 0.15s ease, color 0.2s ease !important;
+        color: #64748b !important;
+        cursor: pointer !important;
+        background: transparent !important;
+        border: none !important;
+        margin: 0 !important;
+        font-size: 0.95rem !important;
+        line-height: 1 !important;
     }
 
-    .nav-menu.open .dropdown-content {
-        opacity: 1;
-        visibility: visible;
-        position: static;
-        transform: none;
-        box-shadow: none;
-        border: none;
-        background: transparent;
-        padding: 0 8px;
+    .nav-menu .dropdown {
+        position: static !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
 
-    .nav-menu.open .dropdown-content a {
-        padding: 8px 0;
-        display: block;
+    .nav-menu .dropdown .dropbtn {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    /* Приховування прихованих пунктів (наприклад адмін для звичайного користувача) */
+    .nav-menu a[style*="display: none"],
+    .nav-menu a[style*="display:none"] {
+        display: none !important;
+    }
+
+    /* Приховування виходу з хедера в мобільній версії */
+    body.user-logged-in .auth-tab-wrap,
+    .auth-tab-wrap.logged-in {
+        display: none !important;
+    }
+
+    .nav-icon {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 1.25rem !important;
+        line-height: 1 !important;
+        margin-bottom: 2px !important;
+        transition: transform 0.2s ease !important;
+    }
+
+    .nav-text {
+        font-size: 0.68rem !important;
+        font-weight: 600 !important;
+        line-height: 1.1 !important;
+        letter-spacing: 0.01em !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        max-width: 100% !important;
+        display: block !important;
+    }
+
+    .nav-text-desktop {
+        display: none !important;
+    }
+
+    .nav-text-mobile {
+        display: block !important;
+        font-size: 0.68rem !important;
+        font-weight: 600 !important;
+        line-height: 1.1 !important;
+    }
+
+    .nav-arrow {
+        display: none !important;
+    }
+
+    .nav-menu a:active,
+    .nav-menu .dropbtn:active {
+        transform: scale(0.92) !important;
+        background: rgba(0, 0, 0, 0.04) !important;
+    }
+
+    .nav-menu a.active-link,
+    .nav-menu .dropbtn.active-link {
+        color: #2563eb !important;
+    }
+
+    .nav-menu a.active-link .nav-icon {
+        transform: translateY(-1px) scale(1.1) !important;
+    }
+
+    .nav-admin-tab {
+        color: #d97706 !important;
+    }
+
+    /* Темна тема для нижнього меню */
+    html.dark .main-header {
+        background: rgba(14, 14, 22, 0.94) !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.4) !important;
+    }
+
+    html.dark .nav-menu a,
+    html.dark .nav-menu .dropbtn {
+        color: #94a3b8 !important;
+    }
+
+    html.dark .nav-menu a:active,
+    html.dark .nav-menu .dropbtn:active {
+        background: rgba(255, 255, 255, 0.06) !important;
+    }
+
+    html.dark .nav-menu a.active-link {
+        color: #60a5fa !important;
+    }
+
+    html.dark .nav-admin-tab {
+        color: #fbbf24 !important;
     }
 
     /* Library container */
@@ -777,73 +944,262 @@ body.library-page {
         width: 100%;
         margin-top: 0;
         border-radius: 0;
-        padding: 16px;
+        padding: 14px 10px;
     }
 
     .library-main-container.narrower {
         width: 100%;
         margin: 0 auto;
-        padding: 16px 12px 30px;
+        padding: 14px 10px 85px;
+        box-sizing: border-box;
+    }
+
+    /* Collections switcher */
+    .collections-switcher-wrap {
+        margin-bottom: 14px;
+        width: 100%;
+    }
+
+    .collections-switcher {
+        display: flex;
+        gap: 8px;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding: 4px;
+        border-radius: 24px;
+    }
+
+    .collections-switcher::-webkit-scrollbar {
+        display: none;
+    }
+
+    .collections-tab-btn {
+        flex-shrink: 0;
+        white-space: nowrap;
+        padding: 9px 16px;
+        font-size: 0.92rem;
+        min-height: 42px;
+        border-radius: 20px;
     }
 
     /* Search */
+    .search-box {
+        margin-bottom: 14px;
+    }
+
     #lib-search-input {
         width: 100%;
-        font-size: 0.95rem;
-        padding: 12px 16px;
+        font-size: 1rem;
+        padding: 13px 16px;
+        border-radius: 14px;
+        min-height: 46px;
+        box-sizing: border-box;
     }
 
     /* Sort controls */
     .sort-controls {
+        display: flex;
         flex-wrap: wrap;
         gap: 8px;
+        align-items: center;
+        margin-bottom: 16px;
     }
 
-    .lib-stats {
-        margin-left: 0;
+    .sort-label {
         width: 100%;
-        margin-top: 4px;
-    }
-
-    /* Table: horizontal scroll */
-    .table-wrapper,
-    .table-area,
-    .books-list-block {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .books-table {
-        min-width: 650px;
-    }
-
-    /* Smaller text in table */
-    .books-table th,
-    .books-table td {
-        padding: 10px 8px;
-        font-size: 0.82rem;
-    }
-
-    .download-btn-js,
-    .download-link {
-        padding: 6px 10px;
-        font-size: 0.82rem;
-    }
-}
-
-/* ≤ 400px */
-@media (max-width: 400px) {
-    .library-main-container.narrower {
-        padding: 12px 8px 20px;
+        font-size: 0.85rem;
+        margin-bottom: 2px;
+        color: #666;
     }
 
     .sort-btn {
-        padding: 6px 10px;
+        flex: 1 1 calc(50% - 6px);
+        min-height: 42px;
+        padding: 8px 12px;
+        font-size: 0.86rem;
+        text-align: center;
+        justify-content: center;
+        border-radius: 10px;
+    }
+
+    .lib-stats {
+        width: 100%;
+        text-align: center;
+        margin-top: 6px;
         font-size: 0.82rem;
     }
 
+    /* Floating scroll to top */
+    .scroll-to-top {
+        bottom: 78px;
+        right: 20px;
+        width: 46px;
+        height: 46px;
+    }
+}
+
+/* ============================================
+   📱 MOBILE CARDS FOR BOOKS TABLE (≤ 650px)
+   ============================================ */
+@media (max-width: 650px) {
+
+    .books-table,
+    .books-table tbody,
+    .books-table tr,
+    .books-table td {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
     .books-table {
-        min-width: 420px;
+        min-width: unset !important;
+        border-spacing: 0;
+    }
+
+    .books-table thead {
+        display: none !important;
+    }
+
+    .books-table tbody {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .books-table tbody tr {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 16px;
+        padding: 14px 16px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        position: relative;
+    }
+
+    .books-table tbody tr:hover,
+    .books-table tbody tr:active {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Cells inside card */
+    .books-table td {
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+    }
+
+    .books-table td.col-title {
+        font-size: 1.12rem;
+        font-weight: 700;
+        color: #111;
+        line-height: 1.35;
+        margin-bottom: 4px;
+    }
+
+    .books-table td.col-author {
+        font-size: 0.92rem;
+        color: #666;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .books-table td.col-author::before {
+        content: '👤 ';
+        font-size: 0.85rem;
+    }
+
+    /* Meta items grouped horizontally: Year, Pages, Format, Size */
+    .books-table td.col-year,
+    .books-table td.col-pages,
+    .books-table td.col-format,
+    .books-table td.col-size {
+        display: inline-flex !important;
+        align-items: center;
+        width: auto !important;
+        font-size: 0.82rem;
+        color: #666;
+        margin-right: 6px;
+        margin-bottom: 12px;
+        background: rgba(0, 0, 0, 0.04);
+        padding: 3px 8px;
+        border-radius: 6px;
+    }
+
+    .books-table td.col-year::before {
+        content: '📅 ';
+        margin-right: 3px;
+    }
+
+    .books-table td.col-pages::before {
+        content: '📄 ';
+        margin-right: 3px;
+    }
+
+    .books-table td.col-format .badge {
+        padding: 0;
+        background: transparent !important;
+        color: inherit !important;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .books-table td.col-size::before {
+        content: '💾 ';
+        margin-right: 3px;
+    }
+
+    /* Download button */
+    .books-table td.col-action {
+        display: block !important;
+        width: 100% !important;
+        margin-top: 4px;
+    }
+
+    .books-table td.col-action .download-link {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 16px;
+        font-size: 0.95rem;
+        border-radius: 10px;
+        min-height: 44px;
+    }
+
+    /* Loading / Empty row */
+    .books-table td.loading-row {
+        display: block !important;
+        text-align: center;
+        padding: 30px 16px !important;
+    }
+}
+
+/* ≤ 400px refinements */
+@media (max-width: 400px) {
+    .library-main-container.narrower {
+        padding: 12px 8px 30px;
+    }
+
+    .sort-btn {
+        padding: 8px 10px;
+        font-size: 0.82rem;
+    }
+
+    .books-table tbody tr {
+        padding: 12px 14px;
+    }
+
+    .books-table td.col-title {
+        font-size: 1.05rem;
     }
 }
 
@@ -1305,6 +1661,14 @@ html.dark .nav-menu>.dropdown {
     padding-bottom: 30px;
     border-bottom: 2px solid rgba(0, 0, 0, 0.06);
     overflow-x: auto;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+.years-chart-container::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 
 .year-bar-col {
@@ -1536,4 +1900,71 @@ html.dark .magazines-info-banner {
     background: rgba(255, 255, 255, 0.03);
     border-color: rgba(255, 255, 255, 0.1);
     color: #aaaab8;
+}
+
+/* --- Mobile Dark Mode Refinements --- */
+html.dark .main-header {
+    background: rgba(18, 18, 28, 0.95);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4);
+}
+
+html.dark .hamburger {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #f1f1f6;
+}
+
+html.dark .nav-menu.open > a,
+html.dark .nav-menu.open > .dropdown {
+    color: #e2e8f0;
+}
+
+html.dark .nav-menu.open > a:hover,
+html.dark .nav-menu.open > a:active {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+html.dark .nav-menu.open .dropdown-content {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+html.dark .nav-menu.open .dropdown-content a {
+    border-bottom-color: rgba(255, 255, 255, 0.05);
+    color: #cbd5e1;
+}
+
+html.dark .nav-menu.open .dropdown-content a:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+@media (max-width: 650px) {
+    html.dark .books-table tbody tr {
+        background: rgba(22, 24, 36, 0.75);
+        border-color: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    }
+
+    html.dark .books-table tbody tr:hover,
+    html.dark .books-table tbody tr:active {
+        border-color: rgba(212, 175, 55, 0.4);
+    }
+
+    html.dark .books-table td.col-title {
+        color: #fff;
+    }
+
+    html.dark .books-table td.col-author {
+        color: #a0a0b8;
+    }
+
+    html.dark .books-table td.col-year,
+    html.dark .books-table td.col-pages,
+    html.dark .books-table td.col-format,
+    html.dark .books-table td.col-size {
+        background: rgba(255, 255, 255, 0.06);
+        color: #aaaacc;
+    }
 }

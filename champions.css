@@ -206,6 +206,14 @@
     display: flex;
     flex-direction: column;
     gap: 36px;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+#champion-modal-card::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 
 @keyframes chCardIn {
@@ -505,15 +513,14 @@
     gap: 8px;
     padding-right: 6px;
     margin-top: 10px;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
 }
 
 .chm-books-scroll-list::-webkit-scrollbar {
-    width: 6px;
-}
-
-.chm-books-scroll-list::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.15);
-    border-radius: 10px;
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 
 /* Клікне посилання на книгу */
@@ -735,9 +742,36 @@ html.dark .chm-elo-val {
 }
 
 @media (max-width: 650px) {
+    .champions-section {
+        max-width: calc(100% - 24px);
+        margin: 20px auto 60px;
+    }
+    .champions-header {
+        padding: 16px 18px;
+        border-radius: 18px;
+        margin-bottom: 16px;
+    }
+    .champions-title {
+        font-size: 1.6rem;
+    }
     .champion-row {
-        flex-wrap: wrap;
+        padding: 12px 14px;
+        border-radius: 16px;
         gap: 12px;
+        flex-wrap: wrap;
+    }
+    .champ-row-portrait-wrap {
+        width: 52px;
+        height: 52px;
+    }
+    .champ-row-main {
+        min-width: 0;
+    }
+    .champ-row-name {
+        font-size: 1.1rem;
+    }
+    .champ-row-reign {
+        font-size: 0.85rem;
     }
     .champ-row-stats {
         width: 100%;
@@ -747,5 +781,12 @@ html.dark .chm-elo-val {
     }
     .champ-row-arrow {
         display: none;
+    }
+    #champion-modal-card {
+        width: 95vw;
+        max-width: 95vw;
+        max-height: 90vh;
+        padding: 24px 16px;
+        border-radius: 18px;
     }
 }

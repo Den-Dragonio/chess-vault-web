@@ -20,7 +20,9 @@
 <body>
     <!-- Форма входу для адміністратора (відображається, якщо сесія відсутня) -->
     <div id="auth-barrier-wrap" class="auth-barrier" style="display: none;">
-        <h2>♟️ Chess Vault Admin</h2>
+        <a href="index.html" style="text-decoration: none; color: inherit; display: inline-block;" title="Повернутися на головну">
+            <h2>♟️ Chess Vault Admin</h2>
+        </a>
         <p>Введіть ваш логін і пароль адміністратора для доступу до аналітики</p>
         <form id="admin-login-form">
             <input type="text" id="admin-user" class="auth-input" placeholder="Логін" required autocomplete="username">
@@ -37,19 +39,31 @@
     <div id="admin-dashboard-wrap" style="display: none;">
         <header class="admin-header">
             <div class="header-inner">
-                <div class="header-brand">
+                <a href="index.html" class="header-brand" title="Повернутися на головну" style="text-decoration: none; cursor: pointer;">
                     <span class="brand-icon">♟️</span>
                     <span class="brand-title">Chess Vault</span>
                     <span class="brand-badge">Admin Dashboard</span>
-                </div>
-                <div class="header-actions">
+                </a>
+                <div class="header-meta-wrap">
                     <span id="current-admin-label" style="font-size: 0.85rem; color: #8b949e;">👤 Admin</span>
-                    <button id="refresh-data-btn" class="btn-ghost" title="Оновити дані">🔄 Оновити</button>
-                    <a href="index.html" class="btn-ghost">🏠 Головна</a>
-                    <a href="library.html" class="btn-ghost" target="_blank">📚 Бібліотека ↗</a>
-                    <button id="admin-logout-btn" class="btn-ghost" style="color: #f87171;">🚪 Вийти</button>
+                    <button id="admin-logout-btn" class="btn-ghost btn-admin-logout" style="color: #f87171;" title="Вийти">🚪 <span class="logout-text">Вийти</span></button>
                 </div>
             </div>
+            <!-- Навігація дешборда: на десктопі справа в хедері, на мобілці фіксований бар внизу -->
+            <nav class="admin-nav-dock" id="admin-nav-dock">
+                <button id="refresh-data-btn" class="admin-dock-btn" title="Оновити дані">
+                    <span class="dock-icon">🔄</span>
+                    <span class="dock-text">Оновити</span>
+                </button>
+                <a href="index.html" class="admin-dock-btn">
+                    <span class="dock-icon">🏠</span>
+                    <span class="dock-text">Головна</span>
+                </a>
+                <a href="library.html" class="admin-dock-btn">
+                    <span class="dock-icon">📚</span>
+                    <span class="dock-text">Бібліотека</span>
+                </a>
+            </nav>
         </header>
 
         <main class="admin-container">

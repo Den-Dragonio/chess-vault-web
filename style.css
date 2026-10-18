@@ -2,6 +2,15 @@
 * {
     font-family: "Marker Felt Thin", "Marker Felt", "Permanent Marker", cursive !important;
     box-sizing: border-box;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+*::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
 }
 
 input,
@@ -20,6 +29,16 @@ html {
     overflow-y: auto;
     scroll-behavior: smooth;
     background: #ffffff;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
 }
 
 /* --- ГОЛОВНИЙ КОНТЕНТ --- */
@@ -142,15 +161,14 @@ html {
     overflow-y: auto;
     padding-right: 4px;
     text-align: left;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
 .news-list::-webkit-scrollbar {
-    width: 4px;
-}
-
-.news-list::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
+    display: none;
+    width: 0;
+    height: 0;
 }
 
 /* --- ХЕДЕР --- */
@@ -239,6 +257,32 @@ html {
 
 .dropdown-content a:last-child {
     border-bottom: none;
+}
+
+/* Навігаційні іконки та текст для мобільної/десктопної версій */
+.nav-icon {
+    display: none;
+}
+
+.nav-admin-tab .nav-icon {
+    display: inline;
+    margin-right: 4px;
+}
+
+.nav-text-mobile {
+    display: none;
+}
+
+.nav-text-desktop {
+    display: inline;
+}
+
+.nav-arrow {
+    display: inline;
+}
+
+.hamburger {
+    display: none;
 }
 
 /* Помилка авторизації та валідація */
@@ -748,79 +792,231 @@ input:focus {
         overflow-x: hidden;
         overflow-y: auto;
         height: auto;
+        width: 100%;
     }
 
-    /* Header */
+    /* Header - Фіксований нижній бар (Mobile Tab Bar / Dock) */
     .main-header {
-        height: auto;
-        padding: 0 16px;
-        justify-content: flex-start;
-        position: sticky;
-        top: 0;
+        position: fixed !important;
+        top: auto !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        height: 62px !important;
+        min-height: 62px !important;
+        padding: 0 8px !important;
+        margin: 0 !important;
+        background: rgba(255, 255, 255, 0.94) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+        border-bottom: none !important;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06) !important;
+        z-index: 9999 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
 
-    /* Nav: collapsed by default */
+    /* Навігаційний ряд */
     .nav-menu {
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: 0;
-        width: 100%;
-        padding: 8px 0;
-        align-items: center;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-around !important;
+        width: 100% !important;
+        max-width: 520px !important;
+        height: 100% !important;
+        padding: 0 !important;
+        margin: 0 auto !important;
+        gap: 2px !important;
     }
 
+    /* Повне приховування гамбургера та випадаючого списку на мобілці */
     .hamburger {
-        display: inline-flex;
-        margin-right: 12px;
+        display: none !important;
     }
 
-    .nav-menu>a,
-    .nav-menu>.dropdown {
-        display: none;
-        width: 100%;
-        padding: 10px 16px;
-        border-top: 1px solid rgba(0, 0, 0, 0.05);
-        font-size: 1.05rem;
+    .dropdown-content {
+        display: none !important;
     }
 
-    .nav-menu.open>a,
-    .nav-menu.open>.dropdown {
-        display: block;
+    /* Кнопки-вкладки з іконками для мобільних */
+    .nav-menu a,
+    .nav-menu .dropbtn,
+    .nav-menu .dropdown {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-decoration: none !important;
+        padding: 6px 4px !important;
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        min-height: 48px !important;
+        border-radius: 12px !important;
+        transition: background 0.2s ease, transform 0.15s ease, color 0.2s ease !important;
+        color: #64748b !important;
+        cursor: pointer !important;
+        background: transparent !important;
+        border: none !important;
+        margin: 0 !important;
+        font-size: 0.95rem !important;
+        line-height: 1 !important;
     }
 
-    .nav-menu.open .dropdown-content {
-        opacity: 1;
-        visibility: visible;
-        position: static;
-        transform: none;
-        box-shadow: none;
-        border: none;
-        background: transparent;
-        padding: 0 8px;
+    .nav-menu .dropdown {
+        position: static !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
 
-    .nav-menu.open .dropdown-content a {
-        padding: 8px 0;
-        display: block;
+    .nav-menu .dropdown .dropbtn {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    /* Приховування прихованих пунктів (наприклад адмін для звичайного користувача) */
+    .nav-menu a[style*="display: none"],
+    .nav-menu a[style*="display:none"] {
+        display: none !important;
+    }
+
+    /* Приховування виходу з хедера в мобільній версії */
+    body.user-logged-in .auth-tab-wrap,
+    .auth-tab-wrap.logged-in {
+        display: none !important;
+    }
+
+    .nav-icon {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 1.25rem !important;
+        line-height: 1 !important;
+        margin-bottom: 2px !important;
+        transition: transform 0.2s ease !important;
+    }
+
+    .nav-text {
+        font-size: 0.68rem !important;
+        font-weight: 600 !important;
+        line-height: 1.1 !important;
+        letter-spacing: 0.01em !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        max-width: 100% !important;
+        display: block !important;
+    }
+
+    .nav-text-desktop {
+        display: none !important;
+    }
+
+    .nav-text-mobile {
+        display: block !important;
+        font-size: 0.68rem !important;
+        font-weight: 600 !important;
+        line-height: 1.1 !important;
+    }
+
+    .nav-arrow {
+        display: none !important;
+    }
+
+    .nav-menu a:active,
+    .nav-menu .dropbtn:active {
+        transform: scale(0.92) !important;
+        background: rgba(0, 0, 0, 0.04) !important;
+    }
+
+    .nav-menu a.active-link,
+    .nav-menu .dropbtn.active-link {
+        color: #2563eb !important;
+    }
+
+    .nav-menu a.active-link .nav-icon {
+        transform: translateY(-1px) scale(1.1) !important;
+    }
+
+    .nav-admin-tab {
+        color: #d97706 !important;
+    }
+
+    /* Темна тема для нижнього меню */
+    html.dark .main-header {
+        background: rgba(14, 14, 22, 0.94) !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.4) !important;
+    }
+
+    html.dark .nav-menu a,
+    html.dark .nav-menu .dropbtn {
+        color: #94a3b8 !important;
+    }
+
+    html.dark .nav-menu a:active,
+    html.dark .nav-menu .dropbtn:active {
+        background: rgba(255, 255, 255, 0.06) !important;
+    }
+
+    html.dark .nav-menu a.active-link {
+        color: #60a5fa !important;
+    }
+
+    html.dark .nav-admin-tab {
+        color: #fbbf24 !important;
     }
 
     /* Main layout */
     .main-container {
         flex-direction: column;
         align-items: stretch;
-        padding: 20px 14px 40px;
+        padding: 16px 14px 85px;
         gap: 20px;
+        width: 100%;
+        box-sizing: border-box;
     }
 
     .news-block {
         width: 100%;
         min-height: unset;
-        padding: 20px;
+        padding: 22px 18px;
+        border-radius: 22px;
+        box-sizing: border-box;
+    }
+
+    .main-sidebar {
+        width: 100%;
+        gap: 20px;
+        box-sizing: border-box;
     }
 
     .top-books {
         width: 100%;
-        padding: 20px;
+        padding: 22px 18px;
+        border-radius: 22px;
+        box-sizing: border-box;
+    }
+
+    .useful-links {
+        width: 100%;
+        padding: 22px 18px;
+        border-radius: 22px;
+        box-sizing: border-box;
+    }
+
+    .useful-links-list li a {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        font-size: 1.05rem;
+    }
+
+    .news-list {
+        max-height: 380px;
     }
 
     /* Hide decorative giant pieces */
@@ -830,56 +1026,92 @@ input:focus {
 
     /* Modals */
     .modal-overlay {
-        padding: 60px 12px 20px;
-        align-items: flex-start;
+        padding: 40px 14px 20px;
+        align-items: center;
     }
 
     .login-card {
         width: 100%;
-        max-width: 100%;
-        padding: 28px 20px;
-        border-radius: 18px;
+        max-width: 420px;
+        padding: 32px 22px 26px;
+        border-radius: 22px;
+        box-sizing: border-box;
     }
 
-    /* Profile page */
+    .login-card h1 {
+        font-size: 1.8rem;
+        margin: 0 0 18px;
+    }
+
+    .modal-close {
+        top: 14px;
+        right: 14px;
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
+        font-size: 1.4rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-form input {
+        padding: 12px 16px;
+        font-size: 0.95rem;
+        min-height: 44px;
+        border-radius: 12px;
+        margin-bottom: 12px;
+    }
+
+    .login-btn {
+        padding: 12px;
+        font-size: 1.05rem;
+        min-height: 46px;
+        border-radius: 12px;
+    }
+
+    /* Floating scroll to top */
+    .scroll-to-top {
+        bottom: 78px;
+        right: 20px;
+        width: 46px;
+        height: 46px;
+    }
+
+    /* Profile page base in style.css */
     .profile-wrapper {
         flex-direction: column;
-        padding: 80px 14px 40px;
+        padding: 16px 14px 85px;
         gap: 20px;
     }
 
     .profile-card {
-        max-width: 100%;
-        width: 100%;
+        max-width: 100% !important;
+        width: 100% !important;
     }
 
     .history-card {
-        max-width: 100%;
-    }
-
-    .history-table {
-        font-size: 0.82rem;
-    }
-
-    .history-table th,
-    .history-table td {
-        padding: 10px 7px;
+        max-width: 100% !important;
+        width: 100% !important;
     }
 }
 
 @media (max-width: 400px) {
 
     .news-block,
-    .top-books {
-        padding: 14px 12px;
+    .top-books,
+    .useful-links {
+        padding: 18px 14px;
+        border-radius: 18px;
     }
 
     .news-item {
-        padding: 10px 12px;
+        padding: 12px 12px;
     }
 
-    .profile-card {
-        padding: 22px 14px;
+    .login-card {
+        padding: 26px 16px 22px;
     }
 }
 
@@ -1233,13 +1465,41 @@ html.dark .grid-cell {
     color: rgba(255, 255, 255, 0.06) !important;
 }
 
-html.dark .hamburger {
-    color: #aaa;
+html.dark .main-header {
+    background: rgba(18, 18, 28, 0.95);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4);
 }
 
-html.dark .nav-menu>a,
-html.dark .nav-menu>.dropdown {
-    border-top-color: rgba(255, 255, 255, 0.06);
+html.dark .hamburger {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #f1f1f6;
+}
+
+html.dark .nav-menu.open > a,
+html.dark .nav-menu.open > .dropdown {
+    color: #e2e8f0;
+}
+
+html.dark .nav-menu.open > a:hover,
+html.dark .nav-menu.open > a:active {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+html.dark .nav-menu.open .dropdown-content {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+html.dark .nav-menu.open .dropdown-content a {
+    border-bottom-color: rgba(255, 255, 255, 0.05);
+    color: #cbd5e1;
+}
+
+html.dark .nav-menu.open .dropdown-content a:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
 }
 
 html.dark .scroll-to-top {

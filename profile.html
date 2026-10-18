@@ -19,8 +19,31 @@
     <script src="firebase-init.js?v=8"></script>
     <script src="presence.js?v=1"></script>
     <style>
-        body {
+        * {
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+        }
+
+        *::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+            background: transparent !important;
+        }
+
+        body,
+        html {
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
             overflow-y: auto;
+        }
+
+        html::-webkit-scrollbar,
+        body::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+            background: transparent !important;
         }
 
         .profile-wrapper {
@@ -329,19 +352,14 @@
             width: 100%;
             animation: modalFadeIn 0.3s ease;
             box-sizing: border-box;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
         }
 
         .settings-card::-webkit-scrollbar {
-            width: 5px;
-        }
-        .settings-card::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        .settings-card::-webkit-scrollbar-thumb {
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 4px;
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
         }
 
         html.dark .settings-card {
@@ -349,11 +367,7 @@
             border-color: rgba(255, 255, 255, 0.1);
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
             color: #eee;
-            scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
-        }
-
-        html.dark .settings-card::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.25);
+            scrollbar-width: none !important;
         }
 
         @keyframes modalFadeIn {
@@ -460,6 +474,107 @@
             display: flex;
             gap: 8px;
             align-items: center;
+        }
+
+        @media (max-width: 768px) {
+            .profile-wrapper {
+                flex-direction: column;
+                align-items: stretch;
+                padding: 70px 14px 40px;
+                gap: 20px;
+            }
+
+            .profile-card {
+                min-width: unset !important;
+                max-width: 100% !important;
+                width: 100% !important;
+                padding: 28px 18px;
+                border-radius: 22px;
+                box-sizing: border-box;
+            }
+
+            .history-card {
+                max-width: 100% !important;
+                width: 100% !important;
+                padding: 24px 16px;
+                border-radius: 22px;
+                box-sizing: border-box;
+            }
+
+            .settings-card {
+                max-width: 100%;
+                width: 100%;
+                padding: 24px 18px 22px;
+                border-radius: 20px;
+                max-height: 90vh;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .history-table thead {
+                display: none;
+            }
+
+            .history-table,
+            .history-table tbody,
+            .history-table tr,
+            .history-table td {
+                display: block;
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            .history-table tbody tr {
+                background: rgba(255, 255, 255, 0.55);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(0, 0, 0, 0.06);
+                border-radius: 14px;
+                padding: 12px 14px;
+                margin-bottom: 10px;
+                transition: transform 0.2s;
+            }
+
+            html.dark .history-table tbody tr {
+                background: rgba(255, 255, 255, 0.04);
+                border-color: rgba(255, 255, 255, 0.08);
+            }
+
+            .history-table td {
+                padding: 0 !important;
+                border: none !important;
+            }
+
+            .history-table td:first-child {
+                font-size: 1.05rem;
+                font-weight: 700;
+                margin-bottom: 4px;
+            }
+
+            .history-table td:nth-child(2) {
+                font-size: 0.9rem;
+                color: #666;
+                margin-bottom: 6px;
+            }
+
+            html.dark .history-table td:nth-child(2) {
+                color: #aaa;
+            }
+
+            .history-table td:nth-child(3) {
+                font-size: 0.78rem;
+                color: #999;
+            }
+
+            .theme-switcher-group,
+            .lang-switcher-group {
+                flex-wrap: wrap;
+            }
+
+            .theme-opt-btn,
+            .lang-opt-btn {
+                flex: 1 1 calc(50% - 6px);
+                min-height: 42px;
+            }
         }
 
         @media (max-width: 480px) {
@@ -613,12 +728,15 @@
     <header class="main-header">
         <nav class="nav-menu">
             <button class="hamburger" onclick="this.closest('nav').classList.toggle('open')">☰</button>
-            <a href="index.html" data-i18n="nav_home">Головна</a>
-            <a href="profile.html" id="nav-my-account" data-i18n="nav_my_account">Мій Аккаунт</a>
-            <a href="library.html" data-i18n="nav_library">Бібліотека</a>
-            <a href="admin.html" id="nav-admin-link" style="display:none; color: #f59e0b; font-weight: 700;">👑 <span data-i18n="nav_admin_panel">Адмін-панель</span></a>
-            <div class="dropdown">
-                <a class="dropbtn" id="acc-btn">Аккаунт ▾</a>
+            <a href="index.html" class="nav-tab"><span class="nav-icon">🏠</span><span class="nav-text" data-i18n="nav_home">Головна</span></a>
+            <a href="library.html" class="nav-tab"><span class="nav-icon">📚</span><span class="nav-text" data-i18n="nav_library">Бібліотека</span></a>
+            <a href="profile.html" id="nav-my-account" class="nav-tab active-link"><span class="nav-icon">👤</span><span class="nav-text" data-i18n="nav_my_account">Мій Аккаунт</span></a>
+            <a href="admin.html" id="nav-admin-link" class="nav-tab nav-admin-tab" style="display:none; color: #f59e0b; font-weight: 700;"><span class="nav-icon">👑</span><span class="nav-text" data-i18n="nav_admin_panel">Адмін-панель</span></a>
+            <div class="dropdown nav-tab auth-tab-wrap logged-in">
+                <a class="dropbtn" id="acc-btn">
+                    <span class="nav-text nav-text-desktop">Аккаунт</span>
+                    <span class="nav-arrow"> ▾</span>
+                </a>
                 <div class="dropdown-content" id="acc-dropdown">
                     <a href="#" id="logout-btn" data-i18n="nav_logout">🚪 Вийти</a>
                 </div>
@@ -982,7 +1100,13 @@
 
                 document.getElementById('profile-name').textContent = newName;
                 document.getElementById('profile-avatar').textContent = newName.charAt(0).toUpperCase();
-                document.getElementById('acc-btn').textContent = `👤 ${newName} ▾`;
+                const accBtnEl = document.getElementById('acc-btn');
+                if (accBtnEl) {
+                    accBtnEl.innerHTML = `
+                        <span class="nav-text nav-text-desktop">👤 ${newName}</span>
+                        <span class="nav-arrow"> ▾</span>
+                    `;
+                }
                 showSettingsAlert(`🎉 Логін успішно оновлено на: ${newName}`, true);
             } catch (err) {
                 console.error(err);
@@ -1096,7 +1220,14 @@
             const name = user.displayName || user.email.split('@')[0];
             document.getElementById('profile-name').textContent = name;
             document.getElementById('profile-avatar').textContent = name.charAt(0).toUpperCase();
-            document.getElementById('acc-btn').textContent = `👤 ${name} ▾`;
+            document.body.classList.add('user-logged-in');
+            const accBtnEl = document.getElementById('acc-btn');
+            if (accBtnEl) {
+                accBtnEl.innerHTML = `
+                    <span class="nav-text nav-text-desktop">👤 ${name}</span>
+                    <span class="nav-arrow"> ▾</span>
+                `;
+            }
 
             // Ранг та дата реєстрації
             let currentUniqueDownloads = 0;
@@ -1272,6 +1403,18 @@
                 document.getElementById('history-body').innerHTML =
                     `<tr><td colspan="3" class="history-empty">${errBase}${e.code === 'permission-denied' ? ': check Firestore rules' : ''}</td></tr>`;
                 console.error(e);
+            }
+        });
+
+        // Закриття мобільного меню при кліку поза ним або на посилання
+        document.addEventListener('click', (e) => {
+            const nav = document.querySelector('.nav-menu');
+            if (!nav || !nav.classList.contains('open')) return;
+            if (e.target.closest('.hamburger')) return;
+            const isInsideNav = nav.contains(e.target);
+            const isLink = e.target.closest('a');
+            if (!isInsideNav || isLink) {
+                nav.classList.remove('open');
             }
         });
     </script>

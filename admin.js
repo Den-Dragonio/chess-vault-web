@@ -72,9 +72,23 @@
     });
 
     refreshBtn.addEventListener('click', () => {
-        refreshBtn.textContent = '⏳ Оновлення...';
+        const textEl = refreshBtn.querySelector('.dock-text');
+        const iconEl = refreshBtn.querySelector('.dock-icon');
+        if (textEl && iconEl) {
+            iconEl.textContent = '⏳';
+            textEl.textContent = 'Оновлення...';
+        } else {
+            refreshBtn.textContent = '⏳ Оновлення...';
+        }
         loadAllDashboardData().finally(() => {
-            setTimeout(() => { refreshBtn.textContent = '🔄 Оновити'; }, 600);
+            setTimeout(() => {
+                if (textEl && iconEl) {
+                    iconEl.textContent = '🔄';
+                    textEl.textContent = 'Оновити';
+                } else {
+                    refreshBtn.textContent = '🔄 Оновити';
+                }
+            }, 600);
         });
     });
 
