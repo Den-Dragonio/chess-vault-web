@@ -609,9 +609,11 @@ function openBookModalFromFilename(filename) {
     const format = normFilename.split('.').pop().toLowerCase() || 'pdf';
 
     const cachedBook = window.CHESS_BOOKS_CACHE && window.CHESS_BOOKS_CACHE.find(b => 
-        b.id === normFilename || 
-        b.id.toLowerCase() === normFilename.toLowerCase() ||
-        (b.id.normalize && b.id.normalize('NFC').toLowerCase() === normFilename.toLowerCase())
+        b && b.id && (
+            b.id === normFilename || 
+            b.id.toLowerCase() === normFilename.toLowerCase() ||
+            (b.id.normalize && b.id.normalize('NFC').toLowerCase() === normFilename.toLowerCase())
+        )
     );
 
     const canonicalId = cachedBook ? (cachedBook.id.normalize ? cachedBook.id.normalize('NFC') : cachedBook.id) : normFilename;

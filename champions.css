@@ -162,7 +162,7 @@
    МОДАЛЬНЕ ВІКНО ЧЕМПІОНА — 1 В 1 ЯК ДЛЯ КНИГИ
    ============================================== */
 #book-detail-overlay {
-    z-index: 3600 !important;
+    z-index: 10000 !important;
 }
 
 #champion-modal-overlay {

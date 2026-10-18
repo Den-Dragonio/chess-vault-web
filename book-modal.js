@@ -139,6 +139,12 @@ function ensureBookModalElements() {
             </div>
         `;
         document.body.appendChild(overlay);
+    } else if (!document.getElementById('book-detail-card')) {
+        overlay.innerHTML = `
+            <div id="book-detail-card">
+                <button id="book-detail-close">✕</button>
+            </div>
+        `;
     }
     if (!overlay.dataset.listenersAttached) {
         overlay.dataset.listenersAttached = '1';
@@ -152,6 +158,7 @@ function ensureBookModalElements() {
 }
 
 function openBookModal(book) {
+    if (!book) return;
     const overlay = ensureBookModalElements();
     overlay.classList.add('active');
     document.body.style.overflow = 'hidden';
@@ -162,7 +169,12 @@ function openBookModal(book) {
 function closeBookModal() {
     const overlay = document.getElementById('book-detail-overlay');
     if (overlay) overlay.classList.remove('active');
-    document.body.style.overflow = '';
+    const champOverlay = document.getElementById('champion-modal-overlay');
+    if (champOverlay && champOverlay.classList.contains('active')) {
+        document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = '';
+    }
 }
 
 if (document.readyState === 'loading') {
@@ -185,7 +197,7 @@ document.addEventListener('keydown', e => {
 // =============================================
 function formatDescriptionText(text) {
     if (!text) return '';
-    return text.split(/\n\s*\n/).map(p => {
+    return String(text).split(/\n\s*\n/).map(p => {
         const trimmed = p.trim();
         if (!trimmed) return '';
         if (trimmed.startsWith('•') || trimmed.startsWith('-')) {
@@ -195,23 +207,28 @@ function formatDescriptionText(text) {
     }).join('');
 }
 
-function getCanonicalBookId(book) {
-    if (!book || !book.id) return '';
-    const raw = (typeof book.id === 'string') ? book.id.normalize('NFC') : String(book.id);
+function resolveBookFileName(book) {
+    if (!book) return '';
+    const rawId = (typeof book === 'string') ? book : (book.id || '');
+    if (!rawId) return '';
+    const raw = (typeof rawId === 'string') ? rawId.normalize('NFC') : String(rawId);
     if (window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE)) {
         const lower = raw.toLowerCase();
         const found = window.CHESS_BOOKS_CACHE.find(b => 
-            b.id === raw || 
-            b.id.toLowerCase() === lower || 
-            (b.id.normalize && b.id.normalize('NFC').toLowerCase() === lower)
+            b && b.id && (
+                b.id === raw || 
+                b.id.toLowerCase() === lower || 
+                (b.id.normalize && b.id.normalize('NFC').toLowerCase() === lower)
+            )
         );
-        if (found) return (found.id.normalize ? found.id.normalize('NFC') : found.id);
+        if (found && found.id) return (found.id.normalize ? found.id.normalize('NFC') : found.id);
     }
     return raw;
 }
+window.resolveBookFileName = resolveBookFileName;
 
 function getLocalCoverUrl(book, mode = 'nfc') {
-    const canon = getCanonicalBookId(book);
+    const canon = resolveBookFileName(book);
     let base = canon.replace(/\.[^/.]+$/, '');
     if (mode === 'nfd') {
         base = base.normalize('NFD');
@@ -308,8 +325,11 @@ function checkAndFetchMissingPages(book, knownPages) {
 // SKELETON
 // =============================================
 function renderModalSkeleton(book) {
+    if (!book) return;
     const card = document.getElementById('book-detail-card');
-    const fmtColor = FORMAT_COLORS[book.format] || '#888';
+    if (!card) return;
+    const format = (book.format || (book.id ? book.id.split('.').pop() : '') || 'pdf').toLowerCase();
+    const fmtColor = FORMAT_COLORS[format] || '#888';
     const pages = getBookPages(book, null);
     const coverUrl = getLocalCoverUrl(book, 'nfc');
     card.innerHTML = `
@@ -318,7 +338,7 @@ function renderModalSkeleton(book) {
             <div class="bd-cover-wrap">
                 <img class="bd-cover" id="bd-cover-img"
                      src="${coverUrl}"
-                     alt="${escHtml(book.title)}"
+                     alt="${escHtml(book.title || book.id || '')}"
                      onerror="handleCoverImgError(this, '${escHtml(book.id || '')}', '')">
                 <div class="bd-cover-placeholder" style="display:none">
                     <span class="bd-placeholder-icon">♟</span>
@@ -327,14 +347,14 @@ function renderModalSkeleton(book) {
             </div>
             <div class="bd-hero">
                 <h1 class="bd-title">
-                    ${escHtml(book.title)}
-                    <span class="bd-format-tag" style="background:${fmtColor}">${book.format.toUpperCase()}</span>
+                    ${escHtml(book.title || book.id || 'Без назви')}
+                    <span class="bd-format-tag" style="background:${fmtColor}">${format.toUpperCase()}</span>
                 </h1>
-                <p class="bd-author">✍️ ${escHtml(book.author)}</p>
+                <p class="bd-author">✍️ ${escHtml(book.author || '—')}</p>
                 <div class="bd-meta-row">
-                    ${book.year !== '---' ? `<span class="bd-meta-pill">📅 ${book.year}</span>` : ''}
-                    <span class="bd-meta-pill">💾 ${book.sizeDisplay}</span>
-                    <span class="bd-meta-pill">📄 ${book.format.toUpperCase()}</span>
+                    ${book.year && book.year !== '---' ? `<span class="bd-meta-pill">📅 ${book.year}</span>` : ''}
+                    <span class="bd-meta-pill">💾 ${book.sizeDisplay || '—'}</span>
+                    <span class="bd-meta-pill">📄 ${format.toUpperCase()}</span>
                     ${pages ? `<span class="bd-meta-pill" id="bd-pages-pill">📖 ${pages} ${(window.i18n && window.i18n.currentLang === 'en' ? 'p.' : 'стор.')}</span>` : `<span class="bd-meta-pill" id="bd-pages-pill" style="display:none"></span>`}
                 </div>
                 <div class="bd-hero-actions">
@@ -343,7 +363,7 @@ function renderModalSkeleton(book) {
                             data-title="${escHtml(book.title || '')}"
                             data-author="${escHtml(book.author || '')}"
                             data-id="${escHtml(book.id || '')}"
-                            data-format="${escHtml(book.format || '')}"
+                            data-format="${escHtml(format)}"
                             data-size="${escHtml(book.sizeDisplay || '')}">${window.i18n ? window.i18n.t('modal_btn_download', { size: book.sizeDisplay || (window.i18n.currentLang === 'en' ? 'file' : 'файл') }) : `⬇ Скачати (${book.sizeDisplay || 'файл'})`}</button>
                 </div>
             </div>
@@ -358,8 +378,10 @@ function renderModalSkeleton(book) {
                 <div class="bd-skeleton-line" style="width:60%"></div>
             </div>
         </div>`;
-    document.getElementById('book-detail-close').addEventListener('click', closeBookModal);
-    document.getElementById('bd-download-btn').addEventListener('click', function () { onDownloadClick(this); });
+    const closeBtn = document.getElementById('book-detail-close');
+    if (closeBtn) closeBtn.addEventListener('click', closeBookModal);
+    const dlBtn = document.getElementById('bd-download-btn');
+    if (dlBtn) dlBtn.addEventListener('click', function () { onDownloadClick(this); });
 }
 
 // =============================================
@@ -580,12 +602,14 @@ function pickBestResult(candidates, book) {
 // РЕНДЕР ПОВНОГО МОДАЛУ
 // =============================================
 function renderModalFull(book, meta) {
+    if (!book) return;
     const card = document.getElementById('book-detail-card');
     if (!card) return;
 
-    const fmtColor = FORMAT_COLORS[book.format] || '#888';
-    const title   = escHtml(book.title);
-    const author  = escHtml(book.author);
+    const format  = (book.format || (book.id ? book.id.split('.').pop() : '') || 'pdf').toLowerCase();
+    const fmtColor = FORMAT_COLORS[format] || '#888';
+    const title   = escHtml(book.title || book.id || 'Без назви');
+    const author  = escHtml(book.author || '—');
     const year    = book.year;
     const desc    = meta?.description || '';
     const subjects = meta?.subjects || [];
@@ -645,7 +669,7 @@ function renderModalFull(book, meta) {
     if (bookDesc) {
         bookDescHTML = formatDescriptionText(bookDesc);
     } else if (isJournal) {
-        const parts = book.id.replace(/\.[^/.]+$/, '').split('-');
+        const parts = String(book.id || '').replace(/\.[^/.]+$/, '').split('-');
         const num = parts[2] ? `№${parseInt(parts[2])}` : '';
         const journalDesc = isEn
             ? `Chess magazine «64» — ${parts[1] || ''}, ${num}. Open the file to review contents and game analyses.`
@@ -685,12 +709,13 @@ function renderModalFull(book, meta) {
     if (Array.isArray(book.formats) && book.formats.length > 1) {
         // Сортуємо: перевага у PDF, потім EPUB, потім інші
         const order = { pdf: 1, djvu: 2, epub: 3, doc: 4, txt: 5 };
-        const sortedFormats = [...book.formats].sort((a, b) => (order[a.format.toLowerCase()] || 99) - (order[b.format.toLowerCase()] || 99));
+        const sortedFormats = [...book.formats].sort((a, b) => (order[(a.format || '').toLowerCase()] || 99) - (order[(b.format || '').toLowerCase()] || 99));
         
         downloadButtonsHTML = sortedFormats.map((f, fIdx) => {
             const isPrimary = fIdx === 0;
             const btnClass = isPrimary ? 'bd-btn-download' : 'bd-btn-download-secondary';
-            const fLabel = `⬇ ${f.format.toUpperCase()} (${f.sizeDisplay})`;
+            const fFormat = (f.format || 'file').toUpperCase();
+            const fLabel = `⬇ ${fFormat} (${f.sizeDisplay || '—'})`;
             return `
                 <button class="${btnClass} bd-multi-download-btn"
                         data-url="${escHtml(f.url || '')}"
@@ -709,7 +734,7 @@ function renderModalFull(book, meta) {
                     data-title="${escHtml(book.title || '')}"
                     data-author="${escHtml(book.author || '')}"
                     data-id="${escHtml(book.id || '')}"
-                    data-format="${escHtml(book.format || '')}"
+                    data-format="${escHtml(format)}"
                     data-size="${escHtml(book.sizeDisplay || '')}">${dlBtnLabel}</button>
         `;
     }
@@ -721,13 +746,13 @@ function renderModalFull(book, meta) {
             <div class="bd-hero">
                 <h1 class="bd-title">
                     ${title}
-                    <span class="bd-format-tag" style="background:${fmtColor}">${book.format.toUpperCase()}</span>
+                    <span class="bd-format-tag" style="background:${fmtColor}">${format.toUpperCase()}</span>
                 </h1>
                 <p class="bd-author">✍️ ${author}</p>
                 <div class="bd-meta-row">
                     ${year && year !== '---' ? `<span class="bd-meta-pill">📅 ${year}</span>` : ''}
-                    <span class="bd-meta-pill">💾 ${book.sizeDisplay}</span>
-                    <span class="bd-meta-pill">📄 ${book.format.toUpperCase()}</span>
+                    <span class="bd-meta-pill">💾 ${book.sizeDisplay || '—'}</span>
+                    <span class="bd-meta-pill">📄 ${format.toUpperCase()}</span>
                     ${langPill}
                     ${pagesPill}
                     ${journalBadge}
@@ -747,7 +772,8 @@ function renderModalFull(book, meta) {
         ${authorBioHTML}
         ${subjectsHTML}`;
 
-    document.getElementById('book-detail-close').addEventListener('click', closeBookModal);
+    const closeBtn = document.getElementById('book-detail-close');
+    if (closeBtn) closeBtn.addEventListener('click', closeBookModal);
     card.querySelectorAll('#bd-download-btn, .bd-multi-download-btn').forEach(btn => {
         btn.addEventListener('click', function () { onDownloadClick(this); });
     });
@@ -795,7 +821,8 @@ async function autoScrapeNewBooks(books) {
 // УТИЛІТИ
 // =============================================
 function isJournalFile(book) {
-    return /^64-\d{4}-\d+/.test(book.id);
+    if (!book || !book.id) return false;
+    return /^64-\d{4}-\d+/.test(String(book.id));
 }
 
 function escHtml(str) {
@@ -806,7 +833,8 @@ function escHtml(str) {
 }
 
 function safeDocId(id) {
-    return id.replace(/\//g, '__').slice(0, 200);
+    if (!id) return 'unknown';
+    return String(id).replace(/\//g, '__').slice(0, 200);
 }
 
 function delay(ms) {
@@ -865,9 +893,12 @@ function escapeHtmlModal(str) {
 // =============================================
 // ЗАВАНТАЖЕННЯ КНИГИ ТА ОБЛІК УНІКАЛЬНОСТІ
 // =============================================
-function getCanonicalBookId(title, filename) {
-    const raw = filename ? filename.replace(/\.[^/.]+$/, '') : (title || 'unknown_book');
-    return raw.trim().replace(/[/\\#?%]/g, '_').toLowerCase().slice(0, 120);
+function getCanonicalBookId(titleOrBook, filename) {
+    if (typeof titleOrBook === 'object' && titleOrBook !== null) {
+        return resolveBookFileName(titleOrBook);
+    }
+    const raw = filename ? String(filename).replace(/\.[^/.]+$/, '') : (titleOrBook ? String(titleOrBook) : 'unknown_book');
+    return String(raw).trim().replace(/[/\\#?%]/g, '_').toLowerCase().slice(0, 120);
 }
 
 function getAuthUser() {

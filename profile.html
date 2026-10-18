@@ -8,7 +8,7 @@
     <link rel="icon" href="img/icon.png" type="image/png" sizes="64x64">
     <link rel="apple-touch-icon" href="img/icon.png">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="book-modal.css">
+    <link rel="stylesheet" href="book-modal.css?v=5">
     <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
     <script src="dark-mode-init.js"></script>
     <script src="analytics.js?v=1"></script>
@@ -872,7 +872,8 @@
 
     <script src="page_counts.js"></script>
     <script src="descriptions.js"></script>
-    <script src="book-modal.js?v=7"></script>
+    <script src="books-cache.js?v=6"></script>
+    <script src="book-modal.js?v=8"></script>
     <script>
         // Фон
         (function () {
@@ -1298,9 +1299,11 @@
             filename = filename.normalize('NFC');
 
             const cachedBook = window.CHESS_BOOKS_CACHE && window.CHESS_BOOKS_CACHE.find(b => 
-                b.id === filename || 
-                b.id.toLowerCase() === filename.toLowerCase() ||
-                (b.id.normalize && b.id.normalize('NFC').toLowerCase() === filename.toLowerCase())
+                b && b.id && (
+                    b.id === filename || 
+                    b.id.toLowerCase() === filename.toLowerCase() ||
+                    (b.id.normalize && b.id.normalize('NFC').toLowerCase() === filename.toLowerCase())
+                )
             );
 
             const canonicalId = cachedBook ? (cachedBook.id.normalize ? cachedBook.id.normalize('NFC') : cachedBook.id) : filename;
