@@ -496,76 +496,297 @@
     content: "💡";
 }
 
-/* СПИСКИ КНИГ: АВТОРСЬКІ ТА ПОВ'ЯЗАНІ (Без заднього фону, збільшені відступи) */
+/* --- ВИДІЛЕНЕ ПРОСТІР / РАМКА ДЛЯ КНИГ ЧЕМПІОНА (ЯК У БІБЛІОТЕЦІ) --- */
+.chm-books-frame {
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    position: relative;
+    margin-top: 10px;
+    box-sizing: border-box;
+}
+
+.chm-books-frame-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.chm-books-title-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.chm-books-frame-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #111;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chm-books-total-pill {
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: #555;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+
+/* Перемикач вкладок у стилі бібліотеки (.collections-switcher) */
+.chm-books-tabs {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.04);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 50px;
+    padding: 4px;
+    gap: 4px;
+}
+
+.chm-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 40px;
+    background: transparent;
+    color: #444;
+    font-size: 0.9rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+    white-space: nowrap;
+}
+
+.chm-tab-btn:hover {
+    color: #000;
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.chm-tab-btn.active {
+    background: #000;
+    color: #fff !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+
+.chm-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.74rem;
+    font-weight: 700;
+    background: rgba(0, 0, 0, 0.08);
+    color: inherit;
+    padding: 2px 7px;
+    border-radius: 10px;
+    min-width: 16px;
+}
+
+.chm-tab-btn.active .chm-tab-badge {
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
+}
+
 .chm-books-columns {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 36px;
+    gap: 28px;
 }
 
 .chm-books-block {
-    background: transparent !important;
+    background: transparent;
     border-radius: 0;
     padding: 0;
-    border: none !important;
-    box-shadow: none !important;
+    border: none;
+    box-shadow: none;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
+    min-width: 0;
+}
+
+.chm-block-subtitle {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #111;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .chm-books-scroll-list {
-    max-height: 260px;
+    max-height: 280px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 8px;
     padding-right: 6px;
-    margin-top: 10px;
-    scrollbar-width: none !important;
-    -ms-overflow-style: none !important;
+    margin-top: 4px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
 }
 
 .chm-books-scroll-list::-webkit-scrollbar {
-    display: none !important;
-    width: 0 !important;
-    height: 0 !important;
+    display: block !important;
+    width: 5px !important;
+    height: 5px !important;
 }
 
-/* Клікне посилання на книгу */
-.chm-book-item {
-    background: rgba(0, 0, 0, 0.03);
-    border: none !important;
+.chm-books-scroll-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.chm-books-scroll-list::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.18);
     border-radius: 10px;
+}
+
+.chm-books-scroll-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.35);
+}
+
+/* Картка книги у стилі бібліотеки */
+.chm-book-item {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+    border-radius: 14px;
     padding: 10px 14px;
     display: flex;
     align-items: center;
+    gap: 12px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
     text-align: left;
     font-family: inherit;
     width: 100%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    box-sizing: border-box;
 }
 
 .chm-book-item:hover {
-    background: rgba(0, 0, 0, 0.07);
-    border: none !important;
-    transform: translateX(4px);
-    box-shadow: none !important;
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(212, 175, 55, 0.5) !important;
+    transform: translateX(3px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06) !important;
+}
+
+.chm-book-item:active {
+    transform: scale(0.985);
+    background: #fff;
+}
+
+.chm-book-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 9px;
+}
+
+.chm-book-details {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    gap: 4px;
 }
 
 .chm-book-title {
-    font-size: 0.98rem;
-    color: #222;
-    line-height: 1.4;
-    flex: 1;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #111;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.chm-book-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: #666;
+}
+
+.chm-book-author,
+.chm-book-year,
+.chm-book-format {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.04);
+    padding: 2px 7px;
+    border-radius: 5px;
+    line-height: 1.2;
+}
+
+.chm-book-format {
+    font-weight: 700;
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.08);
+    text-transform: uppercase;
+}
+
+.chm-book-arrow {
+    font-size: 1.3rem;
+    color: #999;
+    flex-shrink: 0;
+    transition: transform 0.2s ease, color 0.2s ease;
+    margin-left: 2px;
+}
+
+.chm-book-item:hover .chm-book-arrow {
+    color: #111;
+    transform: translateX(3px);
 }
 
 .chm-empty-books {
     font-size: 0.92rem;
     color: #888;
-    margin: 10px 0 0 0;
+    margin: 8px 0 0 0;
     font-style: italic;
+    background: rgba(0, 0, 0, 0.02);
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px dashed rgba(0, 0, 0, 0.08);
+    text-align: center;
+}
+
+.chm-bottom-spacer {
+    display: block;
+    width: 100%;
+    height: 40px;
+    min-height: 40px;
+    flex-shrink: 0;
+    pointer-events: none;
 }
 
 /* ==============================================
@@ -673,11 +894,67 @@ html.dark .chm-count-pill {
     color: #ced6e0;
 }
 
-html.dark .chm-section,
-html.dark .chm-books-block {
+html.dark .chm-section {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
+}
+
+html.dark .chm-books-frame {
+    background: rgba(18, 20, 28, 0.7);
+    border-color: rgba(255, 255, 255, 0.09);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+html.dark .chm-books-frame-title {
+    color: #f1f2f6;
+}
+
+html.dark .chm-books-total-pill {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ced6e0;
+}
+
+html.dark .chm-books-tabs {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .chm-tab-btn {
+    color: #94a3b8;
+}
+
+html.dark .chm-tab-btn:hover {
+    color: #f1f2f6;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .chm-tab-btn.active {
+    background: #d4af37;
+    color: #0b0b12 !important;
+    font-weight: 700;
+    box-shadow: 0 3px 14px rgba(212, 175, 55, 0.35);
+}
+
+html.dark .chm-tab-btn.active .chm-tab-badge {
+    background: rgba(0, 0, 0, 0.25);
+    color: #0b0b12;
+}
+
+html.dark .chm-block-subtitle {
+    color: #f1f2f6;
+}
+
+html.dark .chm-books-scroll-list {
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+html.dark .chm-books-scroll-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+html.dark .chm-books-scroll-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.35);
 }
 
 html.dark .chm-section-title {
@@ -694,16 +971,55 @@ html.dark .chm-facts-list li {
 
 html.dark .chm-book-item {
     background: rgba(255, 255, 255, 0.04);
-    border: none !important;
+    border-color: rgba(255, 255, 255, 0.07) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 html.dark .chm-book-item:hover {
-    background: rgba(255, 255, 255, 0.09);
-    border: none !important;
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(212, 175, 55, 0.5) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+}
+
+html.dark .chm-book-item:active {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+html.dark .chm-book-icon {
+    background: rgba(255, 255, 255, 0.06);
 }
 
 html.dark .chm-book-title {
     color: #f1f2f6;
+}
+
+html.dark .chm-book-meta {
+    color: #a4b0be;
+}
+
+html.dark .chm-book-author,
+html.dark .chm-book-year {
+    background: rgba(255, 255, 255, 0.06);
+    color: #cbd5e1;
+}
+
+html.dark .chm-book-format {
+    color: #60a5fa;
+    background: rgba(96, 165, 250, 0.14);
+}
+
+html.dark .chm-book-arrow {
+    color: #64748b;
+}
+
+html.dark .chm-book-item:hover .chm-book-arrow {
+    color: #f1f2f6;
+}
+
+html.dark .chm-empty-books {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
 }
 
 html.dark .champ-country {
@@ -733,6 +1049,22 @@ html.dark .chm-elo-val {
 }
 
 /* --- АДАПТИВНІСТЬ --- */
+@media (min-width: 769px) {
+    .chm-books-columns {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 28px !important;
+    }
+
+    .chm-books-block {
+        display: flex !important;
+    }
+
+    .chm-books-tabs {
+        display: none !important;
+    }
+}
+
 @media (max-width: 900px) {
     #champion-modal-card {
         padding: 36px 24px;
@@ -748,9 +1080,6 @@ html.dark .chm-elo-val {
     }
     .chm-reign-badge {
         align-self: center;
-    }
-    .chm-books-columns {
-        grid-template-columns: 1fr;
     }
 }
 
@@ -814,7 +1143,7 @@ html.dark .chm-elo-val {
 
     /* Модальне вікно чемпіона: 1 в 1 як book-detail-card на мобілці */
     #champion-modal-overlay.active {
-        padding: 0;
+        padding: 0 0 calc(120px + env(safe-area-inset-bottom, 30px)) 0 !important;
         align-items: stretch;
     }
     #champion-modal-card {
@@ -825,13 +1154,16 @@ html.dark .chm-elo-val {
         max-height: none !important;
         border-radius: 0;
         border: none;
-        padding: 60px 18px 40px;
-        gap: 28px;
+        padding: 60px 18px calc(140px + env(safe-area-inset-bottom, 30px)) !important;
+        gap: 24px;
         background: rgba(255, 255, 255, 0.96);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
         box-shadow: none;
         -webkit-overflow-scrolling: touch;
+    }
+    #champion-modal-body {
+        padding-bottom: 20px;
     }
     #champion-modal-close {
         top: 14px;
@@ -905,20 +1237,121 @@ html.dark .chm-elo-val {
         line-height: 1.5;
         padding-left: 26px;
     }
+
+    /* Рамка для книг чемпіона на мобільних пристроях */
+    .chm-books-frame {
+        padding: 16px 14px 18px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.04);
+        gap: 14px;
+        margin-top: 4px;
+        margin-bottom: 20px;
+    }
+
+    .chm-books-frame-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .chm-books-title-group {
+        justify-content: space-between;
+        width: 100%;
+    }
+
+    .chm-books-frame-title {
+        font-size: 1.18rem;
+    }
+
+    .chm-books-tabs {
+        width: 100%;
+        display: flex;
+        justify-content: stretch;
+        padding: 4px;
+        gap: 4px;
+        box-sizing: border-box;
+    }
+
+    .chm-tab-btn {
+        flex: 1;
+        justify-content: center;
+        padding: 8px 6px;
+        font-size: 0.82rem;
+        gap: 5px;
+        min-height: 38px;
+    }
+
+    .chm-tab-badge {
+        font-size: 0.7rem;
+        padding: 1px 5px;
+    }
+
     .chm-books-columns {
-        grid-template-columns: 1fr;
-        gap: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
     }
+
+    /* Керування вкладками через data-active-tab на мобілці */
+    .chm-books-columns[data-active-tab="author"] .chm-books-block[data-chm-pane="about"] {
+        display: none !important;
+    }
+    .chm-books-columns[data-active-tab="author"] .chm-books-block[data-chm-pane="author"] {
+        display: flex !important;
+    }
+
+    .chm-books-columns[data-active-tab="about"] .chm-books-block[data-chm-pane="author"] {
+        display: none !important;
+    }
+    .chm-books-columns[data-active-tab="about"] .chm-books-block[data-chm-pane="about"] {
+        display: flex !important;
+    }
+
+    .chm-books-columns[data-active-tab="all"] .chm-books-block {
+        display: flex !important;
+    }
+
+    .chm-block-subtitle {
+        font-size: 1.05rem;
+        margin-bottom: 6px;
+    }
+
+    /* В мобільній версії список книг скролиться ВСЕРЕДИНІ виділеної рамки */
     .chm-books-scroll-list {
-        max-height: none;
-        overflow-y: visible;
-        padding-right: 0;
+        max-height: 310px !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior: contain !important;
+        padding-right: 6px;
+        margin-top: 4px;
+        padding-bottom: 24px !important;
     }
+
+    .chm-bottom-spacer {
+        display: block !important;
+        width: 100% !important;
+        height: calc(140px + env(safe-area-inset-bottom, 30px)) !important;
+        min-height: calc(140px + env(safe-area-inset-bottom, 30px)) !important;
+        flex-shrink: 0 !important;
+        pointer-events: none !important;
+    }
+
     .chm-book-item {
-        padding: 9px 12px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        gap: 10px;
     }
+
+    .chm-book-icon {
+        width: 28px;
+        height: 28px;
+        font-size: 1.1rem;
+    }
+
     .chm-book-title {
-        font-size: 0.92rem;
+        font-size: 0.9rem;
     }
 
     /* Темна тема для мобільної версії */
@@ -942,6 +1375,11 @@ html.dark .chm-elo-val {
         border: none;
         box-shadow: none;
     }
+    html.dark .chm-books-frame {
+        background: rgba(22, 25, 36, 0.85);
+        border-color: rgba(255, 255, 255, 0.09);
+        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.4);
+    }
     html.dark .chm-count-pill {
         background: rgba(255, 255, 255, 0.06) !important;
         color: #ced6e0;
@@ -960,8 +1398,8 @@ html.dark .chm-elo-val {
         font-size: 0.78rem;
     }
     #champion-modal-card {
-        padding: 56px 14px 36px;
-        gap: 22px;
+        padding: 56px 14px calc(140px + env(safe-area-inset-bottom, 30px)) !important;
+        gap: 20px;
     }
     .chm-name {
         font-size: 1.45rem;
@@ -973,6 +1411,28 @@ html.dark .chm-elo-val {
     .chm-count-pill {
         font-size: 0.82rem;
         padding: 5px 10px;
+    }
+    .chm-books-frame {
+        padding: 14px 10px 16px;
+        border-radius: 18px;
+    }
+    .chm-books-frame-title {
+        font-size: 1.08rem;
+    }
+    .chm-tab-btn {
+        padding: 7px 4px;
+        font-size: 0.76rem;
+    }
+    .chm-books-scroll-list {
+        max-height: 290px !important;
+        padding-bottom: 24px !important;
+    }
+    .chm-bottom-spacer {
+        display: block !important;
+        width: 100% !important;
+        height: calc(140px + env(safe-area-inset-bottom, 30px)) !important;
+        min-height: calc(140px + env(safe-area-inset-bottom, 30px)) !important;
+        flex-shrink: 0 !important;
     }
 }
 

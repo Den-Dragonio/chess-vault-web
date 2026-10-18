@@ -363,6 +363,43 @@ function setupChampionModal() {
 
 let currentlyOpenChamp = null;
 
+function formatChampBookItem(filename, icon = '📄') {
+    const clean = filename.replace(/\.[^/.]+$/, '');
+    const ext = filename.split('.').pop() || 'PDF';
+    const format = ext.toUpperCase();
+
+    let year = '';
+    const yearMatch = clean.match(/\((\d{4})\)/);
+    if (yearMatch) {
+        year = yearMatch[1];
+    }
+
+    let title = clean;
+    let author = '';
+    const dashMatch = clean.match(/^(.*?)\s*[-—]\s*(.*)$/);
+    if (dashMatch) {
+        author = dashMatch[1].trim();
+        title = dashMatch[2].replace(/\(\d{4}\)/, '').trim();
+    } else {
+        title = clean.replace(/\(\d{4}\)/, '').trim();
+    }
+
+    return `
+        <button type="button" class="chm-book-item" data-book-filename="${encodeURIComponent(filename)}">
+            <span class="chm-book-icon">${icon}</span>
+            <div class="chm-book-details">
+                <span class="chm-book-title">${escapeHtml(title || clean)}</span>
+                <div class="chm-book-meta">
+                    ${author ? `<span class="chm-book-author">👤 ${escapeHtml(author)}</span>` : ''}
+                    ${year ? `<span class="chm-book-year">📅 ${year}</span>` : ''}
+                    <span class="chm-book-format">${escapeHtml(format)}</span>
+                </div>
+            </div>
+            <span class="chm-book-arrow">›</span>
+        </button>
+    `;
+}
+
 function openChampionModal(champ) {
     if (!championModalOverlay) return;
 
@@ -386,11 +423,7 @@ function openChampionModal(champ) {
     if (champ.authorBooks && champ.authorBooks.length > 0) {
         authorBooksHtml = `
             <div class="chm-books-scroll-list">
-                ${champ.authorBooks.map(b => `
-                    <button type="button" class="chm-book-item" data-book-filename="${encodeURIComponent(b)}">
-                        <span class="chm-book-title">📄 ${escapeHtml(b)}</span>
-                    </button>
-                `).join('')}
+                ${champ.authorBooks.map(b => formatChampBookItem(b, '📄')).join('')}
             </div>
         `;
     }
@@ -402,11 +435,7 @@ function openChampionModal(champ) {
     if (champ.aboutBooks && champ.aboutBooks.length > 0) {
         aboutBooksHtml = `
             <div class="chm-books-scroll-list">
-                ${champ.aboutBooks.map(b => `
-                    <button type="button" class="chm-book-item" data-book-filename="${encodeURIComponent(b)}">
-                        <span class="chm-book-title">📖 ${escapeHtml(b)}</span>
-                    </button>
-                `).join('')}
+                ${champ.aboutBooks.map(b => formatChampBookItem(b, '📖')).join('')}
             </div>
         `;
     }
@@ -419,6 +448,14 @@ function openChampionModal(champ) {
     const factsTitle = isEn ? 'Interesting Facts' : 'Цікаві факти';
     const authorColTitle = isEn ? `Authored Books (${champ.authorBooksCount})` : `Книги авторства (${champ.authorBooksCount})`;
     const aboutColTitle = isEn ? `Books About Him & Matches (${champ.aboutBooksCount})` : `Книги про нього та матчі (${champ.aboutBooksCount})`;
+    const booksFrameTitle = isEn ? 'Champion Library' : 'Бібліотека книг';
+    const authTabLabel = isEn ? 'Authored' : 'Авторські';
+    const aboutTabLabel = isEn ? 'About Him' : 'Про нього';
+    const allTabLabel = isEn ? 'All Books' : 'Всі книги';
+    const totalBooksCount = (champ.authorBooksCount || 0) + (champ.aboutBooksCount || 0);
+    const booksCountWord = isEn ? 'books' : 'книг';
+
+    const defaultTab = (champ.authorBooksCount === 0 && champ.aboutBooksCount > 0) ? 'about' : 'author';
 
     const eloDigits = champ.peakElo || (champ.peakEloDisplay ? String(champ.peakEloDisplay).replace(/\D+/g, '') : '');
 
@@ -468,19 +505,63 @@ function openChampionModal(champ) {
             </ul>
         </div>
 
-        <!-- СПИСКИ КНИГ З ПРЯМИМ ПЕРЕХОДОМ НА МОДАЛКУ ТВОРУ -->
-        <div class="chm-books-columns">
-            <div class="chm-books-block">
-                <h3 class="chm-section-title">✍️ ${authorColTitle}</h3>
-                ${authorBooksHtml}
+        <!-- ВИДІЛЕНЕ ПРОСТІР / РАМКА ДЛЯ КНИГ ЧЕМПІОНА (ЯК У БІБЛІОТЕЦІ) -->
+        <div class="chm-books-frame">
+            <div class="chm-books-frame-header">
+                <div class="chm-books-title-group">
+                    <h3 class="chm-books-frame-title">📚 ${booksFrameTitle}</h3>
+                    <span class="chm-books-total-pill">${totalBooksCount} ${booksCountWord}</span>
+                </div>
+                <div class="chm-books-tabs">
+                    <button type="button" class="chm-tab-btn ${defaultTab === 'author' ? 'active' : ''}" data-chm-tab="author">
+                        <span class="chm-tab-icon">✍️</span>
+                        <span class="chm-tab-text">${authTabLabel}</span>
+                        <span class="chm-tab-badge">${champ.authorBooksCount}</span>
+                    </button>
+                    <button type="button" class="chm-tab-btn ${defaultTab === 'about' ? 'active' : ''}" data-chm-tab="about">
+                        <span class="chm-tab-icon">📖</span>
+                        <span class="chm-tab-text">${aboutTabLabel}</span>
+                        <span class="chm-tab-badge">${champ.aboutBooksCount}</span>
+                    </button>
+                    <button type="button" class="chm-tab-btn ${defaultTab === 'all' ? 'active' : ''}" data-chm-tab="all">
+                        <span class="chm-tab-icon">📚</span>
+                        <span class="chm-tab-text">${allTabLabel}</span>
+                        <span class="chm-tab-badge">${totalBooksCount}</span>
+                    </button>
+                </div>
             </div>
 
-            <div class="chm-books-block">
-                <h3 class="chm-section-title">📖 ${aboutColTitle}</h3>
-                ${aboutBooksHtml}
+            <div class="chm-books-columns" data-active-tab="${defaultTab}">
+                <div class="chm-books-block" data-chm-pane="author">
+                    <h4 class="chm-block-subtitle">✍️ ${authorColTitle}</h4>
+                    ${authorBooksHtml}
+                </div>
+
+                <div class="chm-books-block" data-chm-pane="about">
+                    <h4 class="chm-block-subtitle">📖 ${aboutColTitle}</h4>
+                    ${aboutBooksHtml}
+                </div>
             </div>
         </div>
+
+        <!-- ВІДСТУП ЗНИЗУ ДЛЯ ЗАХИСТУ ВІД ПЕРЕКРИТТЯ НИЖНІМ ХЕДЕРОМ -->
+        <div class="chm-bottom-spacer"></div>
     `;
+
+    // Прив'язка вкладок у рамці книг для мобільної версії
+    const tabBtns = modalBody.querySelectorAll('.chm-tab-btn');
+    const booksColumns = modalBody.querySelector('.chm-books-columns');
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const targetTab = btn.getAttribute('data-chm-tab');
+            tabBtns.forEach(b => b.classList.toggle('active', b === btn));
+            if (booksColumns) {
+                booksColumns.setAttribute('data-active-tab', targetTab);
+            }
+        });
+    });
 
     // Прив'язуємо клік на книги → відкриваємо модалку книги (1 в 1 як у My Account / Бібліотеці)
     modalBody.querySelectorAll('.chm-book-item[data-book-filename]').forEach(btn => {
