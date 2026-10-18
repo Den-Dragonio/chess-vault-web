@@ -438,6 +438,14 @@ function plRenderProfileHTML() {
 // =============================================
 // PLAYLIST BOOKS MODAL (WITH EDIT & ADD MODE)
 // =============================================
+function plModalKeyHandler(e) {
+    if (e.key === 'Escape' || e.key === 'Esc' || e.keyCode === 27) {
+        const inputModal = document.getElementById('pl-input-modal-overlay');
+        if (inputModal) return;
+        plClosePlaylistModal();
+    }
+}
+
 function plOpenPlaylistModal(playlistId) {
     const pl = plGetPlaylists().find(p => p.id === playlistId);
     if (!pl) return;
@@ -457,6 +465,9 @@ function plOpenPlaylistModal(playlistId) {
     overlay.onclick = (e) => {
         if (e.target === overlay) plClosePlaylistModal();
     };
+
+    document.removeEventListener('keydown', plModalKeyHandler);
+    document.addEventListener('keydown', plModalKeyHandler);
 }
 
 function plClosePlaylistModal() {
@@ -464,6 +475,7 @@ function plClosePlaylistModal() {
     if (overlay) overlay.style.display = 'none';
     _plActiveModalPlaylistId = null;
     _plModalIsEditing = false;
+    document.removeEventListener('keydown', plModalKeyHandler);
 }
 
 function plRenderPlaylistModalContent(pl) {
@@ -525,13 +537,11 @@ function plRenderPlaylistModalContent(pl) {
                             <span class="pl-modal-book-size">💾 ${plEsc(book.sizeDisplay || '—')}</span>
                         </div>
                     </div>
-                    <div class="pl-modal-book-actions">
-                        ${isEditing ? `
+                    ${isEditing ? `
+                        <div class="pl-modal-book-actions">
                             <button type="button" class="pl-modal-book-remove pl-remove-active" data-pl-id="${plEsc(pl.id)}" data-book-id="${safeBookId}" title="${isEn ? 'Remove from playlist' : 'Видалити з плейлиста'}">✕ ${isEn ? 'Remove' : 'Видалити'}</button>
-                        ` : `
-                            <button type="button" class="pl-modal-book-remove" data-pl-id="${plEsc(pl.id)}" data-book-id="${safeBookId}" title="${isEn ? 'Remove' : 'Видалити'}">✕</button>
-                        `}
-                    </div>
+                        </div>
+                    ` : ''}
                 </div>
             `;
         }
