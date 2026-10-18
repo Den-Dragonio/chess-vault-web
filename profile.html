@@ -1295,30 +1295,44 @@
             if (!filename) {
                 filename = `${author || 'книга'} - ${title || 'твір'}.pdf`;
             }
+            filename = filename.normalize('NFC');
+
+            const cachedBook = window.CHESS_BOOKS_CACHE && window.CHESS_BOOKS_CACHE.find(b => 
+                b.id === filename || 
+                b.id.toLowerCase() === filename.toLowerCase() ||
+                (b.id.normalize && b.id.normalize('NFC').toLowerCase() === filename.toLowerCase())
+            );
+
+            const canonicalId = cachedBook ? (cachedBook.id.normalize ? cachedBook.id.normalize('NFC') : cachedBook.id) : filename;
 
             if (!author || author === '—') {
-                const parts = filename.replace(/\.[^/.]+$/, '').split(/\s*-\s*/);
-                if (parts.length > 1) {
-                    author = parts[0].trim();
-                    title = title || parts.slice(1).join(' - ').trim();
+                if (cachedBook && cachedBook.author) {
+                    author = cachedBook.author;
+                } else {
+                    const parts = canonicalId.replace(/\.[^/.]+$/, '').split(/\s*-\s*/);
+                    if (parts.length > 1) {
+                        author = parts[0].trim();
+                        title = title || parts.slice(1).join(' - ').trim();
+                    }
                 }
             }
 
-            const format = bookData.format || filename.split('.').pop().toLowerCase() || 'pdf';
-            const pages = bookData.pages
-                || (window.CHESS_PAGE_COUNTS && (window.CHESS_PAGE_COUNTS[filename] || window.CHESS_PAGE_COUNTS[filename.toLowerCase()]))
-                || (window.CHESS_DESCRIPTIONS && (window.CHESS_DESCRIPTIONS[filename]?.pages || window.CHESS_DESCRIPTIONS[filename.toLowerCase()]?.pages))
+            const format = (cachedBook && cachedBook.format) ? cachedBook.format : (bookData.format || canonicalId.split('.').pop().toLowerCase() || 'pdf');
+            const pages = (cachedBook && cachedBook.pages)
+                || bookData.pages
+                || (window.CHESS_PAGE_COUNTS && (window.CHESS_PAGE_COUNTS[canonicalId] || window.CHESS_PAGE_COUNTS[canonicalId.toLowerCase()]))
+                || (window.CHESS_DESCRIPTIONS && (window.CHESS_DESCRIPTIONS[canonicalId]?.pages || window.CHESS_DESCRIPTIONS[canonicalId.toLowerCase()]?.pages))
                 || null;
 
             const bookObj = {
-                id: filename,
-                title: title || filename.replace(/\.[^/.]+$/, ''),
+                id: canonicalId,
+                title: (cachedBook && cachedBook.title) ? cachedBook.title : (title || canonicalId.replace(/\.[^/.]+$/, '')),
                 author: author || '—',
-                year: bookData.year || '---',
+                year: (cachedBook && cachedBook.year && cachedBook.year !== '---') ? cachedBook.year : (bookData.year || '---'),
                 pages: pages,
                 format: format,
-                sizeDisplay: bookData.sizeDisplay || '—',
-                url: rawUrl || `https://archive.org/download/1971_20260223/${encodeURIComponent(filename)}`
+                sizeDisplay: (cachedBook && cachedBook.sizeDisplay) ? cachedBook.sizeDisplay : (bookData.sizeDisplay || '—'),
+                url: rawUrl || `https://archive.org/download/1971_20260223/${encodeURIComponent(canonicalId)}`
             };
 
             if (typeof openBookModal === 'function') {

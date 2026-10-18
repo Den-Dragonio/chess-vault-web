@@ -195,17 +195,75 @@ function formatDescriptionText(text) {
     }).join('');
 }
 
+function getCanonicalBookId(book) {
+    if (!book || !book.id) return '';
+    const raw = (typeof book.id === 'string') ? book.id.normalize('NFC') : String(book.id);
+    if (window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE)) {
+        const lower = raw.toLowerCase();
+        const found = window.CHESS_BOOKS_CACHE.find(b => 
+            b.id === raw || 
+            b.id.toLowerCase() === lower || 
+            (b.id.normalize && b.id.normalize('NFC').toLowerCase() === lower)
+        );
+        if (found) return (found.id.normalize ? found.id.normalize('NFC') : found.id);
+    }
+    return raw;
+}
+
+function getLocalCoverUrl(book, mode = 'nfc') {
+    const canon = getCanonicalBookId(book);
+    let base = canon.replace(/\.[^/.]+$/, '');
+    if (mode === 'nfd') {
+        base = base.normalize('NFD');
+    } else {
+        base = base.normalize('NFC');
+    }
+    return `covers/${encodeURIComponent(base)}.jpg`;
+}
+
+function handleCoverImgError(img, bookId, fallbackUrl) {
+    if (!img) return;
+    const step = parseInt(img.dataset.errStep || '0', 10);
+
+    // Спроба 1: якщо первинний запит був NFC, спробувати версію NFD (корисно для локальних серверів macOS)
+    if (step === 0) {
+        img.dataset.errStep = '1';
+        const nfdUrl = getLocalCoverUrl({ id: bookId }, 'nfd');
+        if (img.getAttribute('src') !== nfdUrl) {
+            img.src = nfdUrl;
+            return;
+        }
+    }
+
+    // Спроба 2: зовнішня обкладинка з Open Library чи архіву
+    if (step <= 1 && fallbackUrl && img.src !== fallbackUrl) {
+        img.dataset.errStep = '2';
+        img.src = fallbackUrl;
+        return;
+    }
+
+    // Спроба 3: якщо нічого не спрацювало — плавно показати стильну заглушку
+    img.style.display = 'none';
+    if (img.nextElementSibling) {
+        img.nextElementSibling.style.display = 'flex';
+    }
+}
+window.handleCoverImgError = handleCoverImgError;
+
 function getBookPages(book, meta) {
     if (book && book.pages) return book.pages;
     if (meta && meta.pages) return meta.pages;
     const id = book?.id;
     if (id) {
-        const idLower = id.toLowerCase();
+        const idNfc = (typeof id === 'string') ? id.normalize('NFC') : String(id);
+        const idLower = idNfc.toLowerCase();
         if (window.CHESS_PAGE_COUNTS) {
+            if (window.CHESS_PAGE_COUNTS[idNfc]) return window.CHESS_PAGE_COUNTS[idNfc];
             if (window.CHESS_PAGE_COUNTS[id]) return window.CHESS_PAGE_COUNTS[id];
             if (window.CHESS_PAGE_COUNTS[idLower]) return window.CHESS_PAGE_COUNTS[idLower];
         }
         if (window.CHESS_DESCRIPTIONS) {
+            if (window.CHESS_DESCRIPTIONS[idNfc]?.pages) return window.CHESS_DESCRIPTIONS[idNfc].pages;
             if (window.CHESS_DESCRIPTIONS[id]?.pages) return window.CHESS_DESCRIPTIONS[id].pages;
             if (window.CHESS_DESCRIPTIONS[idLower]?.pages) return window.CHESS_DESCRIPTIONS[idLower].pages;
         }
@@ -253,14 +311,15 @@ function renderModalSkeleton(book) {
     const card = document.getElementById('book-detail-card');
     const fmtColor = FORMAT_COLORS[book.format] || '#888';
     const pages = getBookPages(book, null);
+    const coverUrl = getLocalCoverUrl(book, 'nfc');
     card.innerHTML = `
         <button id="book-detail-close">✕</button>
         <div class="bd-top">
             <div class="bd-cover-wrap">
                 <img class="bd-cover" id="bd-cover-img"
-                     src="covers/${encodeURIComponent(book.id.replace(/\.[^/.]+$/, ''))}.jpg"
+                     src="${coverUrl}"
                      alt="${escHtml(book.title)}"
-                     onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                     onerror="handleCoverImgError(this, '${escHtml(book.id || '')}', '')">
                 <div class="bd-cover-placeholder" style="display:none">
                     <span class="bd-placeholder-icon">♟</span>
                     <span class="bd-placeholder-text">Пошук обкладинки...</span>
@@ -307,16 +366,19 @@ function renderModalSkeleton(book) {
 // ЗАВАНТАЖЕННЯ МЕТАДАНИХ
 // =============================================
 function findDescriptionForBook(book) {
-    if (!window.CHESS_DESCRIPTIONS) return null;
-    if (book.id && window.CHESS_DESCRIPTIONS[book.id]) {
-        return window.CHESS_DESCRIPTIONS[book.id];
+    if (!window.CHESS_DESCRIPTIONS || !book) return null;
+    const rawId = (typeof book.id === 'string') ? book.id.normalize('NFC') : (book.id || '');
+    if (rawId && window.CHESS_DESCRIPTIONS[rawId]) {
+        return window.CHESS_DESCRIPTIONS[rawId];
     }
-    const cleanId = (book.id || '').replace(/\.[^/.]+$/, '').trim().toLowerCase();
-    const cleanTitle = (book.title || '').trim().toLowerCase();
-    const cleanAuthor = (book.author || '').trim().toLowerCase();
+    const cleanId = rawId.replace(/\.[^/.]+$/, '').trim().toLowerCase();
+    const cleanTitle = (book.title || '').normalize('NFC').trim().toLowerCase();
+    const cleanAuthor = (book.author || '').normalize('NFC').trim().toLowerCase();
 
     for (const [key, val] of Object.entries(window.CHESS_DESCRIPTIONS)) {
-        const baseKey = key.replace(/\.[^/.]+$/, '').trim().toLowerCase();
+        const normKey = key.normalize('NFC');
+        if (normKey === rawId) return val;
+        const baseKey = normKey.replace(/\.[^/.]+$/, '').trim().toLowerCase();
         if (cleanId && baseKey === cleanId) return val;
         if (cleanTitle && cleanTitle !== '---' && baseKey.includes(cleanTitle)) {
             if (!cleanAuthor || cleanAuthor === '—' || baseKey.includes(cleanAuthor)) {
@@ -532,15 +594,15 @@ function renderModalFull(book, meta) {
     const source   = meta?.source || 'notfound';
     const isJournal = isJournalFile(book);
 
-    // Обкладинка: спочатку локальна з covers/, потім Open Library, потім заглушка
-    const localCoverUrl = `covers/${encodeURIComponent(book.id.replace(/\.[^/.]+$/, ''))}.jpg`;
+    // Обкладинка: спочатку локальна з covers/ (з автоматичною перевіркою NFC/NFD), потім Open Library, потім заглушка
+    const localCoverUrl = getLocalCoverUrl(book, 'nfc');
     const fallbackCoverUrl = coverUrl ? escHtml(coverUrl) : '';
 
     const coverHTML = `
         <img class="bd-cover" id="bd-cover-img" 
              src="${localCoverUrl}" 
              alt="${title}"
-             onerror="if (this.dataset.fallbackTried !== '1' && '${fallbackCoverUrl}') { this.dataset.fallbackTried = '1'; this.src = '${fallbackCoverUrl}'; } else { this.style.display='none'; if (this.nextElementSibling) this.nextElementSibling.style.display='flex'; }"
+             onerror="handleCoverImgError(this, '${escHtml(book.id || '')}', '${fallbackCoverUrl}')"
         ><div class="bd-cover-placeholder" style="display:none">
             <span class="bd-placeholder-icon">♟</span>
             <span class="bd-placeholder-text">Обкладинка<br>не знайдена</span>
@@ -931,6 +993,10 @@ async function onDownloadClick(btn) {
         const newsRef = firestoreDb.collection('news').doc();
         batch.set(newsRef, {
             text: `📥 ${userName} завантажив "${title}"`,
+            text_uk: `📥 ${userName} завантажив "${title}"`,
+            text_en: `📥 ${userName} downloaded "${title}"`,
+            userName: userName,
+            bookTitle: title,
             timestamp: now,
             type: 'download'
         });

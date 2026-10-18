@@ -496,6 +496,9 @@ document.getElementById('signup-form').addEventListener('submit', async e => {
         try {
             await db.collection('news').add({
                 text: `🎉 ${username} приєднався до Chess Vault! Ласкаво просимо!`,
+                text_uk: `🎉 ${username} приєднався до Chess Vault! Ласкаво просимо!`,
+                text_en: `🎉 ${username} joined Chess Vault! Welcome!`,
+                username: username,
                 timestamp: firebase.firestore.Timestamp.now(),
                 type: 'welcome'
             });
@@ -652,8 +655,105 @@ window.addEventListener('chessVaultLanguageChanged', () => {
 // =============================================
 function formatDate(ts) {
     if (!ts) return '';
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    const d = ts.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date(ts));
+    if (isNaN(d.getTime())) return '';
     return window.formatAppDate ? window.formatAppDate(d) : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth()+1).padStart(2, '0')}/${d.getFullYear()}`;
+}
+
+function getLocalizedNewsText(data, currentLang) {
+    if (!data) return '';
+    const isEn = currentLang === 'en';
+
+    // 1. Direct match if specific language field is available
+    if (isEn && data.text_en && typeof data.text_en === 'string' && data.text_en.trim()) {
+        return data.text_en.trim();
+    }
+    if (!isEn && data.text_uk && typeof data.text_uk === 'string' && data.text_uk.trim()) {
+        return data.text_uk.trim();
+    }
+
+    const rawText = (data.text || data.text_uk || data.text_en || '').trim();
+
+    // 2. Download events (structured or extracted from text)
+    if (data.type === 'download' || /📥/i.test(rawText) || /завантажив|downloaded|скачав/i.test(rawText)) {
+        let userName = data.userName || data.username;
+        let bookTitle = data.bookTitle || data.title;
+
+        if (!userName || !bookTitle) {
+            const dlMatch = rawText.match(/📥\s*(.+?)\s+(?:завантажив|скачав|downloaded)\s+["«]([^"»]+)["»]/i)
+                || rawText.match(/📥\s*(.+?)\s+(?:завантажив|скачав|downloaded)\s+(.+)/i);
+            if (dlMatch) {
+                if (!userName) userName = dlMatch[1].trim();
+                if (!bookTitle) bookTitle = dlMatch[2].trim();
+            }
+        }
+
+        if (userName && bookTitle) {
+            return isEn ? `📥 ${userName} downloaded "${bookTitle}"` : `📥 ${userName} завантажив "${bookTitle}"`;
+        }
+        if (userName) {
+            return isEn ? `📥 ${userName} downloaded a book` : `📥 ${userName} завантажив книгу`;
+        }
+    }
+
+    // 3. Welcome / Registration events
+    if (data.type === 'welcome' || /🎉/i.test(rawText) || /приєднався|joined/i.test(rawText)) {
+        let userName = data.username || data.userName;
+
+        if (!userName) {
+            const wcMatch = rawText.match(/🎉\s*(.+?)\s+(?:приєднався(?:\s+до\s+Chess\s+Vault!)?|joined(?:\s+Chess\s+Vault!)?)/i)
+                || rawText.match(/🎉\s*([^\s]+)\s+(?:приєднався|joined)/i);
+            if (wcMatch) {
+                userName = wcMatch[1].trim();
+            }
+        }
+
+        if (userName) {
+            return isEn ? `🎉 ${userName} joined Chess Vault! Welcome!` : `🎉 ${userName} приєднався до Chess Vault! Ласкаво просимо!`;
+        }
+    }
+
+    // 4. System News Known Patterns
+    // Section addition
+    const sectionMatchUk = rawText.match(/Було додано розділ\s*["«]([A-Za-zА-Яа-яЁёҐґЄєІіЇї0-9])["»]/i);
+    const sectionMatchEn = rawText.match(/Section\s*["«]([A-Za-zА-Яа-яЁёҐґЄєІіЇї0-9])["»]/i);
+    if (sectionMatchUk || sectionMatchEn) {
+        const letter = ((sectionMatchUk || sectionMatchEn)[1]).toUpperCase();
+        return isEn
+            ? `Section "${letter}" (Authors starting with ${letter}) has been added to the Library.`
+            : `Було додано розділ "${letter}" (Автори на літеру ${letter}) до Бібліотеки.`;
+    }
+
+    // Migration to Internet Archive
+    if (/Шахову бібліотеку повністю перенесено|Chess library migration completed/i.test(rawText)) {
+        return isEn
+            ? 'Chess library migration completed! All 1,879 rare books and treatises are safely archived and ready to explore.'
+            : 'Шахову бібліотеку повністю перенесено в сховище Internet Archive — усі 1879 рідкісних книг збережено та доступно для вивчення!';
+    }
+
+    // Champions Gallery
+    if (/Додано інтерактивну залу та повний список чемпіонів|World Chess Champions gallery added/i.test(rawText)) {
+        return isEn
+            ? 'World Chess Champions gallery added! Explore all 22 official world champions from Wilhelm Steinitz to Ding Liren with rich biographies and facts.'
+            : 'Додано інтерактивну залу та повний список чемпіонів світу з шахів — від Вільгельма Стейніца до Дін Ліженя з біографіями та цікавими фактами!';
+    }
+
+    // Themes
+    if (/Оновлено теми оформлення|Themes updated/i.test(rawText)) {
+        return isEn
+            ? 'Themes updated: Dark theme and automatic system theme sync are now available in settings.'
+            : 'Оновлено теми оформлення: додано повноцінну темну тему та синхронізацію з системною темою вашого пристрою.';
+    }
+
+    // English language announcement
+    if (/Додано англійську мову|English language added/i.test(rawText)) {
+        return isEn
+            ? 'English language added! You can now switch between English and Ukrainian in your account settings.'
+            : 'Додано англійську мову інтерфейсу! Тепер у налаштуваннях профілю можна обирати мову (English / Українська).';
+    }
+
+    // 5. Fallback
+    return (isEn ? (data.text_en || rawText) : (data.text_uk || rawText)) || rawText;
 }
 
 function renderNewsList(docs) {
@@ -664,11 +764,11 @@ function renderNewsList(docs) {
         list.innerHTML = `<div class="news-item"><p>${emptyText}</p></div>`;
         return;
     }
-    const currentLang = (window.i18n && window.i18n.currentLang) ? window.i18n.currentLang : 'en';
+    const currentLang = (window.i18n && window.i18n.currentLang) ? window.i18n.currentLang : (localStorage.getItem('chess_vault_lang') || 'en');
     list.innerHTML = docs.map(d => {
-        const data = d.data();
+        const data = d.data() || {};
         const isDownload = data.type === 'download';
-        const text = (currentLang === 'uk' ? (data.text_uk || data.text) : (data.text_en || data.text)) || data.text;
+        const text = getLocalizedNewsText(data, currentLang);
         return `
             <div class="news-item${isDownload ? ' news-item-download' : ''}">
                 <span class="news-date">${formatDate(data.timestamp)}</span>
@@ -685,73 +785,82 @@ async function seedSystemNews() {
             text: 'Додано англійську мову інтерфейсу! Тепер у налаштуваннях профілю можна обирати мову (English / Українська).',
             text_uk: 'Додано англійську мову інтерфейсу! Тепер у налаштуваннях профілю можна обирати мову (English / Українська).',
             text_en: 'English language added! You can now switch between English and Ukrainian in your account settings.',
-            date: new Date()
+            date: new Date('2026-03-01T12:00:00Z')
         },
         { 
             id: 'dark-system-themes-added',
             text: 'Оновлено теми оформлення: додано повноцінну темну тему та синхронізацію з системною темою вашого пристрою.',
             text_uk: 'Оновлено теми оформлення: додано повноцінну темну тему та синхронізацію з системною темою вашого пристрою.',
             text_en: 'Themes updated: Dark theme and automatic system theme sync are now available in settings.',
-            date: new Date(Date.now() - 1000)
+            date: new Date('2026-02-28T12:00:00Z')
         },
         { 
             id: 'library-transfer-completed', 
             text: 'Шахову бібліотеку повністю перенесено в сховище Internet Archive — усі 1879 рідкісних книг збережено та доступно для вивчення!',
             text_uk: 'Шахову бібліотеку повністю перенесено в сховище Internet Archive — усі 1879 рідкісних книг збережено та доступно для вивчення!',
             text_en: 'Chess library migration completed! All 1,879 rare books and treatises are safely archived and ready to explore.',
-            date: new Date(Date.now() - 2000) 
+            date: new Date('2026-02-26T12:00:00Z') 
         },
         { 
             id: 'champions-gallery-added', 
             text: 'Додано інтерактивну залу та повний список чемпіонів світу з шахів — від Вільгельма Стейніца до Дін Ліженя з біографіями та цікавими фактами!',
             text_uk: 'Додано інтерактивну залу та повний список чемпіонів світу з шахів — від Вільгельма Стейніца до Дін Ліженя з біографіями та цікавими фактами!',
             text_en: 'World Chess Champions gallery added! Explore all 22 official world champions from Wilhelm Steinitz to Ding Liren with rich biographies and facts.',
-            date: new Date(Date.now() - 3000) 
+            date: new Date('2026-02-25T12:00:00Z') 
         },
         { 
             id: 'section-b', 
             text: 'Було додано розділ "Б" (Автори на літеру Б) до Бібліотеки.',
             text_uk: 'Було додано розділ "Б" (Автори на літеру Б) до Бібліотеки.',
             text_en: 'Section "B" (Authors starting with B) has been added to the Library.',
-            date: new Date('2026-02-23') 
+            date: new Date('2026-02-23T15:00:00Z') 
         },
         { 
             id: 'section-a', 
             text: 'Було додано розділ "А" (Автори на літеру А) до Бібліотеки.',
             text_uk: 'Було додано розділ "А" (Автори на літеру А) до Бібліотеки.',
             text_en: 'Section "A" (Authors starting with A) has been added to the Library.',
-            date: new Date('2026-02-23') 
+            date: new Date('2026-02-23T12:00:00Z') 
         },
     ];
-    for (const item of systemNews) {
-        const ref = db.collection('news').doc(item.id);
-        const snap = await ref.get();
-        if (!snap.exists) {
-            await ref.set({
-                text: item.text,
-                text_uk: item.text_uk,
-                text_en: item.text_en,
-                timestamp: firebase.firestore.Timestamp.fromDate(item.date),
-                type: 'system'
-            });
-            console.log('[Seed] Додано системну новину:', item.id);
-        } else {
-            // Оновлюємо переклади, якщо новина вже існує
-            await ref.set({
-                text: item.text,
-                text_uk: item.text_uk,
-                text_en: item.text_en,
-            }, { merge: true });
+    try {
+        for (const item of systemNews) {
+            const ref = db.collection('news').doc(item.id);
+            const snap = await ref.get();
+            if (!snap.exists) {
+                await ref.set({
+                    text: item.text,
+                    text_uk: item.text_uk,
+                    text_en: item.text_en,
+                    timestamp: firebase.firestore.Timestamp.fromDate(item.date),
+                    type: 'system'
+                });
+            } else {
+                // Оновлюємо переклади, якщо новина вже існує (не перезаписуючи timestamp)
+                await ref.set({
+                    text: item.text,
+                    text_uk: item.text_uk,
+                    text_en: item.text_en,
+                    type: 'system'
+                }, { merge: true });
+            }
         }
+    } catch (err) {
+        console.warn('[Seed] System news seed notice:', err);
     }
 }
 seedSystemNews();
 
 // Збереження списку документів новин для рендеру при перемиканні мови
 let latestNewsDocs = [];
+let latestTopDocs = [];
+
 window.addEventListener('chessVaultLanguageChanged', () => {
     if (latestNewsDocs.length > 0) {
         renderNewsList(latestNewsDocs);
+    }
+    if (latestTopDocs.length > 0) {
+        renderTopBooks(latestTopDocs);
     }
 });
 window.addEventListener('chessVaultDateFormatChanged', () => {
@@ -776,9 +885,10 @@ db.collection('news')
 function renderTopBooks(docs) {
     const ol = document.getElementById('top-books-list');
     if (!ol) return;
-    const filled = docs.filter(d => (d.data().count || 0) > 0).slice(0, 5);
+    const filled = (docs || []).filter(d => (d.data().count || 0) > 0).slice(0, 5);
+    const emptyText = (window.i18n && window.i18n.t) ? window.i18n.t('home_top_empty') : 'Поки порожньо...';
     if (filled.length === 0) {
-        ol.innerHTML = '<li>Поки порожньо...</li>' + '<li>-</li>'.repeat(4);
+        ol.innerHTML = `<li>${emptyText}</li>` + '<li>-</li>'.repeat(4);
         return;
     }
     const items = filled.map(d => {
@@ -793,9 +903,13 @@ function renderTopBooks(docs) {
 db.collection('downloads')
     .orderBy('count', 'desc')
     .limit(5)
-    .onSnapshot(snap => renderTopBooks(snap.docs), () => {
+    .onSnapshot(snap => {
+        latestTopDocs = snap.docs;
+        renderTopBooks(snap.docs);
+    }, () => {
         const ol = document.getElementById('top-books-list');
-        if (ol) ol.innerHTML = '<li>Поки порожньо...</li>' + '<li>-</li>'.repeat(4);
+        const emptyText = (window.i18n && window.i18n.t) ? window.i18n.t('home_top_empty') : 'Поки порожньо...';
+        if (ol) ol.innerHTML = `<li>${emptyText}</li>` + '<li>-</li>'.repeat(4);
     });
 
 // =============================================

@@ -49,15 +49,22 @@ def load_page_counts():
             print(f"Попередження: не вдалося завантажити page_counts.js: {e}")
     return {}
 
+import unicodedata
+
 def save_descriptions(data):
+    # Завжди нормалізуємо в канонічний NFC Unicode
+    normalized = {}
+    for k, v in data.items():
+        k_clean = unicodedata.normalize('NFC', k) if isinstance(k, str) else k
+        normalized[k_clean] = v
     # Зберігаємо JSON
     with open(DESCRIPTIONS_JSON, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        json.dump(normalized, f, ensure_ascii=False, indent=2)
     # Зберігаємо JS для веб-сторінок
     with open(DESCRIPTIONS_JS, 'w', encoding='utf-8') as f:
         f.write('// Auto-generated descriptions for Chess Vault books\n')
         f.write('window.CHESS_DESCRIPTIONS = ')
-        json.dump(data, f, ensure_ascii=False)
+        json.dump(normalized, f, ensure_ascii=False)
         f.write(';\n')
 
 def clean_query(title, author=''):

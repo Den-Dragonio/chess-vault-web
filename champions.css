@@ -1143,7 +1143,7 @@ html.dark .chm-elo-val {
 
     /* Модальне вікно чемпіона: 1 в 1 як book-detail-card на мобілці */
     #champion-modal-overlay.active {
-        padding: 0 0 calc(120px + env(safe-area-inset-bottom, 30px)) 0 !important;
+        padding: 0 !important;
         align-items: stretch;
     }
     #champion-modal-card {
@@ -1152,26 +1152,26 @@ html.dark .chm-elo-val {
         min-height: 100vh;
         min-height: 100dvh;
         max-height: none !important;
-        border-radius: 0;
-        border: none;
-        padding: 60px 18px calc(140px + env(safe-area-inset-bottom, 30px)) !important;
-        gap: 24px;
-        background: rgba(255, 255, 255, 0.96);
+        border-radius: 0 !important;
+        border: none !important;
+        padding: 48px 16px calc(74px + env(safe-area-inset-bottom, 12px)) 16px !important;
+        gap: 20px;
+        background: rgba(255, 255, 255, 0.98) !important;
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
-        box-shadow: none;
+        box-shadow: none !important;
         -webkit-overflow-scrolling: touch;
     }
     #champion-modal-body {
-        padding-bottom: 20px;
+        padding-bottom: 0;
     }
     #champion-modal-close {
-        top: 14px;
-        right: 14px;
-        width: 44px;
-        height: 44px;
-        min-width: 44px;
-        min-height: 44px;
+        top: 10px;
+        right: 10px;
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        min-height: 40px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1247,7 +1247,7 @@ html.dark .chm-elo-val {
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.04);
         gap: 14px;
         margin-top: 4px;
-        margin-bottom: 20px;
+        margin-bottom: 0 !important;
     }
 
     .chm-books-frame-header {
@@ -1330,12 +1330,14 @@ html.dark .chm-elo-val {
     }
 
     .chm-bottom-spacer {
-        display: block !important;
-        width: 100% !important;
-        height: calc(140px + env(safe-area-inset-bottom, 30px)) !important;
-        min-height: calc(140px + env(safe-area-inset-bottom, 30px)) !important;
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        min-height: 0 !important;
         flex-shrink: 0 !important;
         pointer-events: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
 
     .chm-book-item {
@@ -1371,9 +1373,9 @@ html.dark .chm-elo-val {
         border-top: 1px dashed rgba(255, 255, 255, 0.09);
     }
     html.dark #champion-modal-card {
-        background: rgba(14, 16, 24, 0.96);
-        border: none;
-        box-shadow: none;
+        background: rgba(14, 16, 24, 0.98) !important;
+        border: none !important;
+        box-shadow: none !important;
     }
     html.dark .chm-books-frame {
         background: rgba(22, 25, 36, 0.85);
@@ -1398,8 +1400,8 @@ html.dark .chm-elo-val {
         font-size: 0.78rem;
     }
     #champion-modal-card {
-        padding: 56px 14px calc(140px + env(safe-area-inset-bottom, 30px)) !important;
-        gap: 20px;
+        padding: 48px 14px calc(74px + env(safe-area-inset-bottom, 12px)) 14px !important;
+        gap: 18px;
     }
     .chm-name {
         font-size: 1.45rem;
@@ -1428,11 +1430,10 @@ html.dark .chm-elo-val {
         padding-bottom: 24px !important;
     }
     .chm-bottom-spacer {
-        display: block !important;
-        width: 100% !important;
-        height: calc(140px + env(safe-area-inset-bottom, 30px)) !important;
-        min-height: calc(140px + env(safe-area-inset-bottom, 30px)) !important;
-        flex-shrink: 0 !important;
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        min-height: 0 !important;
     }
 }
 

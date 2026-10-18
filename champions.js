@@ -543,9 +543,6 @@ function openChampionModal(champ) {
                 </div>
             </div>
         </div>
-
-        <!-- ВІДСТУП ЗНИЗУ ДЛЯ ЗАХИСТУ ВІД ПЕРЕКРИТТЯ НИЖНІМ ХЕДЕРОМ -->
-        <div class="chm-bottom-spacer"></div>
     `;
 
     // Прив'язка вкладок у рамці книг для мобільної версії
@@ -590,7 +587,8 @@ function closeChampionModal() {
 function openBookModalFromFilename(filename) {
     if (!filename) return;
 
-    const cleanName = filename.replace(/\.[^/.]+$/, '');
+    const normFilename = (typeof filename === 'string') ? filename.normalize('NFC') : filename;
+    const cleanName = normFilename.replace(/\.[^/.]+$/, '');
     const match = cleanName.match(/(.*?)\s*-\s*(.*)\s*\((\d{4})\)/);
     let author = '—';
     let title = cleanName;
@@ -608,25 +606,34 @@ function openBookModalFromFilename(filename) {
         }
     }
 
-    const format = filename.split('.').pop().toLowerCase() || 'pdf';
-    const pages = (window.CHESS_PAGE_COUNTS && (window.CHESS_PAGE_COUNTS[filename] || window.CHESS_PAGE_COUNTS[filename.toLowerCase()]))
-        || (window.CHESS_DESCRIPTIONS && (window.CHESS_DESCRIPTIONS[filename]?.pages || window.CHESS_DESCRIPTIONS[filename.toLowerCase()]?.pages))
+    const format = normFilename.split('.').pop().toLowerCase() || 'pdf';
+
+    const cachedBook = window.CHESS_BOOKS_CACHE && window.CHESS_BOOKS_CACHE.find(b => 
+        b.id === normFilename || 
+        b.id.toLowerCase() === normFilename.toLowerCase() ||
+        (b.id.normalize && b.id.normalize('NFC').toLowerCase() === normFilename.toLowerCase())
+    );
+
+    const canonicalId = cachedBook ? (cachedBook.id.normalize ? cachedBook.id.normalize('NFC') : cachedBook.id) : normFilename;
+
+    const pages = (cachedBook && cachedBook.pages)
+        || (window.CHESS_PAGE_COUNTS && (window.CHESS_PAGE_COUNTS[canonicalId] || window.CHESS_PAGE_COUNTS[canonicalId.toLowerCase()]))
+        || (window.CHESS_DESCRIPTIONS && (window.CHESS_DESCRIPTIONS[canonicalId]?.pages || window.CHESS_DESCRIPTIONS[canonicalId.toLowerCase()]?.pages))
         || null;
 
-    const cachedBook = window.CHESS_BOOKS_CACHE && window.CHESS_BOOKS_CACHE.find(b => b.id === filename || b.id.toLowerCase() === filename.toLowerCase());
     const sizeDisplay = cachedBook ? cachedBook.sizeDisplay : '—';
     const sizeRaw = cachedBook ? cachedBook.sizeRaw : 0;
 
     const bookObj = {
-        id: filename,
-        title: title || (cachedBook ? cachedBook.title : cleanName),
-        author: author || (cachedBook ? cachedBook.author : ''),
-        year: year !== '---' ? year : (cachedBook ? cachedBook.year : '---'),
+        id: canonicalId,
+        title: (cachedBook && cachedBook.title) ? cachedBook.title : (title || cleanName),
+        author: (cachedBook && cachedBook.author) ? cachedBook.author : (author || '—'),
+        year: (cachedBook && cachedBook.year && cachedBook.year !== '---') ? cachedBook.year : (year !== '---' ? year : '---'),
         pages: pages ? parseInt(pages, 10) : (cachedBook ? cachedBook.pages : null),
-        format: format,
+        format: (cachedBook && cachedBook.format) ? cachedBook.format : format,
         sizeDisplay: sizeDisplay,
         sizeRaw: sizeRaw,
-        url: `https://archive.org/download/1971_20260223/${encodeURIComponent(filename)}`
+        url: (cachedBook && cachedBook.url) ? cachedBook.url : `https://archive.org/download/1971_20260223/${encodeURIComponent(canonicalId)}`
     };
 
     if (typeof openBookModal === 'function') {

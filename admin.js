@@ -246,25 +246,25 @@
             // 4. Джерело: news (реєстрації та активності завантаження)
             newsSnap.docs.forEach(doc => {
                 const data = doc.data() || {};
-                const text = data.text || '';
+                const text = data.text_uk || data.text || data.text_en || '';
                 const ts = data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp)) : null;
 
-                // Подія реєстрації: "🎉 {username} приєднався до Chess Vault! Ласкаво просимо!"
-                const welcomeMatch = text.match(/🎉\s+([^\s]+)\s+приєднався/i);
-                if (welcomeMatch && welcomeMatch[1]) {
-                    const uName = welcomeMatch[1].trim();
-                    const u = getOrCreateUser(uName);
+                // Подія реєстрації: "🎉 {username} приєднався..." або "🎉 {username} joined..."
+                const welcomeMatch = text.match(/🎉\s+([^\s]+)\s+(?:приєднався|joined)/i);
+                const regUser = (data.username || (welcomeMatch ? welcomeMatch[1] : '')).trim();
+                if (regUser) {
+                    const u = getOrCreateUser(regUser);
                     if (ts && (!u.createdAt || ts < u.createdAt)) {
                         u.createdAt = ts;
                     }
                 }
 
-                // Подія скачування: "📥 {username} завантажив "{bookTitle}""
-                const downloadMatch = text.match(/📥\s+([^\s]+)\s+завантажив\s+"([^"]+)"/i);
-                if (downloadMatch && downloadMatch[1]) {
-                    const uName = downloadMatch[1].trim();
-                    const bookTitle = downloadMatch[2] ? downloadMatch[2].trim() : 'Книга';
-                    const u = getOrCreateUser(uName);
+                // Подія скачування: "📥 {username} завантажив "{bookTitle}"" або "📥 {username} downloaded "{bookTitle}""
+                const downloadMatch = text.match(/📥\s+([^\s]+)\s+(?:завантажив|скачав|downloaded)\s+["«]([^"»]+)["»]/i);
+                const dlUser = (data.userName || (downloadMatch ? downloadMatch[1] : '')).trim();
+                if (dlUser) {
+                    const bookTitle = (data.bookTitle || (downloadMatch && downloadMatch[2] ? downloadMatch[2] : 'Книга')).trim();
+                    const u = getOrCreateUser(dlUser);
                     if (ts && (!u.last_active_at || ts > u.last_active_at)) {
                         u.last_active_at = ts;
                     }

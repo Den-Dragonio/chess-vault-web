@@ -20,6 +20,8 @@ const I18N_TRANSLATIONS = {
         // Home Page (index.html)
         home_news_title: "News",
         home_news_empty: "No news yet...",
+        news_downloaded: "📥 {user} downloaded \"{title}\"",
+        news_welcome: "🎉 {user} joined Chess Vault! Welcome!",
         home_top_books: "Top Downloads",
         home_top_empty: "No downloads yet...",
         home_useful_links: "Useful Links",
@@ -235,6 +237,8 @@ const I18N_TRANSLATIONS = {
         // Home Page (index.html)
         home_news_title: "Новини",
         home_news_empty: "Поки порожньо...",
+        news_downloaded: "📥 {user} завантажив \"{title}\"",
+        news_welcome: "🎉 {user} приєднався до Chess Vault! Ласкаво просимо!",
         home_top_books: "Топ завантажень",
         home_top_empty: "Поки порожньо...",
         home_useful_links: "Корисні посилання",

@@ -60,6 +60,7 @@ def main():
 
     books = []
     for fname, desc in descriptions.items():
+        fname = unicodedata.normalize('NFC', fname)
         fileName = os.path.splitext(fname)[0]
         match = re.match(r'(.*?)\s*-\s*(.*)\s*\((\d{4})\)', fileName)
         
@@ -77,6 +78,9 @@ def main():
         author = match.group(1).strip() if match else fileName.split('-')[0].strip()
         title = match.group(2).strip() if match else fileName
         year = match.group(3) if match else '---'
+
+        author = unicodedata.normalize('NFC', author)
+        title = unicodedata.normalize('NFC', title)
 
         b = {
             'author': author,
