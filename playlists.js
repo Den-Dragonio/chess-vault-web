@@ -1,16 +1,21 @@
 /* ====================================================
-   CHESS VAULT — PLAYLISTS MODULE
-   Firestore structure:
-     users/{uid}/playlists/{playlistId}
-       → { name, icon, isDefault, createdAt, updatedAt }
-     users/{uid}/playlists/{playlistId}/books/{bookDocId}
-       → { title, author, id, format, sizeDisplay, url, addedAt }
+   CHESS VAULT — PLAYLISTS MODULE (ROBUST & INSTANT)
+   - Stored in user_preferences/{uid}.playlists (guaranteed permissions)
+   - Cached in localStorage for 0ms instant loading
+   - Works for both logged in users and guests (prompts login)
+   - Default playlists: "watch-later" (На потім) and "favorites" (Улюблені)
    ==================================================== */
 
-const PLAYLISTS_DEFAULT = [
-    { id: 'watch-later', icon: '🕐', nameKey: 'pl_watch_later', name_uk: 'На потім', name_en: 'Watch Later' },
-    { id: 'favorites',   icon: '⭐', nameKey: 'pl_favorites',   name_uk: 'Улюблені',  name_en: 'Favorites'   },
+const PL_DEFAULT_CONFIG = [
+    { id: 'watch-later', icon: '🕐', name_uk: 'На потім', name_en: 'Watch Later', isDefault: true, books: [] },
+    { id: 'favorites',   icon: '⭐', name_uk: 'Улюблені',  name_en: 'Favorites',   isDefault: true, books: [] }
 ];
+
+// In-memory cache
+let _plCurrentUid = null;
+let _plUserPlaylists = [];
+let _plCurrentlyOpenId = null;
+let _plInitialized = false;
 
 // =============================================
 // HELPERS
@@ -18,6 +23,7 @@ const PLAYLISTS_DEFAULT = [
 function plGetDb() {
     return window.db || (typeof db !== 'undefined' ? db : null);
 }
+
 function plGetUser() {
     try {
         if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
@@ -28,203 +34,307 @@ function plGetUser() {
     if (window.auth && window.auth.currentUser) return window.auth.currentUser;
     return null;
 }
+
 function plIsEn() {
     return window.i18n && window.i18n.currentLang === 'en';
 }
-function plT(key, fallback, vars) {
-    if (window.i18n) {
-        const t = window.i18n.t(key, vars);
-        if (t && t !== key) return t;
-    }
-    if (vars) {
-        let s = fallback;
-        for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, v);
-        return s;
-    }
-    return fallback;
-}
+
 function plEsc(str) {
     if (!str) return '';
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
-function plSafeBookId(book) {
-    const raw = book?.id || book?.title || 'unknown';
-    return String(raw).replace(/[/\\#?%]/g, '_').slice(0, 200);
+
+function plStorageKey(uid) {
+    return 'chess_vault_playlists_' + (uid || 'guest');
+}
+
+function plLoadFromLocalStorage(uid) {
+    try {
+        const raw = localStorage.getItem(plStorageKey(uid));
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                return parsed;
+            }
+        }
+    } catch (_) {}
+    return JSON.parse(JSON.stringify(PL_DEFAULT_CONFIG));
+}
+
+function plSaveToLocalStorage(uid, playlists) {
+    try {
+        localStorage.setItem(plStorageKey(uid), JSON.stringify(playlists));
+    } catch (_) {}
+}
+
+// Timeout helper for Firestore queries to prevent hanging
+function plWithTimeout(promise, ms = 3500) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), ms))
+    ]);
 }
 
 // =============================================
-// FIRESTORE OPERATIONS
+// CORE PLAYLIST STATE MANAGEMENT
 // =============================================
-async function plEnsureDefaults(uid) {
-    const firestore = plGetDb();
-    if (!firestore || !uid) return;
-    const col = firestore.collection('users').doc(uid).collection('playlists');
-    for (const def of PLAYLISTS_DEFAULT) {
-        const ref = col.doc(def.id);
-        const snap = await ref.get();
-        if (!snap.exists) {
-            await ref.set({
-                name: plIsEn() ? def.name_en : def.name_uk,
-                name_uk: def.name_uk,
-                name_en: def.name_en,
-                icon: def.icon,
-                isDefault: true,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+function plInitForUser(user) {
+    const uid = user ? user.uid : 'guest';
+    _plCurrentUid = uid;
+    _plUserPlaylists = plLoadFromLocalStorage(uid);
+
+    // Ensure defaults exist
+    for (const def of PL_DEFAULT_CONFIG) {
+        if (!_plUserPlaylists.some(p => p.id === def.id)) {
+            _plUserPlaylists.unshift(JSON.parse(JSON.stringify(def)));
         }
+    }
+
+    // Sync from Firestore in background if logged in
+    if (user && user.uid) {
+        plSyncFromFirestore(user.uid).catch(() => {});
     }
 }
 
-async function plGetAll(uid) {
+async function plSyncFromFirestore(uid) {
     const firestore = plGetDb();
-    if (!firestore || !uid) return [];
-    const snap = await firestore.collection('users').doc(uid).collection('playlists')
-        .orderBy('createdAt', 'asc').get();
-    const arr = [];
-    snap.forEach(doc => {
-        const d = doc.data();
-        arr.push({ id: doc.id, ...d });
-    });
-    return arr;
+    if (!firestore || !uid || uid === 'guest') return;
+
+    try {
+        const docRef = firestore.collection('user_preferences').doc(uid);
+        const snap = await plWithTimeout(docRef.get(), 4000);
+
+        if (snap && snap.exists) {
+            const data = snap.data();
+            if (data && Array.isArray(data.playlists) && data.playlists.length > 0) {
+                // Merge with local playlists
+                _plUserPlaylists = data.playlists;
+                // Ensure defaults
+                for (const def of PL_DEFAULT_CONFIG) {
+                    if (!_plUserPlaylists.some(p => p.id === def.id)) {
+                        _plUserPlaylists.unshift(JSON.parse(JSON.stringify(def)));
+                    }
+                }
+                plSaveToLocalStorage(uid, _plUserPlaylists);
+                // Re-render if profile section exists
+                if (document.getElementById('playlists-section')) {
+                    plRenderProfileHTML();
+                }
+                return;
+            }
+        }
+
+        // If no playlists in Firestore yet, write default state
+        await plSyncToFirestore(uid);
+    } catch (err) {
+        console.warn('[Playlists] Firestore sync warning (using local):', err.message || err);
+    }
 }
 
-async function plGetBooks(uid, playlistId) {
+async function plSyncToFirestore(uid) {
     const firestore = plGetDb();
-    if (!firestore || !uid || !playlistId) return [];
-    const snap = await firestore.collection('users').doc(uid)
-        .collection('playlists').doc(playlistId)
-        .collection('books').orderBy('addedAt', 'desc').get();
-    const books = [];
-    snap.forEach(doc => {
-        books.push({ _docId: doc.id, ...doc.data() });
-    });
-    return books;
+    if (!firestore || !uid || uid === 'guest') return;
+
+    try {
+        const docRef = firestore.collection('user_preferences').doc(uid);
+        // Clean data for Firestore
+        const cleanList = _plUserPlaylists.map(pl => ({
+            id: pl.id || 'pl_' + Date.now(),
+            icon: pl.icon || '📋',
+            name: pl.name || pl.name_uk || 'Плейлист',
+            name_uk: pl.name_uk || pl.name || 'Плейлист',
+            name_en: pl.name_en || pl.name || 'Playlist',
+            isDefault: !!pl.isDefault,
+            books: (pl.books || []).map(b => ({
+                id: b.id || '',
+                title: b.title || '',
+                author: b.author || '',
+                format: b.format || 'pdf',
+                sizeDisplay: b.sizeDisplay || '—',
+                url: b.url || '',
+                year: b.year || '---',
+                addedAt: b.addedAt || Date.now()
+            }))
+        }));
+
+        await plWithTimeout(docRef.set({ playlists: cleanList }, { merge: true }), 4000);
+    } catch (err) {
+        console.warn('[Playlists] Firestore save error:', err.message || err);
+    }
 }
 
-async function plAddBook(uid, playlistId, book) {
-    const firestore = plGetDb();
-    if (!firestore || !uid || !playlistId || !book) return false;
-    const bookDocId = plSafeBookId(book);
-    const bookRef = firestore.collection('users').doc(uid)
-        .collection('playlists').doc(playlistId)
-        .collection('books').doc(bookDocId);
-    const existing = await bookRef.get();
-    if (existing.exists) return false; // already in playlist
-    await bookRef.set({
-        title: book.title || '',
-        author: book.author || '',
+function plGetPlaylists() {
+    if (!_plUserPlaylists || _plUserPlaylists.length === 0) {
+        const u = plGetUser();
+        plInitForUser(u);
+    }
+    return _plUserPlaylists;
+}
+
+// =============================================
+// CRUD OPERATIONS
+// =============================================
+async function plAddBookToPlaylist(playlistId, book) {
+    const u = plGetUser();
+    if (!u) {
+        plPromptLogin();
+        return false;
+    }
+
+    const playlists = plGetPlaylists();
+    const pl = playlists.find(p => p.id === playlistId);
+    if (!pl) return false;
+
+    if (!pl.books) pl.books = [];
+    const bookId = (book.id || book.title || '').trim().toLowerCase();
+    const exists = pl.books.some(b => (b.id || b.title || '').trim().toLowerCase() === bookId);
+    if (exists) return false; // already in playlist
+
+    pl.books.unshift({
         id: book.id || '',
-        format: book.format || 'pdf',
+        title: book.title || book.id || 'Без назви',
+        author: book.author || '—',
+        format: (book.format || 'pdf').toLowerCase(),
         sizeDisplay: book.sizeDisplay || '—',
         url: book.url || '',
         year: book.year || '---',
-        addedAt: firebase.firestore.FieldValue.serverTimestamp()
+        addedAt: Date.now()
     });
-    // Update playlist timestamp
-    await firestore.collection('users').doc(uid)
-        .collection('playlists').doc(playlistId)
-        .update({ updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+
+    plSaveToLocalStorage(u.uid, playlists);
+    plSyncToFirestore(u.uid).catch(() => {});
     return true;
 }
 
-async function plRemoveBook(uid, playlistId, bookDocId) {
-    const firestore = plGetDb();
-    if (!firestore || !uid || !playlistId || !bookDocId) return;
-    await firestore.collection('users').doc(uid)
-        .collection('playlists').doc(playlistId)
-        .collection('books').doc(bookDocId).delete();
-    await firestore.collection('users').doc(uid)
-        .collection('playlists').doc(playlistId)
-        .update({ updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+async function plRemoveBookFromPlaylist(playlistId, bookId) {
+    const u = plGetUser();
+    const playlists = plGetPlaylists();
+    const pl = playlists.find(p => p.id === playlistId);
+    if (!pl || !pl.books) return;
+
+    const bId = String(bookId).trim().toLowerCase();
+    pl.books = pl.books.filter(b => (b.id || b.title || '').trim().toLowerCase() !== bId);
+
+    const uid = u ? u.uid : 'guest';
+    plSaveToLocalStorage(uid, playlists);
+    if (u) plSyncToFirestore(u.uid).catch(() => {});
 }
 
-async function plCreatePlaylist(uid, name, icon) {
-    const firestore = plGetDb();
-    if (!firestore || !uid || !name) return null;
-    const ref = await firestore.collection('users').doc(uid).collection('playlists').add({
-        name: name.trim(),
-        name_uk: name.trim(),
-        name_en: name.trim(),
+async function plCreateCustomPlaylist(name, icon = '📋') {
+    const u = plGetUser();
+    if (!u) {
+        plPromptLogin();
+        return null;
+    }
+
+    const trimmed = (name || '').trim();
+    if (!trimmed) return null;
+
+    const newId = 'custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+    const newPl = {
+        id: newId,
         icon: icon || '📋',
+        name: trimmed,
+        name_uk: trimmed,
+        name_en: trimmed,
         isDefault: false,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    return ref.id;
+        books: []
+    };
+
+    _plUserPlaylists.push(newPl);
+    plSaveToLocalStorage(u.uid, _plUserPlaylists);
+    plSyncToFirestore(u.uid).catch(() => {});
+    return newId;
 }
 
-async function plRenamePlaylist(uid, playlistId, newName) {
-    const firestore = plGetDb();
-    if (!firestore || !uid || !playlistId || !newName) return;
-    await firestore.collection('users').doc(uid)
-        .collection('playlists').doc(playlistId)
-        .update({
-            name: newName.trim(),
-            name_uk: newName.trim(),
-            name_en: newName.trim(),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+async function plRenamePlaylist(playlistId, newName) {
+    const u = plGetUser();
+    const playlists = plGetPlaylists();
+    const pl = playlists.find(p => p.id === playlistId);
+    if (!pl || pl.isDefault) return;
+
+    const trimmed = (newName || '').trim();
+    if (!trimmed) return;
+
+    pl.name = trimmed;
+    pl.name_uk = trimmed;
+    pl.name_en = trimmed;
+
+    const uid = u ? u.uid : 'guest';
+    plSaveToLocalStorage(uid, playlists);
+    if (u) plSyncToFirestore(u.uid).catch(() => {});
 }
 
-async function plDeletePlaylist(uid, playlistId) {
-    const firestore = plGetDb();
-    if (!firestore || !uid || !playlistId) return;
-    // Delete all books in the playlist first
-    const booksSnap = await firestore.collection('users').doc(uid)
-        .collection('playlists').doc(playlistId)
-        .collection('books').get();
-    const batch = firestore.batch();
-    booksSnap.forEach(doc => batch.delete(doc.ref));
-    batch.delete(firestore.collection('users').doc(uid).collection('playlists').doc(playlistId));
-    await batch.commit();
+async function plDeletePlaylist(playlistId) {
+    const u = plGetUser();
+    let playlists = plGetPlaylists();
+    const pl = playlists.find(p => p.id === playlistId);
+    if (!pl || pl.isDefault) return;
+
+    _plUserPlaylists = playlists.filter(p => p.id !== playlistId);
+    const uid = u ? u.uid : 'guest';
+    plSaveToLocalStorage(uid, _plUserPlaylists);
+    if (u) plSyncToFirestore(u.uid).catch(() => {});
 }
 
-async function plGetBookCount(uid, playlistId) {
-    const firestore = plGetDb();
-    if (!firestore || !uid || !playlistId) return 0;
-    const snap = await firestore.collection('users').doc(uid)
-        .collection('playlists').doc(playlistId)
-        .collection('books').get();
-    return snap.size;
+// Prompt login for guests
+function plPromptLogin() {
+    const isEn = plIsEn();
+    const msg = isEn ? 'Please log in to save books to playlists!' : 'Будь ласка, увійдіть в аккаунт, щоб зберігати книги в плейлисти!';
+    if (typeof showToast === 'function') {
+        showToast(msg, 'warn');
+    } else {
+        alert(msg);
+    }
+    const loginTrigger = document.getElementById('login-trigger');
+    if (loginTrigger) {
+        loginTrigger.click();
+    }
 }
 
 // =============================================
-// PROFILE PAGE — PLAYLIST SECTION RENDER
+// PROFILE PAGE — RENDERING
 // =============================================
-let _plCurrentlyOpenId = null;
-let _plAllPlaylists = [];
+function plRenderProfileSection(optionalUser) {
+    const user = optionalUser || plGetUser();
+    plInitForUser(user);
+    plRenderProfileHTML();
+}
 
-async function plRenderProfileSection() {
+function plRenderProfileHTML() {
     const container = document.getElementById('playlists-section');
     if (!container) return;
-    const user = plGetUser();
-    if (!user) return;
-
-    await plEnsureDefaults(user.uid);
-    _plAllPlaylists = await plGetAll(user.uid);
 
     const isEn = plIsEn();
     const titleText = isEn ? '📋 My Playlists' : '📋 Мої Плейлисти';
     const addBtnText = isEn ? '+ New Playlist' : '+ Новий плейлист';
     const emptyText = isEn ? 'No playlists yet' : 'Плейлистів ще немає';
 
+    const playlists = plGetPlaylists();
+
     let html = `
         <div class="pl-header">
             <h2 class="pl-title">${titleText}</h2>
-            <button class="pl-add-btn" id="pl-add-btn">${addBtnText}</button>
+            <button type="button" class="pl-add-btn" id="pl-add-btn">${addBtnText}</button>
         </div>
     `;
 
-    if (_plAllPlaylists.length === 0) {
+    if (playlists.length === 0) {
         html += `<p class="pl-empty">${emptyText}</p>`;
     } else {
         html += `<div class="pl-list" id="pl-list">`;
-        for (const pl of _plAllPlaylists) {
+        for (const pl of playlists) {
             const displayName = isEn ? (pl.name_en || pl.name) : (pl.name_uk || pl.name);
-            const bookCount = await plGetBookCount(user.uid, pl.id);
+            const bookCount = (pl.books || []).length;
             const isOpen = _plCurrentlyOpenId === pl.id;
-            const booksWord = isEn ? (bookCount === 1 ? 'book' : 'books') : (bookCount === 1 ? 'книга' : (bookCount >= 2 && bookCount <= 4 ? 'книги' : 'книг'));
+            const booksWord = isEn
+                ? (bookCount === 1 ? 'book' : 'books')
+                : (bookCount === 1 ? 'книга' : (bookCount >= 2 && bookCount <= 4 ? 'книги' : 'книг'));
 
             html += `
                 <div class="pl-item ${isOpen ? 'pl-item-open' : ''}" data-pl-id="${plEsc(pl.id)}">
@@ -236,14 +346,14 @@ async function plRenderProfileSection() {
                         </div>
                         <div class="pl-item-actions">
                             ${!pl.isDefault ? `
-                                <button class="pl-item-action-btn pl-rename-btn" data-pl-id="${plEsc(pl.id)}" title="${isEn ? 'Rename' : 'Перейменувати'}">✏️</button>
-                                <button class="pl-item-action-btn pl-delete-btn" data-pl-id="${plEsc(pl.id)}" title="${isEn ? 'Delete' : 'Видалити'}">🗑️</button>
+                                <button type="button" class="pl-item-action-btn pl-rename-btn" data-pl-id="${plEsc(pl.id)}" title="${isEn ? 'Rename' : 'Перейменувати'}">✏️</button>
+                                <button type="button" class="pl-item-action-btn pl-delete-btn" data-pl-id="${plEsc(pl.id)}" title="${isEn ? 'Delete' : 'Видалити'}">🗑️</button>
                             ` : ''}
                             <span class="pl-item-chevron">${isOpen ? '▲' : '▼'}</span>
                         </div>
                     </div>
                     <div class="pl-item-books" id="pl-books-${plEsc(pl.id)}" style="display: ${isOpen ? 'block' : 'none'};">
-                        <div class="pl-books-loading">${isEn ? 'Loading...' : 'Завантаження...'}</div>
+                        ${plRenderBooksHTML(pl)}
                     </div>
                 </div>
             `;
@@ -253,127 +363,101 @@ async function plRenderProfileSection() {
 
     container.innerHTML = html;
 
-    // Attach event listeners
-    // Toggle playlist books
+    // Attach listeners
+    const addBtn = document.getElementById('pl-add-btn');
+    if (addBtn) addBtn.onclick = plShowCreateDialog;
+
     container.querySelectorAll('.pl-item-header').forEach(header => {
-        header.addEventListener('click', (e) => {
+        header.onclick = (e) => {
             if (e.target.closest('.pl-item-action-btn')) return;
             const plId = header.dataset.plId;
-            plToggleBooks(plId);
-        });
+            plTogglePlaylist(plId);
+        };
     });
 
-    // Add new playlist
-    const addBtn = document.getElementById('pl-add-btn');
-    if (addBtn) addBtn.addEventListener('click', plShowCreateDialog);
-
-    // Rename
     container.querySelectorAll('.pl-rename-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.onclick = (e) => {
             e.stopPropagation();
             plShowRenameDialog(btn.dataset.plId);
-        });
+        };
     });
 
-    // Delete
     container.querySelectorAll('.pl-delete-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.onclick = (e) => {
             e.stopPropagation();
             plShowDeleteConfirm(btn.dataset.plId);
-        });
+        };
     });
+
+    // Attach click to books inside playlists
+    plAttachBookEvents(container);
 }
 
-async function plToggleBooks(playlistId) {
-    const booksContainer = document.getElementById(`pl-books-${playlistId}`);
-    if (!booksContainer) return;
-    const item = booksContainer.closest('.pl-item');
-    const chevron = item?.querySelector('.pl-item-chevron');
-
-    if (booksContainer.style.display === 'none' || !booksContainer.style.display) {
-        _plCurrentlyOpenId = playlistId;
-        booksContainer.style.display = 'block';
-        if (item) item.classList.add('pl-item-open');
-        if (chevron) chevron.textContent = '▲';
-        await plRenderBooks(playlistId);
-    } else {
-        _plCurrentlyOpenId = null;
-        booksContainer.style.display = 'none';
-        if (item) item.classList.remove('pl-item-open');
-        if (chevron) chevron.textContent = '▼';
-    }
-}
-
-async function plRenderBooks(playlistId) {
-    const user = plGetUser();
-    if (!user) return;
-    const booksContainer = document.getElementById(`pl-books-${playlistId}`);
-    if (!booksContainer) return;
-
+function plRenderBooksHTML(pl) {
     const isEn = plIsEn();
-    const books = await plGetBooks(user.uid, playlistId);
+    const books = pl.books || [];
 
     if (books.length === 0) {
-        booksContainer.innerHTML = `<p class="pl-books-empty">${isEn ? 'No books in this playlist yet' : 'У цьому плейлисті ще немає книг'}</p>`;
-        // Also update the count badge in the header
-        const item = booksContainer.closest('.pl-item');
-        const countBadge = item?.querySelector('.pl-item-count');
-        if (countBadge) countBadge.textContent = `0 ${isEn ? 'books' : 'книг'}`;
-        return;
+        return `<p class="pl-books-empty">${isEn ? 'No books in this playlist yet' : 'У цьому плейлисті ще немає книг'}</p>`;
     }
 
     let html = `<div class="pl-books-list">`;
     for (const book of books) {
         const format = (book.format || 'pdf').toUpperCase();
+        const safeBookId = plEsc(book.id || book.title || '');
         html += `
-            <div class="pl-book-row" data-book-doc-id="${plEsc(book._docId)}">
-                <div class="pl-book-info" data-book-json='${plEsc(JSON.stringify(book))}'>
+            <div class="pl-book-row" data-book-id="${safeBookId}">
+                <div class="pl-book-info" data-book-data="${plEsc(JSON.stringify(book))}">
                     <span class="pl-book-title">📖 ${plEsc(book.title || book.id || '—')}</span>
                     <span class="pl-book-author">${plEsc(book.author || '—')}</span>
                 </div>
                 <div class="pl-book-actions">
                     <span class="pl-book-format">${format}</span>
-                    <button class="pl-book-remove-btn" data-pl-id="${plEsc(playlistId)}" data-book-doc-id="${plEsc(book._docId)}" title="${isEn ? 'Remove' : 'Видалити'}">✕</button>
+                    <button type="button" class="pl-book-remove-btn" data-pl-id="${plEsc(pl.id)}" data-book-id="${safeBookId}" title="${isEn ? 'Remove' : 'Видалити'}">✕</button>
                 </div>
             </div>
         `;
     }
     html += `</div>`;
-    booksContainer.innerHTML = html;
+    return html;
+}
 
-    // Update count badge
-    const item = booksContainer.closest('.pl-item');
-    const countBadge = item?.querySelector('.pl-item-count');
-    if (countBadge) {
-        const booksWord = isEn ? (books.length === 1 ? 'book' : 'books') : (books.length === 1 ? 'книга' : (books.length >= 2 && books.length <= 4 ? 'книги' : 'книг'));
-        countBadge.textContent = `${books.length} ${booksWord}`;
-    }
-
-    // Click on book opens modal
-    booksContainer.querySelectorAll('.pl-book-info').forEach(info => {
-        info.addEventListener('click', () => {
+function plAttachBookEvents(container) {
+    container.querySelectorAll('.pl-book-info').forEach(info => {
+        info.onclick = () => {
             try {
-                const bookData = JSON.parse(info.dataset.bookJson);
+                const bookData = JSON.parse(info.dataset.bookData);
                 if (typeof openBookModal === 'function') {
                     openBookModal(bookData);
+                } else if (typeof openBookModalFromData === 'function') {
+                    openBookModalFromData(bookData);
                 }
             } catch (_) {}
-        });
+        };
     });
 
-    // Remove book button
-    booksContainer.querySelectorAll('.pl-book-remove-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
+    container.querySelectorAll('.pl-book-remove-btn').forEach(btn => {
+        btn.onclick = async (e) => {
+            e.stopPropagation();
             const plId = btn.dataset.plId;
-            const bookDocId = btn.dataset.bookDocId;
-            await plRemoveBook(user.uid, plId, bookDocId);
+            const bookId = btn.dataset.bookId;
+            await plRemoveBookFromPlaylist(plId, bookId);
             const isEn = plIsEn();
             if (typeof showToast === 'function') {
                 showToast(isEn ? 'Book removed from playlist' : 'Книгу видалено з плейлиста', 'ok');
             }
-            await plRenderBooks(plId);
-        });
+            plRenderProfileHTML();
+        };
     });
+}
+
+function plTogglePlaylist(playlistId) {
+    if (_plCurrentlyOpenId === playlistId) {
+        _plCurrentlyOpenId = null;
+    } else {
+        _plCurrentlyOpenId = playlistId;
+    }
+    plRenderProfileHTML();
 }
 
 // =============================================
@@ -387,21 +471,24 @@ function plShowCreateDialog() {
         confirmText: isEn ? 'Create' : 'Створити',
         onConfirm: async (name) => {
             if (!name || !name.trim()) return;
-            const user = plGetUser();
-            if (!user) return;
-            await plCreatePlaylist(user.uid, name.trim(), '📋');
-            if (typeof showToast === 'function') {
-                showToast(isEn ? `Playlist "${name.trim()}" created!` : `Плейлист "${name.trim()}" створено!`, 'ok');
+            const newId = await plCreateCustomPlaylist(name.trim());
+            if (newId) {
+                if (typeof showToast === 'function') {
+                    showToast(isEn ? `Playlist "${name.trim()}" created!` : `Плейлист "${name.trim()}" створено!`, 'ok');
+                }
+                _plCurrentlyOpenId = newId;
+                plRenderProfileHTML();
             }
-            await plRenderProfileSection();
         }
     });
 }
 
 function plShowRenameDialog(playlistId) {
     const isEn = plIsEn();
-    const pl = _plAllPlaylists.find(p => p.id === playlistId);
-    const currentName = pl ? (isEn ? (pl.name_en || pl.name) : (pl.name_uk || pl.name)) : '';
+    const pl = plGetPlaylists().find(p => p.id === playlistId);
+    if (!pl) return;
+    const currentName = isEn ? (pl.name_en || pl.name) : (pl.name_uk || pl.name);
+
     plShowInputModal({
         title: isEn ? 'Rename Playlist' : 'Перейменувати плейлист',
         placeholder: isEn ? 'New name...' : 'Нова назва...',
@@ -409,21 +496,20 @@ function plShowRenameDialog(playlistId) {
         confirmText: isEn ? 'Save' : 'Зберегти',
         onConfirm: async (name) => {
             if (!name || !name.trim()) return;
-            const user = plGetUser();
-            if (!user) return;
-            await plRenamePlaylist(user.uid, playlistId, name.trim());
+            await plRenamePlaylist(playlistId, name.trim());
             if (typeof showToast === 'function') {
                 showToast(isEn ? 'Playlist renamed!' : 'Плейлист перейменовано!', 'ok');
             }
-            await plRenderProfileSection();
+            plRenderProfileHTML();
         }
     });
 }
 
 function plShowDeleteConfirm(playlistId) {
     const isEn = plIsEn();
-    const pl = _plAllPlaylists.find(p => p.id === playlistId);
-    const displayName = pl ? (isEn ? (pl.name_en || pl.name) : (pl.name_uk || pl.name)) : '';
+    const pl = plGetPlaylists().find(p => p.id === playlistId);
+    if (!pl) return;
+    const displayName = isEn ? (pl.name_en || pl.name) : (pl.name_uk || pl.name);
 
     plShowInputModal({
         title: isEn ? 'Delete Playlist' : 'Видалити плейлист',
@@ -434,20 +520,17 @@ function plShowDeleteConfirm(playlistId) {
         confirmDanger: true,
         noInput: true,
         onConfirm: async () => {
-            const user = plGetUser();
-            if (!user) return;
-            await plDeletePlaylist(user.uid, playlistId);
+            await plDeletePlaylist(playlistId);
             if (_plCurrentlyOpenId === playlistId) _plCurrentlyOpenId = null;
             if (typeof showToast === 'function') {
                 showToast(isEn ? 'Playlist deleted' : 'Плейлист видалено', 'ok');
             }
-            await plRenderProfileSection();
+            plRenderProfileHTML();
         }
     });
 }
 
 function plShowInputModal({ title, placeholder, defaultValue, confirmText, message, confirmDanger, noInput, onConfirm }) {
-    // Remove any existing modal
     const existing = document.getElementById('pl-input-modal-overlay');
     if (existing) existing.remove();
 
@@ -461,54 +544,46 @@ function plShowInputModal({ title, placeholder, defaultValue, confirmText, messa
         <div class="pl-input-card">
             <h3 class="pl-input-title">${plEsc(title)}</h3>
             ${message ? `<p class="pl-input-message">${plEsc(message)}</p>` : ''}
-            ${!noInput ? `<input type="text" class="pl-input-field" id="pl-input-field" placeholder="${plEsc(placeholder || '')}" value="${plEsc(defaultValue || '')}" maxlength="50" autofocus>` : ''}
+            ${!noInput ? `<input type="text" class="pl-input-field" id="pl-input-field" placeholder="${plEsc(placeholder || '')}" value="${plEsc(defaultValue || '')}" maxlength="50">` : ''}
             <div class="pl-input-buttons">
-                <button class="pl-input-cancel-btn" id="pl-input-cancel">${cancelText}</button>
-                <button class="pl-input-confirm-btn ${confirmDanger ? 'pl-input-danger' : ''}" id="pl-input-confirm">${plEsc(confirmText)}</button>
+                <button type="button" class="pl-input-cancel-btn" id="pl-input-cancel">${cancelText}</button>
+                <button type="button" class="pl-input-confirm-btn ${confirmDanger ? 'pl-input-danger' : ''}" id="pl-input-confirm">${plEsc(confirmText)}</button>
             </div>
         </div>
     `;
     document.body.appendChild(overlay);
 
-    // Focus input
     const input = document.getElementById('pl-input-field');
     if (input) {
         setTimeout(() => { input.focus(); input.select(); }, 50);
     }
 
-    // Handle events
     const close = () => overlay.remove();
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-    document.getElementById('pl-input-cancel').addEventListener('click', close);
-    document.getElementById('pl-input-confirm').addEventListener('click', async () => {
+    overlay.onclick = (e) => { if (e.target === overlay) close(); };
+    document.getElementById('pl-input-cancel').onclick = close;
+
+    const doConfirm = async () => {
         const val = input ? input.value : '';
         close();
         if (onConfirm) await onConfirm(val);
-    });
+    };
+
+    document.getElementById('pl-input-confirm').onclick = doConfirm;
     if (input) {
-        input.addEventListener('keydown', async (e) => {
-            if (e.key === 'Enter') {
-                const val = input.value;
-                close();
-                if (onConfirm) await onConfirm(val);
-            }
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') doConfirm();
             if (e.key === 'Escape') close();
-        });
+        };
     }
-    overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 }
 
 // =============================================
-// BOOK MODAL — "ADD TO PLAYLIST" DROPDOWN
+// BOOK MODAL — "ADD TO PLAYLIST" (SYNCHRONOUS & RELIABLE)
 // =============================================
-async function plRenderAddToPlaylistButton(book) {
-    const user = plGetUser();
-    if (!user) return '';
-
-    await plEnsureDefaults(user.uid);
-    const playlists = await plGetAll(user.uid);
+function plGetModalButtonHTML(book) {
     const isEn = plIsEn();
     const btnLabel = isEn ? '📋 Add to Playlist' : '📋 Додати в плейлист';
+    const playlists = plGetPlaylists();
 
     let optionsHtml = '';
     for (const pl of playlists) {
@@ -521,7 +596,7 @@ async function plRenderAddToPlaylistButton(book) {
 
     return `
         <div class="pl-add-to-wrap" id="pl-add-to-wrap">
-            <button class="bd-btn-playlist" id="bd-playlist-btn">${btnLabel}</button>
+            <button type="button" class="bd-btn-playlist" id="bd-playlist-btn">${btnLabel}</button>
             <div class="pl-dropdown" id="pl-dropdown" style="display:none;">
                 ${optionsHtml}
             </div>
@@ -536,66 +611,90 @@ function plAttachModalListeners(book) {
     const dropdown = document.getElementById('pl-dropdown');
     if (!btn || !dropdown) return;
 
-    btn.addEventListener('click', (e) => {
+    btn.onclick = (e) => {
         e.stopPropagation();
-        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
-    });
+        const user = plGetUser();
+        if (!user) {
+            plPromptLogin();
+            return;
+        }
 
-    // Close dropdown on outside click
-    document.addEventListener('click', function _plCloseDropdown(e) {
+        // Refresh dropdown options in case playlists changed
+        const isEn = plIsEn();
+        const playlists = plGetPlaylists();
+        let optionsHtml = '';
+        for (const pl of playlists) {
+            const displayName = isEn ? (pl.name_en || pl.name) : (pl.name_uk || pl.name);
+            const bookId = (book.id || book.title || '').trim().toLowerCase();
+            const isIn = (pl.books || []).some(b => (b.id || b.title || '').trim().toLowerCase() === bookId);
+            const checkMark = isIn ? ' ✓' : '';
+            optionsHtml += `<div class="pl-dropdown-option ${isIn ? 'pl-already-in' : ''}" data-pl-id="${plEsc(pl.id)}">${pl.icon || '📋'} ${plEsc(displayName)}${checkMark}</div>`;
+        }
+        optionsHtml += `<div class="pl-dropdown-option pl-dropdown-new">${isEn ? '+ New Playlist...' : '+ Новий плейлист...'}</div>`;
+        dropdown.innerHTML = optionsHtml;
+
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+        plAttachDropdownOptionListeners(book, dropdown);
+    };
+
+    // Close on outside click
+    document.addEventListener('click', function _closePlDropdown(e) {
         if (!wrap.contains(e.target)) {
             dropdown.style.display = 'none';
-            document.removeEventListener('click', _plCloseDropdown);
         }
     });
+}
 
-    // Playlist options
+function plAttachDropdownOptionListeners(book, dropdown) {
     dropdown.querySelectorAll('.pl-dropdown-option:not(.pl-dropdown-new)').forEach(opt => {
-        opt.addEventListener('click', async () => {
+        opt.onclick = async (e) => {
+            e.stopPropagation();
             dropdown.style.display = 'none';
-            const user = plGetUser();
-            if (!user) return;
             const plId = opt.dataset.plId;
             const isEn = plIsEn();
-            const added = await plAddBook(user.uid, plId, book);
+            const pl = plGetPlaylists().find(p => p.id === plId);
+            const plName = pl ? (isEn ? (pl.name_en || pl.name) : (pl.name_uk || pl.name)) : '';
+
+            const added = await plAddBookToPlaylist(plId, book);
             if (added) {
-                const plName = opt.textContent.trim();
-                showToast(isEn ? `Added to "${plName}"` : `Додано до "${plName}"`, 'ok');
+                if (typeof showToast === 'function') {
+                    showToast(isEn ? `Added to "${plName}"!` : `Додано до "${plName}"!`, 'ok');
+                }
             } else {
-                showToast(isEn ? 'Already in this playlist' : 'Вже у цьому плейлисті', 'warn');
+                if (typeof showToast === 'function') {
+                    showToast(isEn ? `Already in "${plName}"` : `Вже у списку "${plName}"`, 'warn');
+                }
             }
-        });
+        };
     });
 
-    // "New Playlist" option
     const newOpt = dropdown.querySelector('.pl-dropdown-new');
     if (newOpt) {
-        newOpt.addEventListener('click', () => {
+        newOpt.onclick = (e) => {
+            e.stopPropagation();
             dropdown.style.display = 'none';
             const isEn = plIsEn();
             plShowInputModal({
-                title: isEn ? 'Create & Add' : 'Створити та додати',
+                title: isEn ? 'Create & Add Book' : 'Створити та додати книгу',
                 placeholder: isEn ? 'Playlist name...' : 'Назва плейлиста...',
                 confirmText: isEn ? 'Create' : 'Створити',
                 onConfirm: async (name) => {
                     if (!name || !name.trim()) return;
-                    const user = plGetUser();
-                    if (!user) return;
-                    const newId = await plCreatePlaylist(user.uid, name.trim(), '📋');
+                    const newId = await plCreateCustomPlaylist(name.trim());
                     if (newId) {
-                        await plAddBook(user.uid, newId, book);
-                        showToast(isEn ? `Created "${name.trim()}" and added book!` : `Створено "${name.trim()}" і додано книгу!`, 'ok');
+                        await plAddBookToPlaylist(newId, book);
+                        if (typeof showToast === 'function') {
+                            showToast(isEn ? `Created "${name.trim()}" and added book!` : `Створено "${name.trim()}" і додано книгу!`, 'ok');
+                        }
                     }
                 }
             });
-        });
+        };
     }
 }
 
-// =============================================
-// EXPORTS
-// =============================================
+// Global exports
 window.plRenderProfileSection = plRenderProfileSection;
-window.plRenderAddToPlaylistButton = plRenderAddToPlaylistButton;
+window.plGetModalButtonHTML = plGetModalButtonHTML;
 window.plAttachModalListeners = plAttachModalListeners;
-window.plEnsureDefaults = plEnsureDefaults;
+window.plInitForUser = plInitForUser;

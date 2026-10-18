@@ -365,7 +365,7 @@ function renderModalSkeleton(book) {
                             data-id="${escHtml(book.id || '')}"
                             data-format="${escHtml(format)}"
                             data-size="${escHtml(book.sizeDisplay || '')}">${window.i18n ? window.i18n.t('modal_btn_download', { size: book.sizeDisplay || (window.i18n.currentLang === 'en' ? 'file' : 'файл') }) : `⬇ Скачати (${book.sizeDisplay || 'файл'})`}</button>
-                    <div class="pl-add-to-wrap" id="pl-add-to-wrap-skeleton"></div>
+                    ${typeof plGetModalButtonHTML === 'function' ? plGetModalButtonHTML(book) : ''}
                 </div>
             </div>
         </div>
@@ -384,15 +384,9 @@ function renderModalSkeleton(book) {
     const dlBtn = document.getElementById('bd-download-btn');
     if (dlBtn) dlBtn.addEventListener('click', function () { onDownloadClick(this); });
 
-    // Async render playlist button in skeleton
-    if (typeof plRenderAddToPlaylistButton === 'function') {
-        plRenderAddToPlaylistButton(book).then(html => {
-            const wrap = document.getElementById('pl-add-to-wrap-skeleton');
-            if (wrap) {
-                wrap.outerHTML = html;
-                if (typeof plAttachModalListeners === 'function') plAttachModalListeners(book);
-            }
-        }).catch(() => {});
+    // Attach playlist button listener
+    if (typeof plAttachModalListeners === 'function') {
+        plAttachModalListeners(book);
     }
 }
 
@@ -771,6 +765,7 @@ function renderModalFull(book, meta) {
                 </div>
                 <div class="bd-hero-actions">
                     ${downloadButtonsHTML}
+                    ${typeof plGetModalButtonHTML === 'function' ? plGetModalButtonHTML(book) : ''}
                     ${extBtnHTML}
                 </div>
                 ${source !== 'notfound' ? `<p class="bd-source-badge">${sourceDataText}</p>` : ''}
@@ -790,15 +785,9 @@ function renderModalFull(book, meta) {
         btn.addEventListener('click', function () { onDownloadClick(this); });
     });
 
-    // Render playlist button async
-    if (typeof plRenderAddToPlaylistButton === 'function') {
-        plRenderAddToPlaylistButton(book).then(html => {
-            const actionsDiv = card.querySelector('.bd-hero-actions');
-            if (actionsDiv) {
-                actionsDiv.insertAdjacentHTML('beforeend', html);
-                if (typeof plAttachModalListeners === 'function') plAttachModalListeners(book);
-            }
-        }).catch(() => {});
+    // Attach playlist button listener
+    if (typeof plAttachModalListeners === 'function') {
+        plAttachModalListeners(book);
     }
 }
 

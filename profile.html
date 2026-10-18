@@ -790,9 +790,7 @@
 
         <!-- ПЛЕЙЛИСТИ -->
         <div class="history-card" id="playlists-card" style="flex-basis:100%; max-width:100%;">
-            <div id="playlists-section">
-                <p class="pl-empty" style="color:#bbb;">⏳ Завантаження плейлистів...</p>
-            </div>
+            <div id="playlists-section"></div>
         </div>
     </div>
 
@@ -881,9 +879,14 @@
     <script src="page_counts.js"></script>
     <script src="descriptions.js"></script>
     <script src="books-cache.js?v=6"></script>
-    <script src="book-modal.js?v=8"></script>
-    <script src="playlists.js?v=1"></script>
+    <script src="playlists.js?v=2"></script>
+    <script src="book-modal.js?v=9"></script>
     <script>
+        // Ініціалізація плейлистів миттєво
+        if (typeof plRenderProfileSection === 'function') {
+            try { plRenderProfileSection(); } catch (_) {}
+        }
+
         // Фон
         (function () {
             const sq = [];
@@ -1275,7 +1278,11 @@
 
             // Плейлисти
             if (typeof plRenderProfileSection === 'function') {
-                plRenderProfileSection().catch(e => console.warn('Playlists load error:', e));
+                try {
+                    plRenderProfileSection(user);
+                } catch (e) {
+                    console.warn('Playlists load error:', e);
+                }
             }
 
             // Виходи
