@@ -491,9 +491,6 @@ function plRenderPlaylistModalContent(pl) {
     const isDefault = !!pl.isDefault;
     const isEditing = _plModalIsEditing;
 
-    // Edit action button text
-    const editBtnLabel = isEditing ? (isEn ? '✓ Done' : '✓ Готово') : (isEn ? '✏️ Edit' : '✏️ Редагувати');
-
     // Add Book block (only visible in edit mode)
     let addBookHTML = '';
     if (isEditing) {
@@ -566,10 +563,12 @@ function plRenderPlaylistModalContent(pl) {
                     </div>
                 </div>
                 <div class="pl-modal-header-actions">
-                    <!-- Кнопка Редагувати (доступна завжди) -->
-                    <button type="button" class="pl-modal-tool-btn ${isEditing ? 'pl-modal-tool-active' : ''}" id="pl-modal-edit-btn" title="${editBtnLabel}">
-                        ${editBtnLabel}
-                    </button>
+                    <!-- Кнопка Редагувати (показується тільки у режимі перегляду) -->
+                    ${!isEditing ? `
+                        <button type="button" class="pl-modal-tool-btn" id="pl-modal-edit-btn" title="${isEn ? 'Edit' : 'Редагувати'}">
+                            ✏️ ${isEn ? 'Edit' : 'Редагувати'}
+                        </button>
+                    ` : ''}
                     <!-- Кнопка Видалити (ТІЛЬКИ для кастомних, заборонено для "Улюблені" та "Читати потім") -->
                     ${!isDefault ? `
                         <button type="button" class="pl-modal-tool-btn pl-modal-tool-danger" id="pl-modal-delete-btn" title="${isEn ? 'Delete playlist' : 'Видалити плейлист'}">
