@@ -14,13 +14,26 @@
 
 const PL_DEFAULT_CONFIG = [
     { id: 'favorites',  icon: '⭐', name_uk: 'Улюблені',     name_en: 'Favorites',  isDefault: true, books: [] },
-    { id: 'read-later', icon: '📖', name_uk: 'Читати потім', name_en: 'Read Later', isDefault: true, books: [] }
+    { id: 'read-later', icon: '📖', name_uk: 'Читати потім', name_en: 'Read Later', isDefault: true, books: [] },
+    { id: 'downloads',  icon: '📥', name_uk: 'Завантажені',  name_en: 'Downloaded', isDefault: true, isSystemOnly: true, books: [] }
 ];
 
 let _plCurrentUid = null;
 let _plUserPlaylists = [];
 let _plActiveModalPlaylistId = null;
 let _plModalIsEditing = false;
+
+// Helper to sort pinned playlists (1. favorites, 2. read-later, 3. downloads, then custom)
+function plSortPlaylists(list) {
+    const order = { 'favorites': 1, 'read-later': 2, 'downloads': 3 };
+    list.sort((a, b) => {
+        const orderA = order[a.id] || 999;
+        const orderB = order[b.id] || 999;
+        if (orderA !== orderB) return orderA - orderB;
+        return 0;
+    });
+    return list;
+}
 
 // =============================================
 // HELPERS
@@ -84,9 +97,25 @@ function plLoadFromLocalStorage(uid) {
                             name: plIsEn() ? 'Favorites' : 'Улюблені'
                         };
                     }
+                    if (p.id === 'downloads') {
+                        return {
+                            ...p,
+                            icon: '📥',
+                            name_uk: 'Завантажені',
+                            name_en: 'Downloaded',
+                            isDefault: true,
+                            isSystemOnly: true,
+                            name: plIsEn() ? 'Downloaded' : 'Завантажені'
+                        };
+                    }
                     return p;
                 });
-                return parsed;
+                for (const def of PL_DEFAULT_CONFIG) {
+                    if (!parsed.some(p => p.id === def.id)) {
+                        parsed.push(JSON.parse(JSON.stringify(def)));
+                    }
+                }
+                return plSortPlaylists(parsed);
             }
         }
     } catch (_) {}
@@ -120,13 +149,7 @@ function plInitForUser(user) {
         }
     }
 
-    _plUserPlaylists.sort((a, b) => {
-        if (a.id === 'favorites') return -1;
-        if (b.id === 'favorites') return 1;
-        if (a.id === 'read-later') return -1;
-        if (b.id === 'read-later') return 1;
-        return 0;
-    });
+    plSortPlaylists(_plUserPlaylists);
 
     if (user && user.uid) {
         plSyncFromFirestore(user.uid).catch(() => {});
@@ -148,6 +171,9 @@ async function plSyncFromFirestore(uid) {
                     if (p.id === 'watch-later' || p.id === 'read-later') {
                         return { ...p, id: 'read-later', icon: '📖', name_uk: 'Читати потім', name_en: 'Read Later' };
                     }
+                    if (p.id === 'downloads') {
+                        return { ...p, id: 'downloads', icon: '📥', name_uk: 'Завантажені', name_en: 'Downloaded', isDefault: true, isSystemOnly: true };
+                    }
                     return p;
                 });
                 for (const def of PL_DEFAULT_CONFIG) {
@@ -155,13 +181,7 @@ async function plSyncFromFirestore(uid) {
                         _plUserPlaylists.push(JSON.parse(JSON.stringify(def)));
                     }
                 }
-                _plUserPlaylists.sort((a, b) => {
-                    if (a.id === 'favorites') return -1;
-                    if (b.id === 'favorites') return 1;
-                    if (a.id === 'read-later') return -1;
-                    if (b.id === 'read-later') return 1;
-                    return 0;
-                });
+                plSortPlaylists(_plUserPlaylists);
                 plSaveToLocalStorage(uid, _plUserPlaylists);
                 if (document.getElementById('playlists-section')) {
                     plRenderProfileHTML();
@@ -263,6 +283,49 @@ async function plAddBookToPlaylist(playlistId, book) {
     plRenderProfileHTML();
     return true;
 }
+
+function plSyncDownloadsFromList(booksList) {
+    if (!Array.isArray(booksList)) return;
+    const playlists = plGetPlaylists();
+    let pl = playlists.find(p => p.id === 'downloads');
+    if (!pl) {
+        pl = { id: 'downloads', icon: '📥', name_uk: 'Завантажені', name_en: 'Downloaded', isDefault: true, isSystemOnly: true, books: [] };
+        playlists.push(pl);
+    }
+    if (!pl.books) pl.books = [];
+
+    const existingIds = new Set(pl.books.map(b => (b.id || b.title || '').trim().toLowerCase()));
+    let changed = false;
+
+    for (const item of booksList) {
+        const key = (item.id || item.bookId || item.title || '').trim().toLowerCase();
+        if (key && !existingIds.has(key)) {
+            existingIds.add(key);
+            pl.books.push({
+                id: item.id || item.bookId || item.title,
+                title: item.title || item.id || '—',
+                author: item.author || '—',
+                format: (item.format || 'pdf').toLowerCase(),
+                sizeDisplay: item.sizeDisplay || '—',
+                url: item.url || '',
+                year: item.year || '---',
+                addedAt: item.lastDownloadedAt?.toMillis?.() || item.downloadedAt?.toMillis?.() || Date.now()
+            });
+            changed = true;
+        }
+    }
+
+    if (changed) {
+        const u = plGetUser();
+        const uid = u ? u.uid : 'guest';
+        plSaveToLocalStorage(uid, playlists);
+        if (u) plSyncToFirestore(u.uid).catch(() => {});
+        if (document.getElementById('playlists-section')) {
+            plRenderProfileHTML();
+        }
+    }
+}
+window.plSyncDownloadsFromList = plSyncDownloadsFromList;
 
 async function plRemoveBookFromPlaylist(playlistId, bookId) {
     const u = plGetUser();
@@ -511,16 +574,24 @@ function plRenderPlaylistModalContent(pl) {
     // Add Book block (only visible in edit mode)
     let addBookHTML = '';
     if (isEditing) {
-        addBookHTML = `
-            <div class="pl-modal-add-box">
-                <div class="pl-modal-add-input-wrap">
-                    <span class="pl-modal-search-icon">🔍</span>
-                    <input type="text" id="pl-modal-search-input" class="pl-modal-search-field"
-                           placeholder="${isEn ? 'Search by title or author to add book...' : 'Почніть вводити назву або автора книги для додавання...'}" autocomplete="off">
+        if (pl.isSystemOnly || pl.id === 'downloads') {
+            addBookHTML = `
+                <div class="pl-modal-add-box" style="padding: 12px 16px; background: rgba(0,0,0,0.03); border-radius: 14px; text-align: center; color: #64748b; font-size: 0.9rem;">
+                    📥 ${isEn ? 'Books are added to this collection automatically when you download them.' : 'Книги додаються до цієї колекції автоматично при завантаженні.'}
                 </div>
-                <div id="pl-modal-search-dropdown" class="pl-modal-search-dropdown" style="display:none;"></div>
-            </div>
-        `;
+            `;
+        } else {
+            addBookHTML = `
+                <div class="pl-modal-add-box">
+                    <div class="pl-modal-add-input-wrap">
+                        <span class="pl-modal-search-icon">🔍</span>
+                        <input type="text" id="pl-modal-search-input" class="pl-modal-search-field"
+                               placeholder="${isEn ? 'Search by title or author to add book...' : 'Почніть вводити назву або автора книги для додавання...'}" autocomplete="off">
+                    </div>
+                    <div id="pl-modal-search-dropdown" class="pl-modal-search-dropdown" style="display:none;"></div>
+                </div>
+            `;
+        }
     }
 
     // Books list

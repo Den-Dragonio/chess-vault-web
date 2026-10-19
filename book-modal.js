@@ -362,6 +362,9 @@ function renderModalSkeleton(book) {
                     ${pages ? `<span class="bd-meta-pill" id="bd-pages-pill">📖 ${pages} ${(window.i18n && window.i18n.currentLang === 'en' ? 'p.' : 'стор.')}</span>` : `<span class="bd-meta-pill" id="bd-pages-pill" style="display:none"></span>`}
                 </div>
                 <div class="bd-hero-actions">
+                    <button class="bd-btn-read" id="bd-read-btn">
+                        📖 <span data-i18n="modal_btn_read_online">${window.i18n ? window.i18n.t('modal_btn_read_online') : 'Читати онлайн'}</span>
+                    </button>
                     <button class="bd-btn-download" id="bd-download-btn"
                             data-url="${escHtml(book.url || '')}"
                             data-title="${escHtml(book.title || '')}"
@@ -385,6 +388,8 @@ function renderModalSkeleton(book) {
         </div>`;
     const closeBtn = document.getElementById('book-detail-close');
     if (closeBtn) closeBtn.addEventListener('click', closeBookModal);
+    const readBtn = document.getElementById('bd-read-btn');
+    if (readBtn) readBtn.addEventListener('click', function () { onReadOnlineClick(book); });
     const dlBtn = document.getElementById('bd-download-btn');
     if (dlBtn) dlBtn.addEventListener('click', function () { onDownloadClick(this); });
 
@@ -766,6 +771,9 @@ function renderModalFull(book, meta) {
                     ${journalBadge}
                 </div>
                 <div class="bd-hero-actions">
+                    <button class="bd-btn-read" id="bd-read-btn">
+                        📖 <span data-i18n="modal_btn_read_online">${window.i18n ? window.i18n.t('modal_btn_read_online') : 'Читати онлайн'}</span>
+                    </button>
                     ${downloadButtonsHTML}
                     ${typeof plGetModalButtonHTML === 'function' ? plGetModalButtonHTML(book) : ''}
                     ${extBtnHTML}
@@ -783,6 +791,8 @@ function renderModalFull(book, meta) {
 
     const closeBtn = document.getElementById('book-detail-close');
     if (closeBtn) closeBtn.addEventListener('click', closeBookModal);
+    const readBtn = card.querySelector('#bd-read-btn');
+    if (readBtn) readBtn.addEventListener('click', function () { onReadOnlineClick(book); });
     card.querySelectorAll('#bd-download-btn, .bd-multi-download-btn').forEach(btn => {
         btn.addEventListener('click', function () { onDownloadClick(this); });
     });
@@ -1060,6 +1070,18 @@ async function onDownloadClick(btn) {
 
         await batch.commit();
 
+        // 5. Автоматично додаємо до плейлиста "Завантажені"
+        if (typeof plAddBookToPlaylist === 'function') {
+            plAddBookToPlaylist('downloads', {
+                id: bookDocId || filename || `${title}.${format}`,
+                title: title,
+                author: author,
+                format: format,
+                sizeDisplay: sizeDisplay,
+                url: url
+            }).catch(() => {});
+        }
+
         const startMsg = window.i18n ? window.i18n.t('modal_download_success', { title: title || filename }) : `📥 Завантаження розпочато!`;
         if (typeof showLibToast === 'function') showLibToast(startMsg);
         else if (typeof showToast === 'function') showToast(startMsg);
@@ -1069,8 +1091,37 @@ async function onDownloadClick(btn) {
     }
 }
 
+// 7. ОНЛАЙН ЧИТАННЯ КНИГИ
+function onReadOnlineClick(book) {
+    if (!book) return;
+    const user = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+    const uid = user ? user.uid : 'guest';
+    const bookId = book.id || book.title || '';
+    const progress = (window.ReadingProgress && typeof window.ReadingProgress.getProgress === 'function')
+        ? window.ReadingProgress.getProgress(uid, bookId)
+        : null;
+
+    const page = (progress && progress.currentPage) ? progress.currentPage : 1;
+    const fileUrl = book.url || '';
+    const format = (book.format || 'pdf').toLowerCase();
+    const coverUrl = book.coverUrl || '';
+
+    const params = new URLSearchParams({
+        file: fileUrl,
+        id: bookId,
+        title: book.title || '',
+        author: book.author || '',
+        format: format,
+        cover: coverUrl,
+        page: page
+    });
+
+    window.open(`reader.html?${params.toString()}`, '_blank');
+}
+
 window.onDownloadClick = onDownloadClick;
 window.handleBookDownload = onDownloadClick;
+window.onReadOnlineClick = onReadOnlineClick;
 window.getCanonicalBookId = getCanonicalBookId;
 window.openBookModal = openBookModal;
 window.closeBookModal = closeBookModal;

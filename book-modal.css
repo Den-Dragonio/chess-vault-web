@@ -303,12 +303,46 @@
 }
 
 /* ---- ACTION BUTTONS ---- */
-.bd-actions {
+.bd-actions,
+.bd-hero-actions {
     display: flex;
-    gap: 16px;
+    gap: 14px;
     flex-wrap: wrap;
     align-items: center;
     padding-top: 10px;
+}
+
+.bd-btn-read {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    color: #fff;
+    border: none;
+    padding: 16px 32px;
+    border-radius: 14px;
+    font-size: 1.15rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-family: "Marker Felt Thin", "Marker Felt", "Permanent Marker", cursive;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
+}
+
+.bd-btn-read:hover {
+    background: linear-gradient(135deg, #047857 0%, #059669 100%);
+    transform: scale(1.04);
+    box-shadow: 0 12px 28px rgba(16, 185, 129, 0.45);
+}
+
+html.dark .bd-btn-read {
+    background: linear-gradient(135deg, #047857 0%, #10b981 100%);
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+}
+
+html.dark .bd-btn-read:hover {
+    background: linear-gradient(135deg, #059669 0%, #34d399 100%);
+    box-shadow: 0 12px 30px rgba(16, 185, 129, 0.5);
 }
 
 .bd-btn-download {

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Vault — Онлайн Читалка</title>
+    <link rel="icon" href="img/icon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="img/icon.png">
+    <link rel="stylesheet" href="reader.css?v=1">
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="dark-mode-init.js"></script>
+    <script src="i18n.js?v=10"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-init.js?v=8"></script>
+    <script src="reading-progress.js?v=1"></script>
+    <!-- PDF.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- Mammoth.js for Word (.docx) documents -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <!-- Chess.js for chess game logic & notation parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+</head>
+
+<body>
+    <!-- TOPBAR -->
+    <header class="reader-topbar">
+        <div class="reader-topbar-left">
+            <a href="library.html" class="reader-btn-back" id="btn-back">
+                <span>←</span>
+                <span class="nav-text">Бібліотека</span>
+            </a>
+            <button type="button" class="reader-tool-btn" id="btn-toggle-highlight" title="Увімкнути/вимкнути виділення тексту">
+                <span>🖍️</span>
+                <span>Виділення</span>
+            </button>
+            <button type="button" class="reader-tool-btn" id="btn-add-bookmark" title="Додати закладку на поточну сторінку">
+                <span>🔖</span>
+                <span>Закладка</span>
+            </button>
+            <div class="reader-book-meta">
+                <div class="reader-book-title" id="topbar-book-title">Завантаження книги...</div>
+                <div class="reader-book-author" id="topbar-book-author">—</div>
+            </div>
+        </div>
+
+        <div class="reader-topbar-center">
+            <div class="reader-nav-group">
+                <button type="button" class="reader-icon-btn" id="btn-prev-page" title="Попередня сторінка (Стрілка вліво)">◀</button>
+                <div class="reader-page-indicator">
+                    <input type="number" id="input-current-page" class="reader-page-input" value="1" min="1">
+                    <span>/</span>
+                    <span id="label-total-pages">1</span>
+                </div>
+                <button type="button" class="reader-icon-btn" id="btn-next-page" title="Наступна сторінка (Стрілка вправо)">▶</button>
+                <div class="reader-progress-pill" id="label-percentage">0%</div>
+            </div>
+        </div>
+
+        <div class="reader-topbar-right">
+            <div class="reader-nav-group">
+                <button type="button" class="reader-icon-btn" id="btn-zoom-out" title="Зменшити">−</button>
+                <button type="button" class="reader-icon-btn" id="btn-zoom-reset" style="font-size: 0.76rem; width: 44px;" title="Скинути масштаб">100%</button>
+                <button type="button" class="reader-icon-btn" id="btn-zoom-in" title="Збільшити">+</button>
+            </div>
+            <button type="button" class="reader-tool-btn" id="btn-toggle-dock-side" title="Перемістити шахівницю ліворуч/праворуч">
+                <span>⇄</span>
+                <span id="dock-side-label">Ліворуч</span>
+            </button>
+            <button type="button" class="reader-icon-btn" id="btn-toggle-theme" title="Змінити тему">🌓</button>
+            <button type="button" class="reader-icon-btn" id="btn-fullscreen" title="На весь екран">⛶</button>
+        </div>
+    </header>
+
+    <!-- MAIN WORKSPACE -->
+    <main class="reader-workspace dock-right" id="reader-workspace">
+        <!-- READER VIEWPORT -->
+        <section class="reader-viewport" id="reader-viewport">
+            <div class="reader-loading" id="reader-loading">
+                <div class="reader-spinner"></div>
+                <p id="loading-status-text">Завантаження документа...</p>
+            </div>
+            <div id="reader-content-wrap"></div>
+        </section>
+
+        <!-- COLLAPSIBLE DOCK (Chessboard / Bookmarks / Notes) -->
+        <aside class="reader-dock" id="reader-dock">
+            <!-- Floating collapse toggle trigger -->
+            <button type="button" class="reader-dock-toggle-btn" id="btn-toggle-dock-collapse" title="Згорнути/розгорнути панель">
+                <span id="dock-collapse-arrow">▸</span>
+            </button>
+
+            <!-- Dock Header with Tabs -->
+            <div class="reader-dock-header">
+                <div class="reader-dock-tabs">
+                    <button type="button" class="reader-dock-tab active" data-tab="board">
+                        <span>♟️</span>
+                        <span>Дошка</span>
+                    </button>
+                    <button type="button" class="reader-dock-tab" data-tab="bookmarks">
+                        <span>🔖</span>
+                        <span>Закладки</span>
+                        <span id="tab-badge-bookmarks" style="opacity: 0.8;">(0)</span>
+                    </button>
+                    <button type="button" class="reader-dock-tab" data-tab="notes">
+                        <span>📝</span>
+                        <span>Нотатки</span>
+                        <span id="tab-badge-notes" style="opacity: 0.8;">(0)</span>
+                    </button>
+                </div>
+                <button type="button" class="reader-dock-action-btn" id="btn-dock-quick-side" title="Перемістити панель ліворуч/праворуч">⇄</button>
+            </div>
+
+            <!-- Dock Body -->
+            <div class="reader-dock-body">
+                <!-- VIEW 1: CHESSBOARD -->
+                <div class="reader-dock-view active" id="view-board">
+                    <div class="board-container-card">
+                        <!-- Chessboard Canvas / Grid -->
+                        <div class="board-wrapper" id="board-wrapper">
+                            <div class="chess-grid" id="chess-grid"></div>
+                        </div>
+
+                        <!-- Replay Controls -->
+                        <div class="board-nav-controls">
+                            <button type="button" class="board-step-btn" id="btn-board-first" title="На початок">|◀</button>
+                            <button type="button" class="board-step-btn" id="btn-board-prev" title="Хід назад">◀</button>
+                            <button type="button" class="board-step-btn" id="btn-board-next" title="Хід вперед">▶</button>
+                            <button type="button" class="board-step-btn" id="btn-board-last" title="В кінець">▶|</button>
+                            <button type="button" class="board-step-btn" id="btn-board-flip" title="Повернути дошку">🔄</button>
+                        </div>
+
+                        <!-- Moves Sequence Log (Parsed from book text) -->
+                        <div class="board-moves-log" id="board-moves-log">
+                            <span style="color: var(--reader-text-muted); font-size: 0.75rem;">Виділіть шахові ходи в тексті книги (наприклад, "1. e4 e5 2. Nf3 Nc6") або розставте фігури в редакторі.</span>
+                        </div>
+                    </div>
+
+                    <!-- BOARD EDITOR -->
+                    <div class="board-editor-panel" id="board-editor-panel">
+                        <div class="board-editor-header">
+                            <span>🛠️ Редактор позиції (Ендшпіль / Задачі)</span>
+                            <span id="editor-side-indicator" style="font-size: 0.72rem; color: var(--reader-text-muted);">Хід: ⚪ Білі</span>
+                        </div>
+
+                        <!-- Piece Palette -->
+                        <div class="piece-palette">
+                            <button type="button" class="palette-btn white" data-piece="P" title="Білий пішак">♙</button>
+                            <button type="button" class="palette-btn white" data-piece="N" title="Білий кінь">♘</button>
+                            <button type="button" class="palette-btn white" data-piece="B" title="Білий слон">♗</button>
+                            <button type="button" class="palette-btn white" data-piece="R" title="Біла тура">♖</button>
+                            <button type="button" class="palette-btn white" data-piece="Q" title="Білий ферзь">♕</button>
+                            <button type="button" class="palette-btn white" data-piece="K" title="Білий король">♔</button>
+                        </div>
+                        <div class="piece-palette">
+                            <button type="button" class="palette-btn black" data-piece="p" title="Чорний пішак">♟</button>
+                            <button type="button" class="palette-btn black" data-piece="n" title="Чорний кінь">♞</button>
+                            <button type="button" class="palette-btn black" data-piece="b" title="Чорний слон">♝</button>
+                            <button type="button" class="palette-btn black" data-piece="r" title="Чорна тура">♜</button>
+                            <button type="button" class="palette-btn black" data-piece="q" title="Чорний ферзь">♛</button>
+                            <button type="button" class="palette-btn black" data-piece="k" title="Чорний король">♚</button>
+                        </div>
+
+                        <!-- Editor Actions -->
+                        <div class="editor-actions-row">
+                            <button type="button" class="editor-btn" id="btn-editor-clear" title="Видалити всі фігури для аналізу ендшпілю">🗑️ Очистити</button>
+                            <button type="button" class="editor-btn" id="btn-editor-start" title="Стандартна розстановка">♟️ Початкова</button>
+                            <button type="button" class="editor-btn" id="btn-editor-turn" title="Змінити чергу ходу">⚪/⚫ Хід</button>
+                        </div>
+                    </div>
+
+                    <!-- Engine Status (Stockfish Ready Architecture) -->
+                    <div class="engine-status-bar" id="engine-status-bar">
+                        <span>🤖 Рушій Stockfish: <b style="color: #22c55e;">Готовий</b></span>
+                        <span class="engine-eval-score" id="engine-eval-score">0.0</span>
+                    </div>
+                </div>
+
+                <!-- VIEW 2: BOOKMARKS -->
+                <div class="reader-dock-view" id="view-bookmarks">
+                    <div class="bookmarks-list" id="bookmarks-list">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+
+                <!-- VIEW 3: NOTES -->
+                <div class="reader-dock-view" id="view-notes">
+                    <div class="notes-container">
+                        <div class="new-note-card">
+                            <textarea id="note-input" class="note-textarea" maxlength="1000" placeholder="Додайте коментар або нотатку до поточної сторінки (до 1000 символів)..."></textarea>
+                            <div class="note-footer">
+                                <span class="char-counter" id="note-char-counter">0 / 1000</span>
+                                <button type="button" class="btn-add-note" id="btn-save-note">Зберегти нотатку</button>
+                            </div>
+                        </div>
+                        <div class="notes-list" id="notes-list">
+                            <!-- Rendered dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- FLOATING SELECTION TOOLBAR -->
+    <div class="selection-toolbar" id="selection-toolbar">
+        <button type="button" class="selection-btn" id="sel-btn-chess">
+            <span>♟️</span>
+            <span>На дошку</span>
+        </button>
+        <button type="button" class="selection-btn" id="sel-btn-highlight">
+            <span>🖍️</span>
+            <span>Виділити</span>
+        </button>
+        <button type="button" class="selection-btn" id="sel-btn-note">
+            <span>📝</span>
+            <span>Нотатка</span>
+        </button>
+        <button type="button" class="selection-btn" id="sel-btn-copy">
+            <span>📋</span>
+            <span>Копіювати</span>
+        </button>
+    </div>
+
+    <!-- MAIN READER LOGIC SCRIPT -->
+    <script src="reader.js?v=1"></script>
+</body>
+
+</html>
