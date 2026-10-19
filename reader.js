@@ -1,18 +1,20 @@
 /* ========================================================
    CHESS VAULT — ONLINE READER ENGINE (reader.js)
-   - Multi-format rendering (PDF, DjVu, DOCX)
-   - Real-time reading progress calculation & Firestore sync
-   - Interactive Chessboard with chess.js & Board Editor
+   - Multi-format document loading (PDF, DjVu, DOCX)
+   - Native iframe & embedded viewers (bypasses CORS restrictions)
+   - Drag & drop / Local file picker fallback
+   - Per-user per-book workspace persistence in Firestore & localStorage:
+     * Custom Chessboard position (FEN), moves sequence, turn & orientation
+     * Page bookmarks & notes (up to 1000 characters)
+     * Reading progress (currentPage, totalPages, percentage)
    - Text selection chess move parser (SAN & Cyrillic)
-   - Page bookmarking & Annotations (max 1000 chars)
-   - Collapsible & switchable dock (Left / Right side)
-   - Stockfish engine integration architecture
+   - Board editor (Endgames & custom positions)
    ======================================================== */
 
 (function () {
     'use strict';
 
-    // 1. URL & PARAMETERS PARSING
+    // 1. URL & BOOK PARAMETERS
     const urlParams = new URLSearchParams(window.location.search);
     const bookParam = {
         id: urlParams.get('id') || 'book_' + Date.now(),
@@ -30,6 +32,7 @@
         btnBack: document.getElementById('btn-back'),
         btnToggleHighlight: document.getElementById('btn-toggle-highlight'),
         btnAddBookmark: document.getElementById('btn-add-bookmark'),
+        syncStatusPill: document.getElementById('sync-status-pill'),
         btnPrevPage: document.getElementById('btn-prev-page'),
         btnNextPage: document.getElementById('btn-next-page'),
         inputCurrentPage: document.getElementById('input-current-page'),
@@ -46,7 +49,13 @@
         viewport: document.getElementById('reader-viewport'),
         loading: document.getElementById('reader-loading'),
         loadingText: document.getElementById('loading-status-text'),
+        docFrame: document.getElementById('reader-doc-frame'),
+        djvuWrap: document.getElementById('reader-djvu-wrap'),
+        djvuMount: document.getElementById('djvu-viewer-mount'),
         contentWrap: document.getElementById('reader-content-wrap'),
+        dropBar: document.getElementById('reader-file-drop-bar'),
+        inputLocalFile: document.getElementById('input-local-file'),
+        btnPickLocal: document.getElementById('btn-pick-local'),
         dock: document.getElementById('reader-dock'),
         btnToggleDockCollapse: document.getElementById('btn-toggle-dock-collapse'),
         dockCollapseArrow: document.getElementById('dock-collapse-arrow'),
@@ -91,11 +100,9 @@
     // READER STATE
     const state = {
         currentPage: bookParam.startPage,
-        totalPages: 1,
+        totalPages: 100,
         zoom: 1.0,
         pdfDoc: null,
-        isRendering: false,
-        pageNumPending: null,
         isHighlightActive: false,
         dockSide: localStorage.getItem('chess_vault_reader_dock_side') || 'right',
         isDockCollapsed: localStorage.getItem('chess_vault_reader_dock_collapsed') === 'true',
@@ -103,313 +110,439 @@
         selectedText: '',
         currentUser: null,
         bookmarks: [],
-        notes: []
+        notes: [],
+        highlights: []
     };
 
     // CHESS STATE
     const chessState = {
-        game: null, // instance of Chess()
+        game: null, // Chess instance
         boardFlipped: false,
         selectedSquare: null,
-        moveHistory: [], // array of SAN strings or moves
+        moveHistory: [],
         currentMoveIndex: -1,
-        editorActivePiece: null, // selected piece to place: 'P', 'N', 'p', etc.
-        editorTurn: 'w', // 'w' or 'b'
+        editorActivePiece: null,
+        editorTurn: 'w',
         customPositionFEN: null
     };
 
-    // PIECE UNICODE MAPPING
     const PIECE_SYMBOLS = {
         p: '♟', r: '♜', n: '♞', b: '♝', q: '♛', k: '♚',
         P: '♙', R: '♖', N: '♘', B: '♗', Q: '♕', K: '♔'
     };
 
+    // ========================================================
     // 2. INITIALIZATION
+    // ========================================================
     function init() {
-        // Set document title & topbar
         document.title = `${bookParam.title} — Онлайн Читалка | Chess Vault`;
         dom.topbarTitle.textContent = bookParam.title;
         dom.topbarAuthor.textContent = bookParam.author;
 
-        // Apply saved dock side & collapsed state
         applyDockSide(state.dockSide);
         applyDockCollapsed(state.isDockCollapsed);
 
-        // Init Chess Game
         initChessGame();
 
-        // Load annotations
-        loadAnnotations();
+        // 1. Спочатку завантажуємо локальний стан воркспейсу юзера для цієї книги
+        loadUserBookWorkspace();
 
-        // Listen for Auth changes
+        // 2. Слухаємо Firebase Auth для персональної хмарної синхронізації
         if (typeof firebase !== 'undefined' && firebase.auth) {
             firebase.auth().onAuthStateChanged(user => {
                 state.currentUser = user;
-                if (user && window.ReadingProgress) {
-                    window.ReadingProgress.syncFromFirestore(user.uid).then(() => {
-                        const saved = window.ReadingProgress.getProgress(user.uid, bookParam.id);
-                        if (saved && saved.currentPage > state.currentPage && !urlParams.get('page')) {
-                            goToPage(saved.currentPage);
-                        }
-                    }).catch(() => {});
+                if (user) {
+                    loadUserBookWorkspaceFromFirestore(user.uid);
                 }
-                loadAnnotationsFromFirestore();
             });
         }
 
-        // Bind UI events
         bindEvents();
-
-        // Load Document
         loadDocument();
     }
 
     // ========================================================
-    // 3. DOCUMENT LOADERS (PDF, DOCX, DjVu)
+    // 3. DOCUMENT LOADERS (PDF, DjVu, DOCX + Local Drag & Drop)
     // ========================================================
-    async function loadDocument() {
+    function loadDocument() {
         const fileUrl = bookParam.file;
-        const format = bookParam.format;
+        let format = bookParam.format;
 
-        if (!fileUrl) {
-            showError('Файл книги не вказано або посилання відсутнє.');
-            return;
+        // Auto-detect format from file extension if needed
+        if (!format || format === '---') {
+            const ext = fileUrl.split('.').pop().toLowerCase();
+            if (ext) format = ext;
         }
 
         dom.loading.style.display = 'flex';
-        dom.loadingText.textContent = `Завантаження (${format.toUpperCase()})...`;
+        dom.loadingText.textContent = `Завантаження документа (${format.toUpperCase()})...`;
 
-        try {
-            if (format === 'pdf') {
-                await loadPdfDocument(fileUrl);
-            } else if (format === 'docx') {
-                await loadDocxDocument(fileUrl);
-            } else if (format === 'djvu') {
-                await loadDjvuDocument(fileUrl);
-            } else {
-                // Fallback: try PDF
-                await loadPdfDocument(fileUrl);
-            }
-        } catch (err) {
-            console.error('Error loading document:', err);
-            showError(`Помилка завантаження книги: ${err.message || 'Не вдалося відкрити файл'}.`);
+        // Завжди показуємо підказку для відкриття локального файлу при бажанні
+        if (dom.dropBar) dom.dropBar.style.display = 'flex';
+
+        if (format === 'pdf') {
+            loadPdfDirect(fileUrl);
+        } else if (format === 'djvu') {
+            loadDjvuDirect(fileUrl);
+        } else if (format === 'docx' || format === 'doc') {
+            loadDocxDirect(fileUrl);
+        } else {
+            // Default to PDF direct iframe
+            loadPdfDirect(fileUrl);
         }
     }
 
-    // PDF LOADER via pdf.js
-    async function loadPdfDocument(url) {
-        if (typeof pdfjsLib === 'undefined') {
-            throw new Error('Бібліотека PDF.js не завантажена');
+    // PDF LOADER: Uses native browser PDF viewer via Iframe (Zero CORS restrictions)
+    function loadPdfDirect(url) {
+        if (!url) {
+            showDocError('Посилання на файл PDF відсутнє.');
+            return;
         }
 
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        dom.docFrame.style.display = 'block';
+        if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
+        if (dom.contentWrap) dom.contentWrap.style.display = 'none';
 
+        // Direct embed with starting page anchor
+        const frameSrc = url.includes('#') ? url : `${url}#page=${state.currentPage}&toolbar=1&navpanes=0`;
+        dom.docFrame.src = frameSrc;
+
+        dom.docFrame.onload = () => {
+            dom.loading.style.display = 'none';
+            showSyncToast('📄 PDF документ підвантажено успішно');
+        };
+
+        // Fallback timer if onload doesn't fire due to browser plugin
+        setTimeout(() => {
+            if (dom.loading.style.display !== 'none') {
+                dom.loading.style.display = 'none';
+            }
+        }, 1500);
+
+        // Estimate total pages from page_counts or cache
+        if (window.CHESS_PAGE_COUNTS && window.CHESS_PAGE_COUNTS[bookParam.id]) {
+            state.totalPages = window.CHESS_PAGE_COUNTS[bookParam.id];
+            dom.labelTotalPages.textContent = state.totalPages;
+            dom.inputCurrentPage.max = state.totalPages;
+        }
+
+        updatePageUI();
+    }
+
+    // DjVu LOADER: Uses DjVu.js Viewer or Embedded Archive Reader
+    function loadDjvuDirect(url) {
+        if (!url) {
+            showDocError('Посилання на файл DjVu відсутнє.');
+            return;
+        }
+
+        // Check if DjVu.js Viewer library is loaded
+        if (typeof DjVu !== 'undefined' && DjVu.Viewer && dom.djvuMount) {
+            dom.docFrame.style.display = 'none';
+            dom.contentWrap.style.display = 'none';
+            dom.djvuWrap.style.display = 'block';
+
+            try {
+                dom.djvuMount.innerHTML = '';
+                const viewer = new DjVu.Viewer();
+                viewer.render(dom.djvuMount);
+                viewer.loadDocumentByUrl(url);
+
+                dom.loading.style.display = 'none';
+                showSyncToast('📖 DjVu документ підвантажено в онлайн-переглядачі');
+                return;
+            } catch (err) {
+                console.warn('DjVu.Viewer direct URL load warning:', err);
+            }
+        }
+
+        // Fallback: Embed via Archive.org BookReader / stream
+        const archiveEmbedUrl = url.replace('/download/', '/embed/');
+        dom.docFrame.style.display = 'block';
+        if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
+        if (dom.contentWrap) dom.contentWrap.style.display = 'none';
+
+        dom.docFrame.src = archiveEmbedUrl;
+        dom.docFrame.onload = () => {
+            dom.loading.style.display = 'none';
+        };
+        setTimeout(() => { dom.loading.style.display = 'none'; }, 2000);
+
+        updatePageUI();
+    }
+
+    // DOCX LOADER: via mammoth.js
+    async function loadDocxDirect(url) {
         try {
-            const loadingTask = pdfjsLib.getDocument({
-                url: url,
-                cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
-                cMapPacked: true
-            });
+            if (typeof mammoth === 'undefined') throw new Error('Mammoth.js не знайдено');
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const arrayBuffer = await resp.arrayBuffer();
 
-            state.pdfDoc = await loadingTask.promise;
-            state.totalPages = state.pdfDoc.numPages;
+            const result = await mammoth.convertToHtml({ arrayBuffer });
+            dom.loading.style.display = 'none';
+            dom.docFrame.style.display = 'none';
+            if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
+            dom.contentWrap.style.display = 'block';
+
+            dom.contentWrap.innerHTML = `
+                <div class="reader-docx-container">
+                    ${result.value}
+                </div>
+            `;
+
+            const totalChars = (result.value.replace(/<[^>]*>/g, '') || '').length;
+            state.totalPages = Math.max(1, Math.round(totalChars / 2200));
             dom.labelTotalPages.textContent = state.totalPages;
             dom.inputCurrentPage.max = state.totalPages;
 
-            dom.loading.style.display = 'none';
-
-            // Ensure startPage is valid
-            const target = Math.min(Math.max(1, state.currentPage), state.totalPages);
-            goToPage(target);
-        } catch (e) {
-            // Check if CORS or network error, provide friendly fallback
-            throw new Error('CORS або мережева помилка завантаження PDF. ' + (e.message || ''));
-        }
-    }
-
-    // RENDER CURRENT PDF PAGE
-    async function renderPdfPage(pageNumber) {
-        if (!state.pdfDoc) return;
-        state.isRendering = true;
-
-        try {
-            const page = await state.pdfDoc.getPage(pageNumber);
-            dom.contentWrap.innerHTML = '';
-
-            const viewport = page.getViewport({ scale: state.zoom * 1.4 });
-
-            // Create page container
-            const pageContainer = document.createElement('div');
-            pageContainer.className = 'reader-page-container';
-            pageContainer.style.width = `${viewport.width}px`;
-            pageContainer.style.height = `${viewport.height}px`;
-
-            // Canvas
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
-            pageContainer.appendChild(canvas);
-
-            // Text Layer
-            const textLayerDiv = document.createElement('div');
-            textLayerDiv.className = 'textLayer';
-            textLayerDiv.style.width = `${viewport.width}px`;
-            textLayerDiv.style.height = `${viewport.height}px`;
-            pageContainer.appendChild(textLayerDiv);
-
-            dom.contentWrap.appendChild(pageContainer);
-
-            // Render Canvas
-            const renderContext = {
-                canvasContext: ctx,
-                viewport: viewport
-            };
-            await page.render(renderContext).promise;
-
-            // Render Text Layer for text selection & move parsing
-            const textContent = await page.getTextContent();
-            if (pdfjsLib.renderTextLayer) {
-                pdfjsLib.renderTextLayer({
-                    textContentSource: textContent,
-                    container: textLayerDiv,
-                    viewport: viewport,
-                    textDivs: []
-                });
-            }
-
-            state.isRendering = false;
-            if (state.pageNumPending !== null) {
-                const next = state.pageNumPending;
-                state.pageNumPending = null;
-                renderPdfPage(next);
-            }
+            updatePageUI();
+            saveUserBookWorkspace();
         } catch (err) {
-            console.error('Error rendering page:', err);
-            state.isRendering = false;
+            console.warn('Docx direct load error, using frame fallback:', err);
+            loadPdfDirect(url);
         }
-
-        // Update progress tracking
-        saveCurrentProgress();
     }
 
-    // DOCX LOADER via mammoth.js
-    async function loadDocxDocument(url) {
-        if (typeof mammoth === 'undefined') {
-            throw new Error('Бібліотека Mammoth.js не знайдена');
+    // LOCAL FILE LOADER (Drag-and-Drop or File Picker)
+    function handleLocalFileSelected(file) {
+        if (!file) return;
+        const fname = file.name.toLowerCase();
+        dom.loading.style.display = 'flex';
+        dom.loadingText.textContent = `Читання локального файлу ${file.name}...`;
+
+        const reader = new FileReader();
+
+        if (fname.endsWith('.pdf')) {
+            reader.onload = (e) => {
+                const blob = new Blob([e.target.result], { type: 'application/pdf' });
+                const blobUrl = URL.createObjectURL(blob);
+                dom.docFrame.src = blobUrl;
+                dom.docFrame.style.display = 'block';
+                if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
+                if (dom.contentWrap) dom.contentWrap.style.display = 'none';
+                dom.loading.style.display = 'none';
+                showSyncToast(`📂 Локальний PDF "${file.name}" завантажено!`);
+            };
+            reader.readAsArrayBuffer(file);
+        } else if (fname.endsWith('.djvu')) {
+            reader.onload = (e) => {
+                if (typeof DjVu !== 'undefined' && DjVu.Viewer && dom.djvuMount) {
+                    dom.djvuMount.innerHTML = '';
+                    const viewer = new DjVu.Viewer();
+                    viewer.render(dom.djvuMount);
+                    viewer.loadDocument(e.target.result);
+                    dom.djvuWrap.style.display = 'block';
+                    dom.docFrame.style.display = 'none';
+                    if (dom.contentWrap) dom.contentWrap.style.display = 'none';
+                    dom.loading.style.display = 'none';
+                    showSyncToast(`📂 Локальний DjVu "${file.name}" відкрито!`);
+                } else {
+                    dom.loading.style.display = 'none';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        } else if (fname.endsWith('.docx')) {
+            reader.onload = async (e) => {
+                if (typeof mammoth !== 'undefined') {
+                    const result = await mammoth.convertToHtml({ arrayBuffer: e.target.result });
+                    dom.loading.style.display = 'none';
+                    dom.docFrame.style.display = 'none';
+                    if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
+                    dom.contentWrap.style.display = 'block';
+                    dom.contentWrap.innerHTML = `<div class="reader-docx-container">${result.value}</div>`;
+                    showSyncToast(`📂 Локальний DOCX відкрито!`);
+                }
+            };
+            reader.readAsArrayBuffer(file);
         }
-
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const arrayBuffer = await resp.arrayBuffer();
-
-        const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
-        dom.loading.style.display = 'none';
-
-        const docxContainer = document.createElement('div');
-        docxContainer.className = 'reader-docx-container';
-        docxContainer.innerHTML = result.value;
-        dom.contentWrap.innerHTML = '';
-        dom.contentWrap.appendChild(docxContainer);
-
-        // Approximate pages by character length (roughly 2200 chars per page)
-        const totalChars = (result.value.replace(/<[^>]*>/g, '') || '').length;
-        state.totalPages = Math.max(1, Math.round(totalChars / 2200));
-        dom.labelTotalPages.textContent = state.totalPages;
-        dom.inputCurrentPage.max = state.totalPages;
-
-        // Listen for scroll to track progress
-        dom.viewport.addEventListener('scroll', () => {
-            const scrollRatio = dom.viewport.scrollTop / (dom.viewport.scrollHeight - dom.viewport.clientHeight || 1);
-            const computedPage = Math.min(state.totalPages, Math.max(1, Math.round(scrollRatio * state.totalPages)));
-            if (computedPage !== state.currentPage) {
-                state.currentPage = computedPage;
-                updatePageUI();
-                saveCurrentProgress();
-            }
-        });
-
-        updatePageUI();
-        saveCurrentProgress();
-    }
-
-    // DjVu LOADER FALLBACK
-    async function loadDjvuDocument(url) {
-        dom.loading.style.display = 'none';
-
-        const fallback = document.createElement('div');
-        fallback.className = 'reader-docx-container';
-        fallback.style.textAlign = 'center';
-        fallback.innerHTML = `
-            <div style="font-size: 3rem; margin-bottom: 16px;">📚</div>
-            <h2 style="margin-bottom: 12px;">DjVu Документ: ${escapeHtml(bookParam.title)}</h2>
-            <p style="color: var(--reader-text-muted); max-width: 520px; margin: 0 auto 24px; line-height: 1.5;">
-                Формат DjVu підтримується для читання та вивчення з нашою міні-шахівницею та редактором ходів.
-                Ви можете завантажити оригінал для локального перегляду або використовувати шахівницю праворуч для вивчення варіантів.
-            </p>
-            <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-                <a href="${url}" download class="btn-add-note" style="text-decoration: none; padding: 10px 20px; font-size: 0.9rem;">
-                    📥 Завантажити DjVu файл
-                </a>
-            </div>
-        `;
-        dom.contentWrap.innerHTML = '';
-        dom.contentWrap.appendChild(fallback);
-
-        state.totalPages = 100; // default estimated
-        dom.labelTotalPages.textContent = state.totalPages;
-        updatePageUI();
-        saveCurrentProgress();
     }
 
     // ========================================================
-    // 4. PAGE NAVIGATION & PROGRESS SAVING
+    // 4. PER-USER & PER-BOOK WORKSPACE PERSISTENCE
     // ========================================================
-    function goToPage(page) {
-        const p = Math.min(Math.max(1, parseInt(page) || 1), state.totalPages);
-        state.currentPage = p;
-
-        updatePageUI();
-
-        if (state.pdfDoc) {
-            if (state.isRendering) {
-                state.pageNumPending = p;
-            } else {
-                renderPdfPage(p);
-            }
-        } else {
-            saveCurrentProgress();
-        }
+    function getWorkspaceKey(uid) {
+        return `chess_vault_workspace_${uid || 'guest'}_${bookParam.id}`;
     }
 
-    function updatePageUI() {
-        dom.inputCurrentPage.value = state.currentPage;
-        dom.btnPrevPage.disabled = state.currentPage <= 1;
-        dom.btnNextPage.disabled = state.currentPage >= state.totalPages;
-
+    function saveUserBookWorkspace() {
+        const uid = state.currentUser ? state.currentUser.uid : 'guest';
         const percent = Math.min(100, Math.max(1, Math.round((state.currentPage / state.totalPages) * 100)));
-        dom.labelPercentage.textContent = `${percent}%`;
-    }
 
-    function saveCurrentProgress() {
-        if (!window.ReadingProgress) return;
-        const uid = state.currentUser ? state.currentUser.uid : null;
-
-        window.ReadingProgress.saveProgress(uid, {
-            id: bookParam.id,
+        const workspaceData = {
+            bookId: bookParam.id,
             title: bookParam.title,
             author: bookParam.author,
             url: bookParam.file,
             format: bookParam.format,
             currentPage: state.currentPage,
             totalPages: state.totalPages,
-            notesCount: state.notes.length,
-            bookmarksCount: state.bookmarks.length
-        });
+            percentage: percent,
+            boardFEN: chessState.game ? chessState.game.fen() : null,
+            boardMoves: chessState.moveHistory || [],
+            boardMoveIndex: chessState.currentMoveIndex,
+            boardFlipped: chessState.boardFlipped,
+            boardTurn: chessState.editorTurn,
+            bookmarks: state.bookmarks || [],
+            notes: state.notes || [],
+            highlights: state.highlights || [],
+            dockSide: state.dockSide,
+            updatedAt: Date.now()
+        };
+
+        // 1. Миттєве збереження в LocalStorage для поточного користувача
+        try {
+            localStorage.setItem(getWorkspaceKey(uid), JSON.stringify(workspaceData));
+        } catch (_) {}
+
+        // 2. Оновлення ReadingProgress (якщо >= 10 сторінок — рахується у «Зараз читаю» в профілі)
+        if (window.ReadingProgress) {
+            window.ReadingProgress.saveProgress(uid, {
+                id: bookParam.id,
+                title: bookParam.title,
+                author: bookParam.author,
+                url: bookParam.file,
+                format: bookParam.format,
+                currentPage: state.currentPage,
+                totalPages: state.totalPages,
+                notesCount: state.notes.length,
+                bookmarksCount: state.bookmarks.length
+            });
+        }
+
+        // 3. Збереження в хмару Firestore окремо для цього користувача
+        if (state.currentUser && window.db) {
+            window.db.collection('user_reading').doc(state.currentUser.uid)
+                .collection('books').doc(bookParam.id)
+                .set(workspaceData, { merge: true })
+                .then(() => {
+                    showSyncIndicator('✅ Збережено в хмарі');
+                })
+                .catch(err => console.warn('Workspace sync error:', err));
+        } else {
+            showSyncIndicator('💾 Збережено локально');
+        }
+    }
+
+    function loadUserBookWorkspace() {
+        const uid = state.currentUser ? state.currentUser.uid : 'guest';
+        try {
+            const raw = localStorage.getItem(getWorkspaceKey(uid));
+            if (raw) {
+                const data = JSON.parse(raw);
+                applyWorkspaceData(data);
+            }
+        } catch (_) {}
+    }
+
+    async function loadUserBookWorkspaceFromFirestore(uid) {
+        if (!uid || !window.db) return;
+        try {
+            const snap = await window.db.collection('user_reading').doc(uid)
+                .collection('books').doc(bookParam.id).get();
+            if (snap.exists) {
+                const data = snap.data();
+                applyWorkspaceData(data);
+                // Оновлюємо локальний кеш
+                localStorage.setItem(getWorkspaceKey(uid), JSON.stringify(data));
+            }
+        } catch (err) {
+            console.warn('Could not load user workspace from firestore:', err);
+        }
+    }
+
+    function applyWorkspaceData(data) {
+        if (!data) return;
+
+        // Restore reading page
+        if (data.currentPage && !urlParams.get('page')) {
+            state.currentPage = data.currentPage;
+            if (dom.inputCurrentPage) dom.inputCurrentPage.value = state.currentPage;
+        }
+        if (data.totalPages) {
+            state.totalPages = data.totalPages;
+            if (dom.labelTotalPages) dom.labelTotalPages.textContent = state.totalPages;
+        }
+
+        // Restore bookmarks & notes
+        if (Array.isArray(data.bookmarks)) state.bookmarks = data.bookmarks;
+        if (Array.isArray(data.notes)) state.notes = data.notes;
+        if (Array.isArray(data.highlights)) state.highlights = data.highlights;
+        renderBookmarksList();
+        renderNotesList();
+
+        // Restore Chessboard state (FEN, moves, turn, orientation)
+        if (chessState.game) {
+            if (data.boardFEN && data.boardFEN !== 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1') {
+                try {
+                    chessState.game.load(data.boardFEN);
+                } catch (_) {}
+            }
+            if (Array.isArray(data.boardMoves)) {
+                chessState.moveHistory = data.boardMoves;
+                chessState.currentMoveIndex = (typeof data.boardMoveIndex === 'number') ? data.boardMoveIndex : data.boardMoves.length - 1;
+            }
+            if (typeof data.boardFlipped === 'boolean') {
+                chessState.boardFlipped = data.boardFlipped;
+            }
+            if (data.boardTurn) {
+                chessState.editorTurn = data.boardTurn;
+                if (dom.editorSideIndicator) {
+                    dom.editorSideIndicator.textContent = chessState.editorTurn === 'w' ? 'Хід: ⚪ Білі' : 'Хід: ⚫ Чорні';
+                }
+            }
+
+            updateMovesLogUI();
+            renderChessBoard();
+        }
+
+        if (data.dockSide) {
+            applyDockSide(data.dockSide);
+        }
+
+        updatePageUI();
+    }
+
+    function showSyncIndicator(text) {
+        if (!dom.syncStatusPill) return;
+        dom.syncStatusPill.textContent = text;
+        dom.syncStatusPill.style.color = '#22c55e';
+        setTimeout(() => {
+            if (dom.syncStatusPill) {
+                dom.syncStatusPill.textContent = '☁️ Автозбереження';
+                dom.syncStatusPill.style.color = '';
+            }
+        }, 2200);
     }
 
     // ========================================================
-    // 5. INTERACTIVE CHESSBOARD & BOARD EDITOR
+    // 5. PAGE NAVIGATION & UI
+    // ========================================================
+    function goToPage(page) {
+        const p = Math.min(Math.max(1, parseInt(page) || 1), state.totalPages);
+        state.currentPage = p;
+        updatePageUI();
+
+        // Update iframe anchor if in PDF mode
+        if (dom.docFrame && dom.docFrame.style.display !== 'none' && dom.docFrame.src) {
+            const base = dom.docFrame.src.split('#')[0];
+            dom.docFrame.src = `${base}#page=${p}&toolbar=1&navpanes=0`;
+        }
+
+        saveUserBookWorkspace();
+    }
+
+    function updatePageUI() {
+        if (dom.inputCurrentPage) dom.inputCurrentPage.value = state.currentPage;
+        if (dom.btnPrevPage) dom.btnPrevPage.disabled = state.currentPage <= 1;
+        if (dom.btnNextPage) dom.btnNextPage.disabled = state.currentPage >= state.totalPages;
+
+        const percent = Math.min(100, Math.max(1, Math.round((state.currentPage / state.totalPages) * 100)));
+        if (dom.labelPercentage) dom.labelPercentage.textContent = `${percent}%`;
+    }
+
+    // ========================================================
+    // 6. CHESSBOARD & BOARD EDITOR
     // ========================================================
     function initChessGame() {
         if (typeof Chess === 'undefined') {
@@ -425,7 +558,7 @@
         if (!chessState.game) return;
         dom.chessGrid.innerHTML = '';
 
-        const board = chessState.game.board(); // 8x8 array: board[rank][file]
+        const board = chessState.game.board();
         const ranks = chessState.boardFlipped ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
         const files = chessState.boardFlipped ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
 
@@ -442,7 +575,6 @@
                     sqDiv.classList.add('selected');
                 }
 
-                // Check piece on square
                 const piece = board[7 - r][f];
                 if (piece) {
                     const pieceSpan = document.createElement('span');
@@ -452,24 +584,22 @@
                     sqDiv.appendChild(pieceSpan);
                 }
 
-                // Square click handler (Move or Editor)
                 sqDiv.addEventListener('click', () => handleSquareClick(squareName));
-
                 dom.chessGrid.appendChild(sqDiv);
             }
         }
     }
 
     function handleSquareClick(square) {
-        // A) If Editor Piece is selected in palette -> place or remove piece
+        // A) Якщо активна фігура в редакторі -> ставимо/видаляємо її
         if (chessState.editorActivePiece) {
             placePieceInEditor(square, chessState.editorActivePiece);
+            saveUserBookWorkspace();
             return;
         }
 
-        // B) Normal Move Gameplay Mode
+        // B) Звичайний режим гри ходами
         if (!chessState.selectedSquare) {
-            // Select piece to move
             const piece = chessState.game.get(square);
             if (piece) {
                 chessState.selectedSquare = square;
@@ -477,12 +607,10 @@
                 highlightPossibleMoves(square);
             }
         } else {
-            // Try to make a move to clicked square
             const from = chessState.selectedSquare;
             const to = square;
 
             if (from === to) {
-                // Deselect
                 chessState.selectedSquare = null;
                 renderChessBoard();
                 return;
@@ -491,19 +619,18 @@
             const move = chessState.game.move({
                 from: from,
                 to: to,
-                promotion: 'q' // default auto-promote to queen
+                promotion: 'q'
             });
 
             chessState.selectedSquare = null;
 
             if (move) {
-                // Move was valid
                 chessState.moveHistory.push(move.san);
                 chessState.currentMoveIndex = chessState.moveHistory.length - 1;
                 updateMovesLogUI();
                 renderChessBoard();
+                saveUserBookWorkspace();
             } else {
-                // If clicked another friendly piece, select that instead
                 const piece = chessState.game.get(square);
                 if (piece) {
                     chessState.selectedSquare = square;
@@ -521,29 +648,21 @@
         moves.forEach(m => {
             const el = dom.chessGrid.querySelector(`[data-square="${m.to}"]`);
             if (el) {
-                if (m.captured) {
-                    el.classList.add('possible-capture');
-                } else {
-                    el.classList.add('possible-move');
-                }
+                if (m.captured) el.classList.add('possible-capture');
+                else el.classList.add('possible-move');
             }
         });
     }
 
-    // ========================================================
-    // 6. BOARD EDITOR ACTIONS (Endgame / Custom Positions)
-    // ========================================================
     function placePieceInEditor(square, pieceKey) {
-        // Read current FEN or recreate board
         const color = pieceKey === pieceKey.toUpperCase() ? 'w' : 'b';
         const type = pieceKey.toLowerCase();
 
-        // Clear square if clicking with same piece
         const current = chessState.game.get(square);
         if (current && current.type === type && current.color === color) {
             chessState.game.remove(square);
         } else {
-            chessState.game.put({ type: type, color: color }, square);
+            chessState.game.put({ type, color }, square);
         }
 
         renderChessBoard();
@@ -556,7 +675,8 @@
         chessState.currentMoveIndex = -1;
         updateMovesLogUI();
         renderChessBoard();
-        showToast('Дошку очищено. Виберіть фігури з палітри для розстановки.');
+        saveUserBookWorkspace();
+        showSyncToast('🗑️ Дошку очищено для ендшпілю');
     }
 
     function resetToStartingPosition() {
@@ -566,28 +686,25 @@
         chessState.currentMoveIndex = -1;
         updateMovesLogUI();
         renderChessBoard();
-        showToast('Початкову розстановку відновлено.');
+        saveUserBookWorkspace();
+        showSyncToast('♟️ Початкову розстановку відновлено');
     }
 
     function toggleEditorTurn() {
         chessState.editorTurn = chessState.editorTurn === 'w' ? 'b' : 'w';
-        dom.editorSideIndicator.textContent = chessState.editorTurn === 'w' ? 'Хід: ⚪ Білі' : 'Хід: ⚫ Чорні';
-        showToast(`Черга ходу: ${chessState.editorTurn === 'w' ? 'Білі' : 'Чорні'}`);
+        if (dom.editorSideIndicator) {
+            dom.editorSideIndicator.textContent = chessState.editorTurn === 'w' ? 'Хід: ⚪ Білі' : 'Хід: ⚫ Чорні';
+        }
+        saveUserBookWorkspace();
+        showSyncToast(`Черга ходу: ${chessState.editorTurn === 'w' ? 'Білі' : 'Чорні'}`);
     }
 
     // ========================================================
-    // 7. CHESS NOTATION PARSER (Cyrillic & Standard SAN)
+    // 7. NOTATION PARSER & REPLAY
     // ========================================================
     function parseChessMovesFromText(rawText) {
         if (!rawText) return [];
 
-        // 1. Normalize Cyrillic piece notations to standard algebraic:
-        // Кр -> K (King)
-        // Ф -> Q (Queen)
-        // Л -> R (Rook)
-        // С -> B (Bishop)
-        // К -> N (Knight)
-        // 0-0 or О-О -> O-O
         let clean = rawText
             .replace(/[ОO0]-[ОO0]-[ОO0]/g, 'O-O-O')
             .replace(/[ОO0]-[ОO0]/g, 'O-O')
@@ -597,27 +714,19 @@
             .replace(/С/g, 'B')
             .replace(/К/g, 'N')
             .replace(/п/g, '')
-            .replace(/[:xх]/g, 'x');
+            .replace(/[:xх]/g, 'x')
+            .replace(/\b\d+\s*\.{1,3}/g, ' ');
 
-        // 2. Remove move numbers (e.g. "1.", "2...", "12.")
-        clean = clean.replace(/\b\d+\s*\.{1,3}/g, ' ');
-
-        // 3. Extract tokens
         const tokens = clean.split(/\s+/).filter(t => t.trim().length > 0);
         const validMoves = [];
-
-        // Test moves against a test game
         const testGame = new Chess();
+
         for (const token of tokens) {
-            // Strip punctuation like !, ?, etc.
             const sanitized = token.replace(/[\!\?\#\+\,]/g, '').trim();
             if (!sanitized) continue;
-
             try {
                 const m = testGame.move(sanitized, { sloppy: true });
-                if (m) {
-                    validMoves.push(m.san);
-                }
+                if (m) validMoves.push(m.san);
             } catch (_) {}
         }
 
@@ -626,7 +735,7 @@
 
     function loadMovesToBoard(movesArray) {
         if (!movesArray || movesArray.length === 0) {
-            showToast('У виділеному тексті не знайдено шахових ходів.', 'warn');
+            showSyncToast('У виділеному тексті не знайдено шахових ходів.', 'warn');
             return;
         }
 
@@ -645,30 +754,25 @@
         chessState.currentMoveIndex = chessState.moveHistory.length - 1;
         updateMovesLogUI();
         renderChessBoard();
-
-        // Switch to board tab
         switchDockTab('board');
-        showToast(`♟️ Завантажено ${chessState.moveHistory.length} ходів на дошку!`);
+        saveUserBookWorkspace();
+        showSyncToast(`♟️ Завантажено ${chessState.moveHistory.length} ходів на дошку!`);
     }
 
     function updateMovesLogUI() {
         dom.boardMovesLog.innerHTML = '';
         if (chessState.moveHistory.length === 0) {
-            dom.boardMovesLog.innerHTML = '<span style="color: var(--reader-text-muted); font-size: 0.75rem;">Немає ходів. Виділіть ходи в тексті книги або перетягніть фігуру.</span>';
+            dom.boardMovesLog.innerHTML = '<span style="color: var(--reader-text-muted); font-size: 0.75rem;">Виділіть ходи в книзі або перетягніть фігуру.</span>';
             return;
         }
 
         chessState.moveHistory.forEach((san, idx) => {
             const span = document.createElement('span');
             span.className = 'move-token';
-            if (idx === chessState.currentMoveIndex) {
-                span.classList.add('current');
-            }
-            // Add move number
+            if (idx === chessState.currentMoveIndex) span.classList.add('current');
             const moveNum = Math.floor(idx / 2) + 1;
             const prefix = (idx % 2 === 0) ? `${moveNum}. ` : '';
             span.textContent = `${prefix}${san}`;
-
             span.addEventListener('click', () => jumpToMove(idx));
             dom.boardMovesLog.appendChild(span);
         });
@@ -682,73 +786,16 @@
         chessState.currentMoveIndex = targetIndex;
         updateMovesLogUI();
         renderChessBoard();
+        saveUserBookWorkspace();
     }
 
     // ========================================================
     // 8. BOOKMARKS & NOTES MANAGEMENT
     // ========================================================
-    function getAnnotationsStorageKey() {
-        const uid = state.currentUser ? state.currentUser.uid : 'guest';
-        return `chess_vault_annotations_${uid}_${bookParam.id}`;
-    }
-
-    function loadAnnotations() {
-        try {
-            const raw = localStorage.getItem(getAnnotationsStorageKey());
-            if (raw) {
-                const data = JSON.parse(raw);
-                state.bookmarks = data.bookmarks || [];
-                state.notes = data.notes || [];
-            }
-        } catch (_) {}
-
-        renderBookmarksList();
-        renderNotesList();
-    }
-
-    function saveAnnotations() {
-        const payload = {
-            bookmarks: state.bookmarks,
-            notes: state.notes,
-            updatedAt: Date.now()
-        };
-
-        try {
-            localStorage.setItem(getAnnotationsStorageKey(), JSON.stringify(payload));
-        } catch (_) {}
-
-        renderBookmarksList();
-        renderNotesList();
-
-        // Sync with Firestore if authenticated
-        if (state.currentUser && window.db) {
-            window.db.collection('user_reading').doc(state.currentUser.uid)
-                .collection('annotations').doc(bookParam.id)
-                .set(payload, { merge: true })
-                .catch(err => console.warn('Annotations firestore sync err:', err));
-        }
-
-        saveCurrentProgress();
-    }
-
-    async function loadAnnotationsFromFirestore() {
-        if (!state.currentUser || !window.db) return;
-        try {
-            const snap = await window.db.collection('user_reading').doc(state.currentUser.uid)
-                .collection('annotations').doc(bookParam.id).get();
-            if (snap.exists) {
-                const data = snap.data();
-                if (data.bookmarks) state.bookmarks = data.bookmarks;
-                if (data.notes) state.notes = data.notes;
-                saveAnnotations();
-            }
-        } catch (_) {}
-    }
-
     function addBookmarkCurrentPage() {
         const curPage = state.currentPage;
         if (state.bookmarks.some(b => b.page === curPage)) {
-            showToast(`Сторінка ${curPage} вже є в закладках.`, 'warn');
+            showSyncToast(`Сторінка ${curPage} вже є в закладках.`, 'warn');
             return;
         }
 
@@ -758,8 +805,9 @@
             createdAt: Date.now()
         });
 
-        saveAnnotations();
-        showToast(`🔖 Сторінку ${curPage} додано в закладки!`);
+        renderBookmarksList();
+        saveUserBookWorkspace();
+        showSyncToast(`🔖 Сторінку ${curPage} збережено у ваші закладки!`);
     }
 
     function renderBookmarksList() {
@@ -770,7 +818,7 @@
             dom.bookmarksList.innerHTML = `
                 <div class="empty-view-state">
                     <span class="icon">🔖</span>
-                    <p>Закладок поки немає.<br>Натисніть кнопку <b>"Закладка"</b> у верхньому меню, щоб зберегти сторінку.</p>
+                    <p>Закладок поки немає.<br>Натисніть <b>"Закладка"</b> у верхньому меню, щоб зберегти сторінку.</p>
                 </div>
             `;
             return;
@@ -787,15 +835,13 @@
                 <button type="button" class="bookmark-del-btn" title="Видалити закладку">✕</button>
             `;
 
-            div.querySelector('.bookmark-left').addEventListener('click', () => {
-                goToPage(bm.page);
-            });
-
+            div.querySelector('.bookmark-left').addEventListener('click', () => goToPage(bm.page));
             div.querySelector('.bookmark-del-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
                 state.bookmarks.splice(idx, 1);
-                saveAnnotations();
-                showToast(`Закладку видалено.`);
+                renderBookmarksList();
+                saveUserBookWorkspace();
+                showSyncToast('Закладку видалено');
             });
 
             dom.bookmarksList.appendChild(div);
@@ -805,12 +851,12 @@
     function addNote() {
         const text = (dom.noteInput.value || '').trim();
         if (!text) {
-            showToast('Введіть текст нотатки.', 'warn');
+            showSyncToast('Введіть текст нотатки.', 'warn');
             return;
         }
 
         if (text.length > 1000) {
-            showToast('Максимальна довжина нотатки — 1000 символів.', 'warn');
+            showSyncToast('Максимальна довжина нотатки — 1000 символів.', 'warn');
             return;
         }
 
@@ -827,8 +873,9 @@
         dom.noteCharCounter.textContent = '0 / 1000';
         state.selectedText = '';
 
-        saveAnnotations();
-        showToast(`📝 Нотатку до сторінки ${state.currentPage} збережено!`);
+        renderNotesList();
+        saveUserBookWorkspace();
+        showSyncToast(`📝 Нотатку збережено для сторінки ${state.currentPage}!`);
     }
 
     function renderNotesList() {
@@ -839,7 +886,7 @@
             dom.notesList.innerHTML = `
                 <div class="empty-view-state">
                     <span class="icon">📝</span>
-                    <p>Нотаток поки немає.<br>Запишіть свої думки або виділіть цитату з книги.</p>
+                    <p>Нотаток поки немає.<br>Запишіть свої коментарі до книги (до 1000 симв.).</p>
                 </div>
             `;
             return;
@@ -854,7 +901,7 @@
 
             div.innerHTML = `
                 <div class="note-item-header">
-                    <span class="note-page-tag">Стор. ${note.page}</span>
+                    <span class="note-page-tag" style="cursor: pointer;">Стор. ${note.page}</span>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span class="note-date">${dateStr}</span>
                         <button type="button" class="bookmark-del-btn btn-del-note" title="Видалити нотатку">✕</button>
@@ -864,15 +911,13 @@
                 <div class="note-content">${escapeHtml(note.text)}</div>
             `;
 
-            div.querySelector('.note-page-tag').addEventListener('click', () => {
-                goToPage(note.page);
-            });
-
+            div.querySelector('.note-page-tag').addEventListener('click', () => goToPage(note.page));
             div.querySelector('.btn-del-note').addEventListener('click', (e) => {
                 e.stopPropagation();
                 state.notes.splice(idx, 1);
-                saveAnnotations();
-                showToast(`Нотатку видалено.`);
+                renderNotesList();
+                saveUserBookWorkspace();
+                showSyncToast('Нотатку видалено');
             });
 
             dom.notesList.appendChild(div);
@@ -894,6 +939,7 @@
 
     function toggleDockSide() {
         applyDockSide(state.dockSide === 'left' ? 'right' : 'left');
+        saveUserBookWorkspace();
     }
 
     function applyDockCollapsed(collapsed) {
@@ -921,7 +967,6 @@
             dom.dockViews[k].classList.toggle('active', k === tabName);
         });
 
-        // If dock was collapsed, expand it when tab is switched
         if (state.isDockCollapsed) {
             applyDockCollapsed(false);
         }
@@ -930,7 +975,7 @@
     // ========================================================
     // 10. TEXT SELECTION & FLOATING TOOLBAR
     // ========================================================
-    function handleTextSelection(e) {
+    function handleTextSelection() {
         const selection = window.getSelection();
         const text = selection ? selection.toString().trim() : '';
 
@@ -940,8 +985,6 @@
         }
 
         state.selectedText = text;
-
-        // Position toolbar above selection
         const range = selection.getRangeAt(0);
         const rect = range.getBoundingClientRect();
 
@@ -951,62 +994,34 @@
     }
 
     // ========================================================
-    // 11. EVENT LISTENERS BINDING
+    // 11. EVENT LISTENERS
     // ========================================================
     function bindEvents() {
-        // Page navigation
         dom.btnPrevPage.addEventListener('click', () => goToPage(state.currentPage - 1));
         dom.btnNextPage.addEventListener('click', () => goToPage(state.currentPage + 1));
         dom.inputCurrentPage.addEventListener('change', () => goToPage(dom.inputCurrentPage.value));
 
-        // Keyboard navigation
         document.addEventListener('keydown', (e) => {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
             if (e.key === 'ArrowLeft') goToPage(state.currentPage - 1);
             if (e.key === 'ArrowRight') goToPage(state.currentPage + 1);
         });
 
-        // Zoom
-        dom.btnZoomIn.addEventListener('click', () => {
-            state.zoom = Math.min(2.5, state.zoom + 0.15);
-            goToPage(state.currentPage);
-        });
-        dom.btnZoomOut.addEventListener('click', () => {
-            state.zoom = Math.max(0.6, state.zoom - 0.15);
-            goToPage(state.currentPage);
-        });
-        dom.btnZoomReset.addEventListener('click', () => {
-            state.zoom = 1.0;
-            goToPage(state.currentPage);
-        });
-
-        // Dock side & collapse
         dom.btnToggleDockSide.addEventListener('click', toggleDockSide);
         dom.btnDockQuickSide.addEventListener('click', toggleDockSide);
         dom.btnToggleDockCollapse.addEventListener('click', toggleDockCollapsed);
 
-        // Dock Tabs
         dom.dockTabs.forEach(tab => {
             tab.addEventListener('click', () => switchDockTab(tab.dataset.tab));
         });
 
-        // Highlight toggle
-        dom.btnToggleHighlight.addEventListener('click', () => {
-            state.isHighlightActive = !state.isHighlightActive;
-            dom.btnToggleHighlight.classList.toggle('active', state.isHighlightActive);
-            showToast(state.isHighlightActive ? '🖍️ Режим виділення увімкнено' : 'Режим виділення вимкнено');
-        });
-
-        // Bookmark button
         dom.btnAddBookmark.addEventListener('click', addBookmarkCurrentPage);
-
-        // Notes
         dom.btnSaveNote.addEventListener('click', addNote);
         dom.noteInput.addEventListener('input', () => {
             dom.noteCharCounter.textContent = `${dom.noteInput.value.length} / 1000`;
         });
 
-        // Chessboard Navigation
+        // Board Replay
         dom.btnBoardFirst.addEventListener('click', () => jumpToMove(-1));
         dom.btnBoardPrev.addEventListener('click', () => jumpToMove(Math.max(-1, chessState.currentMoveIndex - 1)));
         dom.btnBoardNext.addEventListener('click', () => jumpToMove(Math.min(chessState.moveHistory.length - 1, chessState.currentMoveIndex + 1)));
@@ -1014,9 +1029,10 @@
         dom.btnBoardFlip.addEventListener('click', () => {
             chessState.boardFlipped = !chessState.boardFlipped;
             renderChessBoard();
+            saveUserBookWorkspace();
         });
 
-        // Board Editor Actions
+        // Board Editor
         dom.paletteBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 const p = btn.dataset.piece;
@@ -1027,7 +1043,7 @@
                     dom.paletteBtns.forEach(b => b.classList.remove('active'));
                     chessState.editorActivePiece = p;
                     btn.classList.add('active');
-                    showToast(`Вибрано фігуру для розміщення: ${PIECE_SYMBOLS[p]}`);
+                    showSyncToast(`Вибрано фігуру: ${PIECE_SYMBOLS[p]}`);
                 }
             });
         });
@@ -1036,7 +1052,7 @@
         dom.btnEditorStart.addEventListener('click', resetToStartingPosition);
         dom.btnEditorTurn.addEventListener('click', toggleEditorTurn);
 
-        // Selection Toolbar actions
+        // Selection toolbar
         document.addEventListener('mouseup', handleTextSelection);
 
         dom.selBtnChess.addEventListener('click', () => {
@@ -1046,7 +1062,7 @@
         });
 
         dom.selBtnHighlight.addEventListener('click', () => {
-            showToast('Текст виділено!');
+            showSyncToast('Текст виділено!');
             dom.selectionToolbar.style.display = 'none';
         });
 
@@ -1059,9 +1075,33 @@
         dom.selBtnCopy.addEventListener('click', () => {
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(state.selectedText);
-                showToast('📋 Текст скопійовано в буфер');
+                showSyncToast('📋 Текст скопійовано');
             }
             dom.selectionToolbar.style.display = 'none';
+        });
+
+        // Local file picker
+        if (dom.btnPickLocal && dom.inputLocalFile) {
+            dom.btnPickLocal.addEventListener('click', () => dom.inputLocalFile.click());
+            dom.inputLocalFile.addEventListener('change', (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (file) handleLocalFileSelected(file);
+            });
+        }
+
+        // Drag & drop file support
+        dom.viewport.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dom.viewport.style.outline = '2px dashed var(--reader-accent)';
+        });
+        dom.viewport.addEventListener('dragleave', () => {
+            dom.viewport.style.outline = 'none';
+        });
+        dom.viewport.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dom.viewport.style.outline = 'none';
+            const file = e.dataTransfer.files && e.dataTransfer.files[0];
+            if (file) handleLocalFileSelected(file);
         });
 
         // Fullscreen & Theme
@@ -1088,7 +1128,7 @@
         return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    function showToast(msg, type = 'ok') {
+    function showSyncToast(msg, type = 'ok') {
         const t = document.createElement('div');
         t.style.cssText = `
             position: fixed;
@@ -1119,21 +1159,23 @@
         }, 2500);
     }
 
-    function showError(msg) {
+    function showDocError(msg) {
         dom.loading.style.display = 'none';
-        dom.contentWrap.innerHTML = `
-            <div style="text-align: center; padding: 60px 20px; color: #ef4444;">
-                <div style="font-size: 3rem; margin-bottom: 12px;">⚠️</div>
-                <h3 style="margin-bottom: 8px;">Не вдалося відкрити книгу</h3>
-                <p style="color: var(--reader-text-muted); max-width: 480px; margin: 0 auto 16px;">${escapeHtml(msg)}</p>
-                <a href="${bookParam.file}" target="_blank" class="btn-add-note" style="text-decoration: none; padding: 8px 16px;">
-                    Відкрити файл напряму
-                </a>
-            </div>
-        `;
+        if (dom.contentWrap) {
+            dom.contentWrap.style.display = 'block';
+            dom.contentWrap.innerHTML = `
+                <div style="text-align: center; padding: 60px 20px; color: #ef4444;">
+                    <div style="font-size: 3rem; margin-bottom: 12px;">⚠️</div>
+                    <h3 style="margin-bottom: 8px;">Не вдалося автоматично відкрити книгу</h3>
+                    <p style="color: var(--reader-text-muted); max-width: 480px; margin: 0 auto 16px;">${escapeHtml(msg)}</p>
+                    <a href="${bookParam.file}" target="_blank" class="btn-add-note" style="text-decoration: none; padding: 8px 16px;">
+                        🔗 Відкрити файл напряму
+                    </a>
+                </div>
+            `;
+        }
     }
 
-    // Start on DOMContentLoaded
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

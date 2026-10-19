@@ -20,6 +20,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <!-- Mammoth.js for Word (.docx) documents -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <!-- DjVu.js & DjVu Viewer CDN -->
+    <script src="https://djvu.js.org/assets/dist/djvu.js"></script>
+    <script src="https://djvu.js.org/assets/dist/djvu_viewer.js"></script>
     <!-- Chess.js for chess game logic & notation parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 </head>
@@ -44,6 +47,7 @@
                 <div class="reader-book-title" id="topbar-book-title">Завантаження книги...</div>
                 <div class="reader-book-author" id="topbar-book-author">—</div>
             </div>
+            <span class="reader-sync-pill" id="sync-status-pill" title="Всі ваші зміни (позиція на дошці, нотатки, закладки, сторінка) зберігаються автоматично">☁️ Автозбереження</span>
         </div>
 
         <div class="reader-topbar-center">
@@ -80,9 +84,26 @@
         <section class="reader-viewport" id="reader-viewport">
             <div class="reader-loading" id="reader-loading">
                 <div class="reader-spinner"></div>
-                <p id="loading-status-text">Завантаження документа...</p>
+                <p id="loading-status-text">Завантаження книги...</p>
             </div>
-            <div id="reader-content-wrap"></div>
+
+            <!-- 1. Native Iframe viewer for PDF & Web documents (zero CORS issues) -->
+            <iframe id="reader-doc-frame" class="reader-doc-iframe" style="display: none;" title="PDF Viewer"></iframe>
+
+            <!-- 2. DjVu Container powered by DjVu.js Viewer -->
+            <div id="reader-djvu-wrap" class="reader-djvu-wrap" style="display: none;">
+                <div id="djvu-viewer-mount" style="width: 100%; height: 100%;"></div>
+            </div>
+
+            <!-- 3. Canvas Container for PDF.js / DOCX / Highlights -->
+            <div id="reader-content-wrap" style="display: none; width: 100%;"></div>
+
+            <!-- Fallback & Local File Drag-and-Drop bar -->
+            <div id="reader-file-drop-bar" class="reader-drop-bar" style="display: none;">
+                <input type="file" id="input-local-file" accept=".pdf,.djvu,.docx" style="display: none;">
+                <span>💡 Якщо файл заблоковано провайдером, ви можете відкрити його локально:</span>
+                <button type="button" id="btn-pick-local" class="btn-drop-pick">📂 Відкрити файл з диска</button>
+            </div>
         </section>
 
         <!-- COLLAPSIBLE DOCK (Chessboard / Bookmarks / Notes) -->

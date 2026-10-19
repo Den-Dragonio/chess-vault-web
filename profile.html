@@ -1841,8 +1841,9 @@
                     const percent = Math.min(100, Math.max(0, parseInt(item.percentage) || Math.round(((item.currentPage || 1) / (item.totalPages || 1)) * 100)));
                     const format = (item.format || 'pdf').toUpperCase();
                     const curP = item.currentPage || 1;
-                    const totP = item.totalPages || 1;
-                    const readerUrl = `reader.html?id=${encodeURIComponent(item.id)}&file=${encodeURIComponent(item.url || '')}&title=${encodeURIComponent(item.title || '')}&author=${encodeURIComponent(item.author || '')}&format=${encodeURIComponent(item.format || 'pdf')}&page=${curP}`;
+                    const fileUrl = item.url || (item.id ? `https://archive.org/download/1971_20260223/${encodeURIComponent(item.id)}` : '');
+                    const itemFormat = (item.format || (item.id ? item.id.split('.').pop() : 'pdf')).toLowerCase();
+                    const readerUrl = `reader.html?id=${encodeURIComponent(item.id)}&file=${encodeURIComponent(fileUrl)}&title=${encodeURIComponent(item.title || '')}&author=${encodeURIComponent(item.author || '')}&format=${encodeURIComponent(itemFormat)}&page=${curP}`;
 
                     return `
                         <div class="reading-item" data-id="${esc(item.id)}">

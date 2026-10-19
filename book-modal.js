@@ -1102,8 +1102,15 @@ function onReadOnlineClick(book) {
         : null;
 
     const page = (progress && progress.currentPage) ? progress.currentPage : 1;
-    const fileUrl = book.url || '';
-    const format = (book.format || 'pdf').toLowerCase();
+    let fileUrl = book.url || '';
+    if (!fileUrl && bookId) {
+        fileUrl = `https://archive.org/download/1971_20260223/${encodeURIComponent(bookId)}`;
+    }
+    let format = (book.format || '').toLowerCase();
+    if (!format || format === '---') {
+        const ext = (bookId.split('.').pop() || 'pdf').toLowerCase();
+        format = ext;
+    }
     const coverUrl = book.coverUrl || '';
 
     const params = new URLSearchParams({
