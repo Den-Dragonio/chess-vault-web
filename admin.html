@@ -6,7 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chess Vault — Admin Dashboard</title>
     <link rel="icon" href="img/icon.png" type="image/png" sizes="64x64">
-    <link rel="stylesheet" href="admin.css">
+    <script src="dark-mode-init.js"></script>
+    <link rel="stylesheet" href="admin.css?v=11">
 
     <!-- Firebase SDK (compat) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -45,7 +46,11 @@
                     <span class="brand-badge">Admin Dashboard</span>
                 </a>
                 <div class="header-meta-wrap">
-                    <span id="current-admin-label" style="font-size: 0.85rem; color: #8b949e;">👤 Admin</span>
+                    <button id="admin-theme-btn" class="btn-ghost" title="Змінити тему" type="button">
+                        <span id="admin-theme-icon">🌓</span>
+                        <span id="admin-theme-label" class="logout-text">Тема</span>
+                    </button>
+                    <span id="current-admin-label" class="current-admin-label" style="font-size: 0.85rem; color: #8b949e;">👤 Admin</span>
                     <button id="admin-logout-btn" class="btn-ghost btn-admin-logout" style="color: #f87171;" title="Вийти">🚪 <span class="logout-text">Вийти</span></button>
                 </div>
             </div>
@@ -54,6 +59,10 @@
                 <button id="refresh-data-btn" class="admin-dock-btn" title="Оновити дані">
                     <span class="dock-icon">🔄</span>
                     <span class="dock-text">Оновити</span>
+                </button>
+                <button id="admin-dock-theme-btn" class="admin-dock-btn" title="Змінити тему" type="button">
+                    <span class="dock-icon" id="admin-dock-theme-icon">🌓</span>
+                    <span class="dock-text" id="admin-dock-theme-label">Тема</span>
                 </button>
                 <a href="index.html" class="admin-dock-btn">
                     <span class="dock-icon">🏠</span>
@@ -219,7 +228,7 @@
                     <!-- Заповнюється динамічно -->
                 </div>
 
-                <h4 style="color: #fff; margin-bottom: 12px; font-size: 0.95rem;">📚 Історія завантажених книг:</h4>
+                <h4 class="modal-section-title">📚 Історія завантажених книг:</h4>
                 <div class="table-responsive">
                     <table class="user-downloads-history-table">
                         <thead>
@@ -242,7 +251,7 @@
         </div>
     </div>
 
-    <script src="admin.js?v=9"></script>
+    <script src="admin.js?v=10"></script>
 </body>
 
 </html>

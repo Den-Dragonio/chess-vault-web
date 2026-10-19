@@ -1,20 +1,59 @@
 /* admin.css — Стилі для панелі адміністратора Chess Vault */
 :root {
+    --bg-main: #f1f5f9;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f8fafc;
+    --bg-card-elevated: #ffffff;
+    --bg-input: #f1f5f9;
+    --bg-table-th: #f8fafc;
+    --border-color: rgba(0, 0, 0, 0.08);
+    --border-color-hover: rgba(0, 0, 0, 0.16);
+    --border-accent: rgba(180, 134, 8, 0.35);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --gold: #b48608;
+    --gold-glow: rgba(180, 134, 8, 0.2);
+    --accent-blue: #0284c7;
+    --accent-green: #059669;
+    --accent-purple: #7c3aed;
+    --accent-red: #dc2626;
+    --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.05);
+    --shadow-modal: 0 25px 60px rgba(0, 0, 0, 0.18);
+    --header-bg: rgba(255, 255, 255, 0.88);
+    --dock-bg: rgba(255, 255, 255, 0.96);
+    --modal-bg: #ffffff;
+    --radial-bg-1: rgba(180, 134, 8, 0.05);
+    --radial-bg-2: rgba(2, 132, 199, 0.05);
+    --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+html.dark {
     --bg-main: #0b0f17;
     --bg-card: rgba(22, 27, 34, 0.85);
     --bg-card-hover: rgba(30, 36, 46, 0.95);
+    --bg-card-elevated: #161b22;
+    --bg-input: rgba(0, 0, 0, 0.35);
+    --bg-table-th: rgba(0, 0, 0, 0.25);
     --border-color: rgba(255, 255, 255, 0.08);
+    --border-color-hover: rgba(255, 255, 255, 0.18);
     --border-accent: rgba(212, 175, 55, 0.3);
     --text-primary: #f0f3f6;
     --text-secondary: #8b949e;
-    --text-muted: #586069;
+    --text-muted: #6b7280;
     --gold: #d4af37;
     --gold-glow: rgba(212, 175, 55, 0.25);
     --accent-blue: #38bdf8;
     --accent-green: #34d399;
     --accent-purple: #a855f7;
     --accent-red: #f87171;
-    --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3);
+    --shadow-modal: 0 25px 60px rgba(0, 0, 0, 0.6);
+    --header-bg: rgba(11, 15, 23, 0.88);
+    --dock-bg: rgba(14, 14, 22, 0.95);
+    --modal-bg: #141922;
+    --radial-bg-1: rgba(212, 175, 55, 0.04);
+    --radial-bg-2: rgba(56, 189, 248, 0.04);
 }
 
 * {
@@ -53,15 +92,17 @@ body {
     min-height: 100vh;
     padding-bottom: 60px;
     background-image: 
-        radial-gradient(circle at 15% 15%, rgba(212, 175, 55, 0.04) 0%, transparent 40%),
-        radial-gradient(circle at 85% 85%, rgba(56, 189, 248, 0.04) 0%, transparent 40%);
+        radial-gradient(circle at 15% 15%, var(--radial-bg-1) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, var(--radial-bg-2) 0%, transparent 40%);
     background-attachment: fixed;
+    transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 /* Header */
 .admin-header {
-    background: rgba(11, 15, 23, 0.85);
+    background: var(--header-bg);
     backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--border-color);
     position: sticky;
     top: 0;
@@ -71,6 +112,7 @@ body {
     justify-content: space-between;
     align-items: center;
     gap: 20px;
+    transition: background 0.25s ease, border-color 0.25s ease;
 }
 
 .header-inner {
@@ -109,9 +151,9 @@ body {
 }
 
 .admin-dock-btn:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: #fff;
-    border-color: rgba(255, 255, 255, 0.2);
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+    border-color: var(--border-color-hover);
 }
 
 .admin-dock-btn .dock-icon {
@@ -147,12 +189,12 @@ body {
 .brand-title {
     font-size: 1.35rem;
     font-weight: 700;
-    color: #fff;
+    color: var(--text-primary);
     letter-spacing: -0.02em;
 }
 
 .brand-badge {
-    background: rgba(212, 175, 55, 0.15);
+    background: rgba(180, 134, 8, 0.12);
     color: var(--gold);
     border: 1px solid var(--border-accent);
     font-size: 0.72rem;
@@ -161,6 +203,10 @@ body {
     padding: 3px 8px;
     border-radius: 6px;
     letter-spacing: 0.05em;
+}
+
+html.dark .brand-badge {
+    background: rgba(212, 175, 55, 0.15);
 }
 
 .header-actions {
@@ -185,9 +231,9 @@ body {
 }
 
 .btn-ghost:hover {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+    background: var(--bg-card-hover);
+    border-color: var(--border-color-hover);
 }
 
 .btn-gold {
@@ -234,12 +280,13 @@ body {
     padding: 24px;
     position: relative;
     overflow: hidden;
-    transition: transform 0.2s, border-color 0.2s;
+    box-shadow: var(--shadow-card);
+    transition: transform 0.2s, border-color 0.2s, background 0.25s;
 }
 
 .kpi-card:hover {
     transform: translateY(-3px);
-    border-color: rgba(255, 255, 255, 0.16);
+    border-color: var(--border-color-hover);
 }
 
 .kpi-card::before {
@@ -279,7 +326,7 @@ body {
 .kpi-value {
     font-size: 2.2rem;
     font-weight: 800;
-    color: #fff;
+    color: var(--text-primary);
     line-height: 1.1;
     margin-bottom: 6px;
     letter-spacing: -0.02em;
@@ -306,6 +353,7 @@ body {
     align-items: center;
     gap: 16px;
     flex-wrap: wrap;
+    box-shadow: var(--shadow-card);
 }
 
 .search-box-wrap {
@@ -316,14 +364,14 @@ body {
 
 .search-input {
     width: 100%;
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--bg-input);
     border: 1px solid var(--border-color);
     border-radius: 10px;
     padding: 11px 16px 11px 40px;
-    color: #fff;
+    color: var(--text-primary);
     font-size: 0.92rem;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, background 0.25s;
 }
 
 .search-input:focus {
@@ -347,7 +395,7 @@ body {
 }
 
 .filter-select {
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--bg-input);
     border: 1px solid var(--border-color);
     color: var(--text-primary);
     padding: 10px 14px;
@@ -355,10 +403,16 @@ body {
     font-size: 0.88rem;
     outline: none;
     cursor: pointer;
+    transition: border-color 0.2s, background 0.25s;
 }
 
 .filter-select:focus {
     border-color: var(--gold);
+}
+
+.filter-select option {
+    background: var(--bg-card);
+    color: var(--text-primary);
 }
 
 /* Dashboard Grid (Main Table + Sidebar) */
@@ -381,6 +435,7 @@ body {
     border-radius: 20px;
     overflow: hidden;
     margin-bottom: 24px;
+    box-shadow: var(--shadow-card);
 }
 
 .section-head {
@@ -394,14 +449,14 @@ body {
 .section-title {
     font-size: 1.15rem;
     font-weight: 700;
-    color: #fff;
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
 .section-badge {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--bg-input);
     color: var(--text-secondary);
     font-size: 0.78rem;
     padding: 3px 8px;
@@ -421,7 +476,7 @@ body {
 }
 
 .admin-table th {
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--bg-table-th);
     color: var(--text-secondary);
     padding: 14px 18px;
     font-weight: 600;
@@ -436,6 +491,7 @@ body {
     padding: 16px 18px;
     border-bottom: 1px solid var(--border-color);
     vertical-align: middle;
+    color: var(--text-primary);
 }
 
 .admin-table tr:hover td {
@@ -453,7 +509,7 @@ body {
     width: 38px;
     height: 38px;
     border-radius: 12px;
-    background: linear-gradient(135deg, #1f2937, #374151);
+    background: var(--bg-input);
     color: var(--gold);
     border: 1px solid var(--border-accent);
     display: flex;
@@ -464,9 +520,13 @@ body {
     flex-shrink: 0;
 }
 
+html.dark .user-avatar {
+    background: linear-gradient(135deg, #1f2937, #374151);
+}
+
 .user-name-text {
     font-weight: 600;
-    color: #fff;
+    color: var(--text-primary);
     line-height: 1.2;
     display: flex;
     align-items: center;
@@ -506,43 +566,77 @@ body {
 }
 
 .badge-direct {
+    background: #e2e8f0;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+}
+
+html.dark .badge-direct {
     background: rgba(139, 148, 158, 0.15);
     color: #cbd5e1;
     border: 1px solid rgba(139, 148, 158, 0.3);
 }
 
 .badge-telegram {
+    background: rgba(2, 132, 199, 0.1);
+    color: #0284c7;
+    border: 1px solid rgba(2, 132, 199, 0.25);
+}
+
+html.dark .badge-telegram {
     background: rgba(56, 189, 248, 0.15);
     color: #38bdf8;
     border: 1px solid rgba(56, 189, 248, 0.3);
 }
 
 .badge-google {
+    background: rgba(5, 150, 105, 0.1);
+    color: #059669;
+    border: 1px solid rgba(5, 150, 105, 0.25);
+}
+
+html.dark .badge-google {
     background: rgba(52, 211, 153, 0.15);
     color: #34d399;
     border: 1px solid rgba(52, 211, 153, 0.3);
 }
 
 .badge-reddit {
+    background: rgba(234, 88, 12, 0.1);
+    color: #ea580c;
+    border: 1px solid rgba(234, 88, 12, 0.25);
+}
+
+html.dark .badge-reddit {
     background: rgba(251, 146, 60, 0.15);
     color: #fb923c;
     border: 1px solid rgba(251, 146, 60, 0.3);
 }
 
 .badge-other {
+    background: rgba(124, 58, 237, 0.1);
+    color: #7c3aed;
+    border: 1px solid rgba(124, 58, 237, 0.25);
+}
+
+html.dark .badge-other {
     background: rgba(168, 85, 247, 0.15);
     color: #a855f7;
     border: 1px solid rgba(168, 85, 247, 0.3);
 }
 
 .badge-count {
-    background: rgba(212, 175, 55, 0.15);
+    background: rgba(180, 134, 8, 0.12);
     color: var(--gold);
     border: 1px solid var(--border-accent);
     padding: 3px 9px;
     border-radius: 12px;
     font-weight: 700;
     font-size: 0.8rem;
+}
+
+html.dark .badge-count {
+    background: rgba(212, 175, 55, 0.15);
 }
 
 .landing-url-link {
@@ -562,7 +656,7 @@ body {
 }
 
 .action-btn-sm {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--bg-input);
     border: 1px solid var(--border-color);
     color: var(--text-primary);
     padding: 6px 12px;
@@ -576,7 +670,7 @@ body {
 }
 
 .action-btn-sm:hover {
-    background: rgba(212, 175, 55, 0.15);
+    background: rgba(180, 134, 8, 0.15);
     border-color: var(--border-accent);
     color: var(--gold);
 }
@@ -613,9 +707,13 @@ body {
 .traffic-progress-bg {
     width: 100%;
     height: 8px;
-    background: rgba(0, 0, 0, 0.3);
+    background: #e2e8f0;
     border-radius: 6px;
     overflow: hidden;
+}
+
+html.dark .traffic-progress-bg {
+    background: rgba(0, 0, 0, 0.3);
 }
 
 .traffic-progress-fill {
@@ -633,7 +731,7 @@ body {
 
 .top-book-item {
     padding: 10px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -647,7 +745,7 @@ body {
 
 .top-book-title {
     font-weight: 600;
-    color: #fff;
+    color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -669,9 +767,10 @@ body {
 
 .activity-feed-item {
     padding: 10px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--border-color);
     font-size: 0.82rem;
     line-height: 1.4;
+    color: var(--text-primary);
 }
 
 .activity-feed-item:last-child {
@@ -698,7 +797,7 @@ body {
 }
 
 .modal-card {
-    background: #141922;
+    background: var(--modal-bg);
     border: 1px solid var(--border-color);
     border-radius: 24px;
     width: 100%;
@@ -707,7 +806,7 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-modal);
     animation: modalPop 0.25s ease-out;
 }
 
@@ -727,7 +826,7 @@ body {
 .modal-header h3 {
     font-size: 1.25rem;
     font-weight: 700;
-    color: #fff;
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -743,7 +842,14 @@ body {
 }
 
 .modal-close-btn:hover {
-    color: #fff;
+    color: var(--text-primary);
+}
+
+.modal-section-title {
+    color: var(--text-primary);
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+    font-weight: 700;
 }
 
 .modal-body {
@@ -757,10 +863,14 @@ body {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 14px;
     margin-bottom: 24px;
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--bg-input);
     border: 1px solid var(--border-color);
     padding: 16px;
     border-radius: 14px;
+}
+
+html.dark .user-meta-summary {
+    background: rgba(0, 0, 0, 0.3);
 }
 
 .user-meta-item {
@@ -778,7 +888,7 @@ body {
 
 .user-meta-val {
     font-size: 0.88rem;
-    color: #fff;
+    color: var(--text-primary);
     font-weight: 500;
 }
 
@@ -789,7 +899,7 @@ body {
 }
 
 .user-downloads-history-table th {
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--bg-table-th);
     color: var(--text-secondary);
     padding: 10px 14px;
     font-weight: 600;
@@ -801,7 +911,8 @@ body {
 
 .user-downloads-history-table td {
     padding: 12px 14px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
 }
 
 .loading-state {
@@ -820,13 +931,13 @@ body {
     border-radius: 24px;
     padding: 40px;
     text-align: center;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--shadow-modal);
 }
 
 .auth-barrier h2 {
     font-size: 1.5rem;
     margin-bottom: 8px;
-    color: #fff;
+    color: var(--text-primary);
 }
 
 .auth-barrier p {
@@ -837,14 +948,15 @@ body {
 
 .auth-input {
     width: 100%;
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--bg-input);
     border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 12px 16px;
-    color: #fff;
+    color: var(--text-primary);
     font-size: 0.95rem;
     outline: none;
     margin-bottom: 14px;
+    transition: border-color 0.2s, background 0.25s;
 }
 
 .auth-input:focus {
@@ -917,20 +1029,28 @@ body {
 }
 
 .text-now {
+    color: #10b981;
+}
+
+html.dark .text-now {
     color: #34d399;
 }
 
 .text-recent {
+    color: var(--accent-blue);
+}
+
+html.dark .text-recent {
     color: #e2e8f0;
 }
 
 .text-offline {
-    color: #94a3b8;
+    color: var(--text-muted);
 }
 
 .online-status-sub {
     font-size: 0.72rem;
-    color: #64748b;
+    color: var(--text-muted);
     margin-top: 2px;
 }
 
@@ -946,7 +1066,7 @@ body {
     align-items: center;
     gap: 6px;
     font-size: 0.82rem;
-    color: #e2e8f0;
+    color: var(--text-primary);
     font-weight: 600;
 }
 
@@ -958,9 +1078,9 @@ body {
 }
 
 .user-ip-badge {
-    background: rgba(255, 255, 255, 0.07);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    color: #38bdf8;
+    background: #e0f2fe;
+    border: 1px solid #bae6fd;
+    color: #0284c7;
     padding: 1px 7px;
     border-radius: 4px;
     font-family: monospace;
@@ -968,19 +1088,31 @@ body {
     letter-spacing: 0.02em;
 }
 
+html.dark .user-ip-badge {
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #38bdf8;
+}
+
 .user-device-sub {
-    color: #94a3b8;
+    color: var(--text-muted);
     font-size: 0.74rem;
 }
 
 .ip-code {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: #e0f2fe;
+    border: 1px solid #bae6fd;
     padding: 2px 7px;
     border-radius: 4px;
     font-family: monospace;
-    color: #38bdf8;
+    color: #0284c7;
     font-size: 0.85rem;
+}
+
+html.dark .ip-code {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #38bdf8;
 }
 
 /* ==============================================
@@ -1054,17 +1186,23 @@ body {
         min-height: 62px !important;
         padding: 0 8px !important;
         margin: 0 !important;
-        background: rgba(14, 14, 22, 0.95) !important;
+        background: var(--dock-bg) !important;
         backdrop-filter: blur(20px) !important;
         -webkit-backdrop-filter: blur(20px) !important;
-        border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-        box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.5) !important;
+        border-top: 1px solid var(--border-color) !important;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08) !important;
         z-index: 9999 !important;
         display: flex !important;
         flex-direction: row !important;
         align-items: center !important;
         justify-content: space-around !important;
         gap: 4px !important;
+    }
+
+    html.dark .admin-nav-dock {
+        background: rgba(14, 14, 22, 0.95) !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+        box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.5) !important;
     }
 
     .admin-dock-btn {
@@ -1079,7 +1217,7 @@ body {
         min-height: 48px !important;
         border-radius: 12px !important;
         transition: background 0.2s ease, transform 0.15s ease, color 0.2s ease !important;
-        color: #94a3b8 !important;
+        color: var(--text-secondary) !important;
         cursor: pointer !important;
         background: transparent !important;
         border: none !important;
@@ -1089,6 +1227,15 @@ body {
 
     .admin-dock-btn:active {
         transform: scale(0.92) !important;
+        background: rgba(0, 0, 0, 0.06) !important;
+        color: var(--text-primary) !important;
+    }
+
+    html.dark .admin-dock-btn {
+        color: #94a3b8 !important;
+    }
+
+    html.dark .admin-dock-btn:active {
         background: rgba(255, 255, 255, 0.08) !important;
         color: #fff !important;
     }

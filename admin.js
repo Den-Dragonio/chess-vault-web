@@ -71,6 +71,93 @@
         await auth.signOut();
     });
 
+    // ========================================================
+    // КЕРУВАННЯ ТЕМОЮ ДЕШБОРДА (light / dark / system)
+    // ========================================================
+    function updateThemeIcons(theme) {
+        const themeIcons = {
+            light: '☀️',
+            dark: '🌙',
+            system: '💻'
+        };
+        const themeLabels = {
+            light: 'Світла',
+            dark: 'Темна',
+            system: 'Авто'
+        };
+        const icon = themeIcons[theme] || '🌓';
+        const label = themeLabels[theme] || 'Тема';
+
+        const deskIcon = document.getElementById('admin-theme-icon');
+        const deskLabel = document.getElementById('admin-theme-label');
+        if (deskIcon) deskIcon.textContent = icon;
+        if (deskLabel) deskLabel.textContent = label;
+
+        const dockIcon = document.getElementById('admin-dock-theme-icon');
+        const dockLabel = document.getElementById('admin-dock-theme-label');
+        if (dockIcon) dockIcon.textContent = icon;
+        if (dockLabel) dockLabel.textContent = label;
+    }
+
+    function cycleTheme() {
+        const curTheme = localStorage.getItem('chess_theme') || 'system';
+        const order = ['system', 'light', 'dark'];
+        const nextIndex = (order.indexOf(curTheme) + 1) % order.length;
+        const nextTheme = order[nextIndex];
+
+        localStorage.setItem('chess_theme', nextTheme);
+        if (typeof window.applyTheme === 'function') {
+            window.applyTheme(nextTheme);
+        } else {
+            if (nextTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+            } else if (nextTheme === 'light') {
+                document.documentElement.classList.remove('dark');
+            } else {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.classList.toggle('dark', prefersDark);
+            }
+        }
+
+        updateThemeIcons(nextTheme);
+
+        const user = auth.currentUser;
+        if (user && db) {
+            db.collection('user_preferences').doc(user.uid).set({
+                theme: nextTheme,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true }).catch(() => {});
+        }
+    }
+
+    function initAdminThemeControls() {
+        const curTheme = localStorage.getItem('chess_theme') || 'system';
+        updateThemeIcons(curTheme);
+
+        const deskBtn = document.getElementById('admin-theme-btn');
+        if (deskBtn) {
+            deskBtn.addEventListener('click', cycleTheme);
+        }
+        const dockBtn = document.getElementById('admin-dock-theme-btn');
+        if (dockBtn) {
+            dockBtn.addEventListener('click', cycleTheme);
+        }
+
+        // Слухач зміни теми ОС для синхронізації іконок, якщо активний режим 'system'
+        if (window.matchMedia) {
+            try {
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                    const t = localStorage.getItem('chess_theme') || 'system';
+                    if (t === 'system') {
+                        updateThemeIcons('system');
+                    }
+                });
+            } catch (_) {}
+        }
+    }
+
+    initAdminThemeControls();
+
     refreshBtn.addEventListener('click', () => {
         const textEl = refreshBtn.querySelector('.dock-text');
         const iconEl = refreshBtn.querySelector('.dock-icon');
@@ -99,6 +186,19 @@
                 dashboardWrap.style.display = 'block';
                 const name = user.displayName || user.email.split('@')[0];
                 adminLabel.textContent = `👤 ${name}`;
+
+                // Синхронізувати тему з user_preferences, якщо вона збережена на акаунті
+                db.collection('user_preferences').doc(user.uid).get().then(doc => {
+                    if (doc.exists && doc.data() && doc.data().theme) {
+                        const savedTheme = doc.data().theme;
+                        if (savedTheme !== localStorage.getItem('chess_theme')) {
+                            localStorage.setItem('chess_theme', savedTheme);
+                            if (window.applyTheme) window.applyTheme(savedTheme);
+                            updateThemeIcons(savedTheme);
+                        }
+                    }
+                }).catch(() => {});
+
                 loadAllDashboardData();
             } else {
                 dashboardWrap.style.display = 'none';
