@@ -165,14 +165,6 @@
     z-index: 50000 !important;
 }
 
-/* При відкритій модалці чемпіона або книги приховуємо нижній мобільний хедер,
-   щоб він ніколи не перекривав модалку та її кнопки/список книг */
-body.champion-modal-open .main-header,
-body.book-modal-open .main-header {
-    display: none !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
-}
 
 #champion-modal-overlay {
     display: none;
@@ -1150,31 +1142,43 @@ html.dark .chm-elo-val {
         display: none;
     }
 
-    /* Модальне вікно чемпіона на мобілці: суцільний плавний фон на всю модалку включно з літературою */
+    /* Модальне вікно чемпіона на мобілці:
+       - Нижній хедер (.main-header) завжди видимий на екрані (z-index: 9999)
+       - Модалка зупиняється акуратно над хедером (bottom: calc(62px + env(safe-area-inset-bottom, 0px)))
+       - Суцільний красивий фон (#ffffff / #0e1018), що плавно об'єднує інфу та літературу
+       - Список книг оформлений як скрольне віконце (окошко), як у десктопній версії */
     #champion-modal-overlay {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
+        height: auto !important;
+        max-height: calc(100% - 62px - env(safe-area-inset-bottom, 0px)) !important;
+        z-index: 9900 !important;
         background: #ffffff !important;
-        z-index: 45000 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
     }
     html.dark #champion-modal-overlay {
         background: #0e1018 !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
     }
     #champion-modal-overlay.active {
         display: block !important;
         padding: 0 !important;
-        overflow-y: auto !important;
-        -webkit-overflow-scrolling: touch !important;
     }
     #champion-modal-card {
         width: 100% !important;
         max-width: 100% !important;
-        min-height: 100vh !important;
-        min-height: 100dvh !important;
+        min-height: 100% !important;
         height: auto !important;
         max-height: none !important;
         border-radius: 0 !important;
         border: none !important;
-        padding: 50px 16px calc(64px + env(safe-area-inset-bottom, 20px)) 16px !important;
-        gap: 22px;
+        padding: 40px 16px 20px 16px !important;
+        gap: 20px;
         background: #ffffff !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
@@ -1183,24 +1187,35 @@ html.dark .chm-elo-val {
         -webkit-overflow-scrolling: touch;
     }
     #champion-modal-body {
-        padding-bottom: 24px;
+        padding-bottom: 12px;
         width: 100%;
         display: flex;
         flex-direction: column;
-        gap: 24px;
+        gap: 20px;
     }
     #champion-modal-close {
-        top: 10px;
-        right: 10px;
-        width: 40px;
-        height: 40px;
-        min-width: 40px;
-        min-height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.3rem;
-        z-index: 10;
+        position: fixed !important;
+        top: 10px !important;
+        right: 10px !important;
+        width: 38px !important;
+        height: 38px !important;
+        min-width: 38px !important;
+        min-height: 38px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 1.25rem !important;
+        z-index: 9950 !important;
+        background: rgba(0, 0, 0, 0.08) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        border-radius: 50% !important;
+        border: none !important;
+        cursor: pointer;
+    }
+    html.dark #champion-modal-close {
+        background: rgba(255, 255, 255, 0.12) !important;
+        color: #ffffff !important;
     }
     .chm-top {
         flex-direction: column;
@@ -1262,16 +1277,16 @@ html.dark .chm-elo-val {
         padding-left: 26px;
     }
 
-    /* Рамка для книг чемпіона на мобільних пристроях: гармонійний фон, що продовжує картку */
+    /* Рамка-окошко для списку книг чемпіона (як у десктоп версії) */
     .chm-books-frame {
-        padding: 16px 14px 20px;
+        padding: 16px 14px 16px;
         border-radius: 20px;
-        background: rgba(0, 0, 0, 0.025) !important;
+        background: rgba(0, 0, 0, 0.035) !important;
         border: 1px solid rgba(0, 0, 0, 0.08) !important;
-        box-shadow: none !important;
-        gap: 14px;
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+        gap: 12px;
         margin-top: 4px;
-        margin-bottom: 24px !important;
+        margin-bottom: 16px !important;
         box-sizing: border-box !important;
     }
 
@@ -1343,18 +1358,34 @@ html.dark .chm-elo-val {
         margin-bottom: 6px;
     }
 
-    /* В мобільній версії список книг розгортається повністю і скролиться разом з усією модалкою */
+    /* Окошко всередині якого можна зручно гортати список книг, як у десктоп версії */
     .chm-books-scroll-list {
-        max-height: none !important;
-        overflow-y: visible !important;
+        max-height: 280px !important;
+        overflow-y: auto !important;
         -webkit-overflow-scrolling: touch !important;
-        overscroll-behavior: auto !important;
-        padding-right: 0 !important;
-        margin-top: 6px;
-        padding-bottom: 8px !important;
+        overscroll-behavior: contain !important;
         display: flex !important;
         flex-direction: column !important;
         gap: 8px !important;
+        padding: 4px 6px 8px 2px !important;
+        margin-top: 4px;
+        scrollbar-width: thin !important;
+        scrollbar-color: rgba(0, 0, 0, 0.25) transparent !important;
+    }
+
+    html.dark .chm-books-scroll-list {
+        scrollbar-color: rgba(255, 255, 255, 0.25) transparent !important;
+    }
+    .chm-books-scroll-list::-webkit-scrollbar {
+        width: 4px !important;
+        display: block !important;
+    }
+    .chm-books-scroll-list::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.25) !important;
+        border-radius: 4px !important;
+    }
+    html.dark .chm-books-scroll-list::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.25) !important;
     }
 
     .chm-bottom-spacer {
@@ -1406,9 +1437,9 @@ html.dark .chm-elo-val {
         box-shadow: none !important;
     }
     html.dark .chm-books-frame {
-        background: rgba(255, 255, 255, 0.035) !important;
-        border-color: rgba(255, 255, 255, 0.08) !important;
-        box-shadow: none !important;
+        background: rgba(255, 255, 255, 0.04) !important;
+        border-color: rgba(255, 255, 255, 0.09) !important;
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3) !important;
     }
     html.dark .chm-count-pill {
         background: rgba(255, 255, 255, 0.06) !important;
@@ -1428,7 +1459,7 @@ html.dark .chm-elo-val {
         font-size: 0.78rem;
     }
     #champion-modal-card {
-        padding: 48px 14px calc(64px + env(safe-area-inset-bottom, 20px)) 14px !important;
+        padding: 38px 14px 16px 14px !important;
         gap: 18px;
     }
     .chm-name {
@@ -1443,9 +1474,9 @@ html.dark .chm-elo-val {
         padding: 5px 10px;
     }
     .chm-books-frame {
-        padding: 14px 10px 18px;
+        padding: 14px 10px 14px;
         border-radius: 18px;
-        margin-bottom: 24px !important;
+        margin-bottom: 16px !important;
     }
     .chm-books-frame-title {
         font-size: 1.08rem;
@@ -1455,8 +1486,10 @@ html.dark .chm-elo-val {
         font-size: 0.76rem;
     }
     .chm-books-scroll-list {
-        max-height: none !important;
-        overflow-y: visible !important;
+        max-height: 260px !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior: contain !important;
         padding-bottom: 8px !important;
     }
     .chm-bottom-spacer {

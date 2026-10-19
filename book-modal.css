@@ -4,14 +4,6 @@
    Стиль: Glassmorphism, fullscreen
    ============================================== */
 
-/* ---- OVERLAY ---- */
-body.book-modal-open .main-header,
-body.champion-modal-open .main-header {
-    display: none !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
-}
-
 #book-detail-overlay {
     display: none;
     position: fixed;
