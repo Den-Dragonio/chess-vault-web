@@ -161,6 +161,7 @@ function openBookModal(book) {
     if (!book) return;
     const overlay = ensureBookModalElements();
     overlay.classList.add('active');
+    document.body.classList.add('book-modal-open');
     document.body.style.overflow = 'hidden';
     renderModalSkeleton(book);
     loadBookMetadata(book);
@@ -169,10 +170,13 @@ function openBookModal(book) {
 function closeBookModal() {
     const overlay = document.getElementById('book-detail-overlay');
     if (overlay) overlay.classList.remove('active');
+    document.body.classList.remove('book-modal-open');
     const champOverlay = document.getElementById('champion-modal-overlay');
     if (champOverlay && champOverlay.classList.contains('active')) {
         document.body.style.overflow = 'hidden';
+        document.body.classList.add('champion-modal-open');
     } else {
+        document.body.classList.remove('champion-modal-open');
         document.body.style.overflow = '';
     }
 }

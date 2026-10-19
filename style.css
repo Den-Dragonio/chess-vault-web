@@ -819,6 +819,14 @@ input:focus {
         justify-content: center !important;
     }
 
+    /* При відкритих модалках на мобілці ховаємо хедер, щоб він не перекривав картку */
+    body.champion-modal-open .main-header,
+    body.book-modal-open .main-header {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+
     /* Навігаційний ряд */
     .nav-menu {
         display: flex !important;

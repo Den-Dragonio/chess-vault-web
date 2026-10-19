@@ -574,12 +574,14 @@ function openChampionModal(champ) {
     }
     championModalOverlay.classList.add('active');
     document.body.style.overflow = 'hidden';
+    document.body.classList.add('champion-modal-open');
 }
 
 function closeChampionModal() {
     if (!championModalOverlay) return;
     championModalOverlay.classList.remove('active');
     document.body.style.overflow = '';
+    document.body.classList.remove('champion-modal-open');
     currentlyOpenChamp = null;
 }
 
