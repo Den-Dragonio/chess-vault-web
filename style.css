@@ -803,20 +803,23 @@ input:focus {
         left: 0 !important;
         right: 0 !important;
         width: 100% !important;
-        height: 62px !important;
-        min-height: 62px !important;
-        padding: 0 8px !important;
+        height: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
+        min-height: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
+        padding: 0 8px env(safe-area-inset-bottom, 0px) 8px !important;
         margin: 0 !important;
-        background: rgba(255, 255, 255, 0.94) !important;
+        box-sizing: border-box !important;
+        background: rgba(255, 255, 255, 0.98) !important;
         backdrop-filter: blur(20px) !important;
         -webkit-backdrop-filter: blur(20px) !important;
         border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
         border-bottom: none !important;
-        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06) !important;
-        z-index: 9999 !important;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08) !important;
+        z-index: 99999 !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
+        transform: translateZ(0) !important;
+        -webkit-transform: translateZ(0) !important;
     }
 
     /* Навігаційний ряд */
