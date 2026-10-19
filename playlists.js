@@ -99,7 +99,7 @@ function plSaveToLocalStorage(uid, playlists) {
     } catch (_) {}
 }
 
-function plWithTimeout(promise, ms = 3500) {
+function plWithTimeout(promise, ms = 7000) {
     return Promise.race([
         promise,
         new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), ms))
@@ -139,7 +139,7 @@ async function plSyncFromFirestore(uid) {
 
     try {
         const docRef = firestore.collection('user_preferences').doc(uid);
-        const snap = await plWithTimeout(docRef.get(), 4000);
+        const snap = await plWithTimeout(docRef.get(), 7000);
 
         if (snap && snap.exists) {
             const data = snap.data();
@@ -169,7 +169,13 @@ async function plSyncFromFirestore(uid) {
                 return;
             }
         }
-        await plSyncToFirestore(uid);
+        
+        // Safety guard: only push local to Firestore if local actually has added books or custom playlists!
+        // Never overwrite cloud with empty default playlists.
+        const hasCustomOrBooks = _plUserPlaylists.some(p => !p.isDefault || (p.books && p.books.length > 0));
+        if (hasCustomOrBooks) {
+            await plSyncToFirestore(uid);
+        }
     } catch (err) {
         console.warn('[Playlists] Firestore sync warning:', err.message || err);
     }
@@ -200,15 +206,16 @@ async function plSyncToFirestore(uid) {
             }))
         }));
 
-        await plWithTimeout(docRef.set({ playlists: cleanList }, { merge: true }), 4000);
+        await plWithTimeout(docRef.set({ playlists: cleanList }, { merge: true }), 7000);
     } catch (err) {
         console.warn('[Playlists] Firestore save error:', err.message || err);
     }
 }
 
 function plGetPlaylists() {
-    if (!_plUserPlaylists || _plUserPlaylists.length === 0) {
-        const u = plGetUser();
+    const u = plGetUser();
+    const expectedUid = u ? u.uid : 'guest';
+    if (!_plUserPlaylists || _plUserPlaylists.length === 0 || _plCurrentUid !== expectedUid) {
         plInitForUser(u);
     }
     return _plUserPlaylists;
@@ -222,6 +229,9 @@ async function plAddBookToPlaylist(playlistId, book) {
     if (!u) {
         plPromptLogin();
         return false;
+    }
+    if (_plCurrentUid !== u.uid) {
+        plInitForUser(u);
     }
 
     const playlists = plGetPlaylists();
@@ -987,3 +997,20 @@ window.plAttachModalListeners = plAttachModalListeners;
 window.plInitForUser = plInitForUser;
 window.plOpenPlaylistModal = plOpenPlaylistModal;
 window.plClosePlaylistModal = plClosePlaylistModal;
+window.plSyncFromFirestore = plSyncFromFirestore;
+
+// Automatic auth state change listener across all pages
+if (typeof firebase !== 'undefined') {
+    try {
+        firebase.auth().onAuthStateChanged((user) => {
+            const expectedUid = user ? user.uid : 'guest';
+            if (_plCurrentUid !== expectedUid) {
+                plInitForUser(user);
+                if (document.getElementById('playlists-section')) {
+                    plRenderProfileHTML();
+                }
+            }
+        });
+    } catch (_) {}
+}
+
