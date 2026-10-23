@@ -132,6 +132,93 @@
     };
 
     // ========================================================
+    // ⚡ ELO RATING BAR WIDGET (Dock / Board side)
+    // ========================================================
+    function resolveBookElo() {
+        // 1. З параметрів URL
+        let eloDisplay = urlParams.get('eloDisplay');
+        let eloLevel = urlParams.get('eloLevel');
+        let eloPercent = parseInt(urlParams.get('eloPercent'), 10);
+
+        // 2. З глобального кешу книг (books-cache.js)
+        if (!eloDisplay && window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE)) {
+            const bId = (bookParam.id || '').toLowerCase();
+            const bTitle = (bookParam.title || '').toLowerCase();
+            const found = window.CHESS_BOOKS_CACHE.find(b => 
+                (b.id && b.id.toLowerCase() === bId) ||
+                (b.title && b.title.toLowerCase() === bTitle) ||
+                (b.title && bTitle.includes(b.title.toLowerCase()))
+            );
+            if (found) {
+                eloDisplay = found.eloDisplay;
+                eloLevel = found.eloLevel;
+                eloPercent = found.eloPercent;
+            }
+        }
+
+        // 3. Fallbacks за замовчуванням
+        if (!eloDisplay) eloDisplay = '1400–1800';
+        if (!eloLevel) eloLevel = 'intermediate';
+        if (isNaN(eloPercent) || !eloPercent) eloPercent = 50;
+
+        return { eloDisplay, eloLevel, eloPercent };
+    }
+
+    function initReaderEloWidget() {
+        const eloCard = document.getElementById('reader-elo-card');
+        const badge = document.getElementById('reader-elo-badge');
+        const fill = document.getElementById('reader-elo-fill');
+        const desc = document.getElementById('reader-elo-desc');
+        const toggleBtn = document.getElementById('btn-toggle-reader-elo');
+        const toggleStatus = document.getElementById('reader-elo-toggle-status');
+        if (!eloCard) return;
+
+        const { eloDisplay, eloLevel, eloPercent } = resolveBookElo();
+
+        if (badge) {
+            badge.textContent = `⚡ ${eloDisplay}`;
+            badge.className = `reader-elo-badge level-${eloLevel}`;
+        }
+        if (fill) {
+            fill.style.width = `${eloPercent}%`;
+            fill.className = `reader-elo-fill level-${eloLevel}`;
+        }
+        if (desc) {
+            const isEn = window.i18n && window.i18n.currentLang === 'en';
+            let descText = `Рекомендовано для клубних гравців (${eloDisplay} ELO)`;
+            if (eloLevel === 'novice' || eloLevel === 'beginner') {
+                descText = isEn ? `Recommended: Beginners & Novices (${eloDisplay} ELO)` : `Рекомендовано: початківці та розрядники (${eloDisplay} ELO)`;
+            } else if (eloLevel === 'intermediate') {
+                descText = isEn ? `Recommended: Club players (${eloDisplay} ELO)` : `Рекомендовано: клубні гравці (${eloDisplay} ELO)`;
+            } else if (eloLevel === 'advanced') {
+                descText = isEn ? `Recommended: Advanced & Masters (${eloDisplay} ELO)` : `Рекомендовано: кандидати у майстри та майстри (${eloDisplay} ELO)`;
+            } else if (eloLevel === 'master') {
+                descText = isEn ? `Recommended: Grandmasters (${eloDisplay} ELO)` : `Рекомендовано: майстри та гросмейстери (${eloDisplay} ELO)`;
+            }
+            desc.textContent = descText;
+        }
+
+        // Відновлюємо збережений стан показу/приховування шкали
+        const saved = localStorage.getItem('chess_vault_reader_show_elo');
+        const isShown = saved !== 'false';
+        eloCard.classList.toggle('is-hidden', !isShown);
+        if (toggleBtn) toggleBtn.classList.toggle('active', isShown);
+        if (toggleStatus) toggleStatus.textContent = isShown ? 'УВІМК' : 'ВИМК';
+
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                const nowHidden = eloCard.classList.toggle('is-hidden');
+                const show = !nowHidden;
+                toggleBtn.classList.toggle('active', show);
+                if (toggleStatus) toggleStatus.textContent = show ? 'УВІМК' : 'ВИМК';
+                try {
+                    localStorage.setItem('chess_vault_reader_show_elo', show ? 'true' : 'false');
+                } catch (e) {}
+            });
+        }
+    }
+
+    // ========================================================
     // 2. INITIALIZATION
     // ========================================================
     function init() {
@@ -143,6 +230,7 @@
         applyDockCollapsed(state.isDockCollapsed);
 
         initChessGame();
+        initReaderEloWidget();
 
         // 1. Спочатку завантажуємо локальний стан воркспейсу юзера для цієї книги
         loadUserBookWorkspace();

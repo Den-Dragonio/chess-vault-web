@@ -25,6 +25,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="firebase-init.js?v=8"></script>
     <script src="reading-progress.js?v=1"></script>
+    <script src="books-cache.js?v=2"></script>
     <!-- PDF.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <!-- Mammoth.js for Word (.docx) documents -->
@@ -165,6 +166,26 @@
                         <!-- Moves Sequence Log (Parsed from book text) -->
                         <div class="board-moves-log" id="board-moves-log">
                             <span style="color: var(--reader-text-muted); font-size: 0.75rem;">Виділіть шахові ходи в тексті книги (наприклад, "1. e4 e5 2. Nf3 Nc6") або розставте фігури в редакторі.</span>
+                        </div>
+
+                        <!-- ELO Rating Bar Widget with On/Off Toggle -->
+                        <div class="reader-elo-card" id="reader-elo-card">
+                            <div class="reader-elo-header">
+                                <div class="reader-elo-title-wrap">
+                                    <span class="reader-elo-icon">⚡</span>
+                                    <span class="reader-elo-title">Рівень книги:</span>
+                                    <span class="reader-elo-badge" id="reader-elo-badge">1400–1800</span>
+                                </div>
+                                <button type="button" class="reader-elo-toggle-btn active" id="btn-toggle-reader-elo" title="Показати/приховати шкалу ELO">
+                                    <span id="reader-elo-toggle-status">УВІМК</span>
+                                </button>
+                            </div>
+                            <div class="reader-elo-body" id="reader-elo-body">
+                                <div class="reader-elo-track">
+                                    <div class="reader-elo-fill" id="reader-elo-fill" style="width: 50%;"></div>
+                                </div>
+                                <div class="reader-elo-desc" id="reader-elo-desc">Рекомендовано: клубний гравець (1400–1800 ELO)</div>
+                            </div>
                         </div>
                     </div>
 

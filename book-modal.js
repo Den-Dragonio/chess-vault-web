@@ -1166,6 +1166,9 @@ function onReadOnlineClick(book) {
         author: book.author || '',
         format: format,
         inArchive: (book.inArchive !== false) ? '1' : '0',
+        eloDisplay: book.eloDisplay || '',
+        eloLevel: book.eloLevel || '',
+        eloPercent: book.eloPercent || '',
         cover: coverUrl,
         page: page
     });
