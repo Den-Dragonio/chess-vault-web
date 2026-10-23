@@ -95,6 +95,47 @@
             box-sizing: border-box;
         }
 
+        html.dark .profile-card {
+            background: rgba(20, 20, 32, 0.78);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            color: #f1f5f9;
+        }
+
+        html.dark .profile-name {
+            color: #f8fafc;
+        }
+
+        html.dark .profile-badge {
+            background: rgba(212, 175, 55, 0.15);
+            color: #f1c40f;
+            border: 1px solid rgba(212, 175, 55, 0.3);
+        }
+
+        html.dark .profile-rank-hint,
+        html.dark .profile-reg-date {
+            color: #94a3b8;
+        }
+
+        html.dark .stat-value {
+            color: #f8fafc;
+        }
+
+        html.dark .stat-label {
+            color: #94a3b8;
+        }
+
+        html.dark .profile-divider {
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        html.dark .playlists-shelf-card {
+            background: rgba(20, 20, 32, 0.78);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            color: #f1f5f9;
+        }
+
         .profile-avatar {
             width: 80px;
             height: 80px;
@@ -441,6 +482,48 @@
             gap: 8px;
         }
 
+        .reading-card-title {
+            color: #111;
+        }
+
+        html.dark .reading-card-title {
+            color: #f8fafc !important;
+        }
+
+        .reading-item-btn-remove {
+            padding: 4px 8px;
+            font-size: 0.74rem;
+            font-weight: 700;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.05);
+            color: #666;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .reading-item-btn-remove:hover {
+            background: #ef4444;
+            color: #fff;
+            border-color: #ef4444;
+            transform: scale(1.05);
+        }
+
+        html.dark .reading-item-btn-remove {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.15);
+            color: #94a3b8;
+        }
+
+        html.dark .reading-item-btn-remove:hover {
+            background: #ef4444;
+            color: #fff;
+            border-color: #ef4444;
+        }
+
         .reading-item-pages {
             font-size: 0.74rem;
             color: #888;
@@ -448,7 +531,7 @@
         }
 
         html.dark .reading-item-pages {
-            color: #999;
+            color: #cbd5e1;
         }
 
         .reading-item-btn-continue {
@@ -1178,7 +1261,7 @@
             <div class="reading-card" id="reading-card">
                 <div class="reading-card-header">
                     <div>
-                        <h2 data-i18n="profile_reading_title" style="margin: 0 0 4px; font-size: 1.4rem; color: #222;">📖 Зараз читаю</h2>
+                        <h2 class="reading-card-title" data-i18n="profile_reading_title" style="margin: 0 0 4px; font-size: 1.4rem;">📖 Зараз читаю</h2>
                         <p class="reading-card-subtitle" data-i18n="profile_reading_hint">Книги, де ви прочитали принаймні 10 сторінок онлайн</p>
                     </div>
                     <span class="reading-count-badge" id="reading-count-badge">0</span>
@@ -1848,12 +1931,20 @@
 
                 readingWrap.innerHTML = readingBooks.map(item => {
                     const curP = item.currentPage || 1;
-                    const totP = item.totalPages || 100;
+                    let totP = parseInt(item.totalPages) || 0;
+                    if (!totP || totP === 100) {
+                        if (window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE)) {
+                            const found = window.CHESS_BOOKS_CACHE.find(b => b && (b.id === item.id || b.title === item.title));
+                            if (found && found.pages) totP = parseInt(found.pages) || 0;
+                        }
+                    }
+                    if (!totP) totP = 100;
                     const percent = Math.min(100, Math.max(0, parseInt(item.percentage) || Math.round((curP / totP) * 100)));
                     const format = (item.format || 'pdf').toUpperCase();
                     const fileUrl = item.url || (item.id ? `https://archive.org/download/1971_20260223/${encodeURIComponent(item.id)}` : '');
                     const itemFormat = (item.format || (item.id ? item.id.split('.').pop() : 'pdf')).toLowerCase();
                     const readerUrl = `reader.html?id=${encodeURIComponent(item.id)}&file=${encodeURIComponent(fileUrl)}&title=${encodeURIComponent(item.title || '')}&author=${encodeURIComponent(item.author || '')}&format=${encodeURIComponent(itemFormat)}&page=${curP}`;
+                    const isEn = window.i18n && window.i18n.getLanguage() === 'en';
 
                     return `
                         <div class="reading-item" data-id="${esc(item.id)}">
@@ -1872,12 +1963,35 @@
                                 </div>
                                 <div class="reading-item-footer">
                                     <span class="reading-item-pages">${curP} / ${totP} ${pageWord} • ${percent}%</span>
-                                    <a href="${readerUrl}" target="_blank" rel="noopener" class="reading-item-btn-continue">▶ ${esc(continueBtnText)}</a>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <button type="button" class="reading-item-btn-remove" data-id="${esc(item.id)}" title="${isEn ? 'Remove from Currently Reading' : 'Видалити з Зараз читаю'}">✕</button>
+                                        <a href="${readerUrl}" target="_blank" rel="noopener" class="reading-item-btn-continue">▶ ${esc(continueBtnText)}</a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     `;
                 }).join('');
+
+                // Кнопка видалення книги з Зараз читаю
+                readingWrap.querySelectorAll('.reading-item-btn-remove').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        const bId = btn.dataset.id;
+                        if (!bId) return;
+                        const isEn = window.i18n && window.i18n.getLanguage() === 'en';
+                        const confirmMsg = isEn
+                            ? 'Remove this book from Currently Reading?'
+                            : 'Видалити цю книгу з розділу «Зараз читаю»?';
+                        if (confirm(confirmMsg)) {
+                            if (window.ReadingProgress) {
+                                await window.ReadingProgress.removeProgress(user.uid, bId);
+                                renderReadingCard(user.uid);
+                            }
+                        }
+                    });
+                });
 
                 // Клік на назву відкриває модалку книги
                 readingWrap.querySelectorAll('.reading-item').forEach(row => {

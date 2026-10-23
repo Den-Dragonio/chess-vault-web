@@ -971,12 +971,26 @@ async function onDownloadClick(btn) {
         return;
     }
 
+    if (btn.dataset.available === 'false') {
+        const notAvailMsg = isEn
+            ? 'This book is not in the online archive yet. You can open your local file in the reader.'
+            : 'Ця книга ще не завантажена в онлайн-архів. Ви можете відкрити свій файл у читалці.';
+        showToast(notAvailMsg, 'warn', isEn ? 'Reader 📖' : 'Читалка 📖', () => {
+            window.open(`reader.html?title=${encodeURIComponent(btn.dataset.title || '')}`, '_blank');
+        });
+        return;
+    }
+
     let url = btn.dataset.url || '';
     if (!url) {
         const fallbackFilename = btn.dataset.id || btn.dataset.filename || '';
         if (fallbackFilename) {
             url = `https://archive.org/download/1971_20260223/${encodeURIComponent(fallbackFilename)}`;
         }
+    }
+
+    if (url && url.includes('1971_20260223_vol2')) {
+        url = url.replace('1971_20260223_vol2', '1971_20260223');
     }
 
     // Safely encode filename in URL if raw spaces/Cyrillic exist

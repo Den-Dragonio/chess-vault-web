@@ -275,7 +275,37 @@ function renderTable(books) {
         return;
     }
     container.innerHTML = books.map((b, idx) => {
-        const bookUrl = b.url || (b.id ? `https://archive.org/download/1971_20260223/${encodeURIComponent(b.id)}` : '');
+        const isAvailable = Boolean(b.url || b.inArchive);
+        let bookUrl = b.url || '';
+        if (!bookUrl && b.id && b.inArchive) {
+            bookUrl = `https://archive.org/download/1971_20260223/${encodeURIComponent(b.id)}`;
+        }
+        if (bookUrl && bookUrl.includes('1971_20260223_vol2')) {
+            bookUrl = bookUrl.replace('1971_20260223_vol2', '1971_20260223');
+        }
+
+        const actionBtn = isAvailable
+            ? `<button class="download-link download-btn-js"
+                        data-url="${bookUrl}"
+                        data-available="true"
+                        data-title="${(b.title || '').replace(/"/g, '&quot;')}"
+                        data-author="${(b.author || '').replace(/"/g, '&quot;')}"
+                        data-id="${(b.id || '').replace(/"/g, '&quot;')}"
+                        data-format="${b.format || 'pdf'}"
+                        data-size="${b.sizeDisplay || '—'}">
+                    <span>⬇</span><span>${dlText}</span>
+                </button>`
+            : `<button class="download-link download-btn-js btn-unavailable"
+                        data-url=""
+                        data-available="false"
+                        data-title="${(b.title || '').replace(/"/g, '&quot;')}"
+                        data-author="${(b.author || '').replace(/"/g, '&quot;')}"
+                        data-id="${(b.id || '').replace(/"/g, '&quot;')}"
+                        data-format="${b.format || 'pdf'}"
+                        data-size="${b.sizeDisplay || '—'}"
+                        title="${isEn ? 'Not uploaded to online archive yet' : 'Ще не завантажено в онлайн-архів'}">
+                    <span>📁</span><span>${isEn ? 'Offline' : 'Офлайн'}</span>
+                </button>`;
 
         return `
         <tr data-book-idx="${idx}" style="cursor:pointer">
@@ -286,16 +316,7 @@ function renderTable(books) {
             <td class="col-format"><span class="badge format-${b.format}">${b.format}</span></td>
             <td class="col-size">${b.sizeDisplay}</td>
             <td class="col-action">
-                <button class="download-link download-btn-js"
-                        data-url="${bookUrl}"
-                        data-available="true"
-                        data-title="${(b.title || '').replace(/"/g, '&quot;')}"
-                        data-author="${(b.author || '').replace(/"/g, '&quot;')}"
-                        data-id="${(b.id || '').replace(/"/g, '&quot;')}"
-                        data-format="${b.format || 'pdf'}"
-                        data-size="${b.sizeDisplay || '—'}">
-                    <span>⬇</span><span>${dlText}</span>
-                </button>
+                ${actionBtn}
             </td>
         </tr>
     `;

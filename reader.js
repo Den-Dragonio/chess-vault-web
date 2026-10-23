@@ -134,6 +134,7 @@
         totalPages: 100,
         zoom: 1.0,
         pdfDoc: null,
+        djvuViewer: null,
         isHighlightActive: false,
         settings: {
             dockSide: localStorage.getItem('chess_vault_reader_dock_side') || 'right',
@@ -782,6 +783,19 @@
     // ========================================================
     function resolveTotalPages() {
         let pages = parseInt(urlParams.get('pages')) || 0;
+        const cleanTitle = (bookParam.title || '').toLowerCase().replace(/\.[^/.]+$/, '').trim();
+        const cleanId = (bookParam.id || '').toLowerCase().replace(/\.[^/.]+$/, '').trim();
+
+        if (!pages && window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE)) {
+            const found = window.CHESS_BOOKS_CACHE.find(b => {
+                if (!b) return false;
+                if (b.id && (b.id.toLowerCase() === cleanId || b.id.toLowerCase().includes(cleanId))) return true;
+                const bt = (b.title || '').toLowerCase().replace(/\.[^/.]+$/, '').trim();
+                return bt && cleanTitle && (bt === cleanTitle || bt.includes(cleanTitle) || cleanTitle.includes(bt));
+            });
+            if (found && found.pages) pages = parseInt(found.pages) || 0;
+        }
+
         if (!pages && window.CHESS_PAGE_COUNTS) {
             const id = bookParam.id;
             const title = bookParam.title;
@@ -790,19 +804,15 @@
             else if (title && window.CHESS_PAGE_COUNTS[title]) pages = window.CHESS_PAGE_COUNTS[title];
             else if (title && window.CHESS_PAGE_COUNTS[title.toLowerCase()]) pages = window.CHESS_PAGE_COUNTS[title.toLowerCase()];
             else {
-                const clean = (title || id || '').toLowerCase().replace(/\.[^/.]+$/, '').trim();
                 for (const [k, count] of Object.entries(window.CHESS_PAGE_COUNTS)) {
                     const normK = k.toLowerCase().replace(/\.[^/.]+$/, '').trim();
-                    if (normK.includes(clean) || clean.includes(normK)) {
+                    if ((cleanTitle && (normK.includes(cleanTitle) || cleanTitle.includes(normK))) ||
+                        (cleanId && (normK.includes(cleanId) || cleanId.includes(normK)))) {
                         pages = count;
                         break;
                     }
                 }
             }
-        }
-        if (!pages && window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE)) {
-            const found = window.CHESS_BOOKS_CACHE.find(b => b && (b.id === bookParam.id || b.title === bookParam.title));
-            if (found && found.pages) pages = parseInt(found.pages) || 0;
         }
         return pages > 0 ? pages : 100;
     }
@@ -1015,6 +1025,10 @@
         const addCandidate = (u) => {
             if (!u || typeof u !== 'string') return;
             const clean = u.trim();
+            if (clean.includes('1971_20260223_vol2')) {
+                const fixed = clean.replace('1971_20260223_vol2', '1971_20260223');
+                if (!candidateUrls.includes(fixed)) candidateUrls.push(fixed);
+            }
             if (clean && !candidateUrls.includes(clean)) {
                 candidateUrls.push(clean);
             }
@@ -1139,12 +1153,7 @@
                 dom.contentWrap.style.display = 'none';
                 dom.djvuWrap.style.display = 'block';
                 blob.arrayBuffer().then(buf => {
-                    dom.djvuMount.innerHTML = '';
-                    const viewer = new DjVu.Viewer();
-                    viewer.render(dom.djvuMount);
-                    viewer.loadDocument(buf);
-                    dom.loading.style.display = 'none';
-                    updatePageUI();
+                    initDjVuViewer(buf);
                 }).catch(() => {
                     dom.docFrame.src = blobUrl;
                     dom.docFrame.style.display = 'block';
@@ -1211,6 +1220,54 @@
         updatePageUI();
     }
 
+    // Shared DjVu Viewer initializer with robust page synchronization
+    function initDjVuViewer(buf) {
+        if (!dom.djvuMount) return;
+        dom.djvuMount.innerHTML = '';
+        const viewer = new DjVu.Viewer();
+        state.djvuViewer = viewer;
+        viewer.render(dom.djvuMount);
+
+        // Listen for user turning pages in DjVu.js Viewer
+        const pageEvent = (DjVu.Viewer && DjVu.Viewer.Events && DjVu.Viewer.Events.PAGE_NUMBER_CHANGED) || 'PAGE_NUMBER_CHANGED';
+        viewer.on(pageEvent, (newPage) => {
+            if (newPage && newPage !== state.currentPage) {
+                state.currentPage = newPage;
+                updatePageUI();
+                saveUserBookWorkspace();
+            }
+        });
+
+        viewer.loadDocument(buf).then(() => {
+            dom.loading.style.display = 'none';
+            try {
+                if (DjVu.Viewer && DjVu.Viewer.get && DjVu.Viewer.get.pagesCount) {
+                    const total = DjVu.Viewer.get.pagesCount(viewer.store.getState());
+                    if (total && total > 0) {
+                        state.totalPages = total;
+                        if (dom.labelTotalPages) dom.labelTotalPages.textContent = total;
+                        if (dom.inputCurrentPage) dom.inputCurrentPage.max = total;
+                    }
+                }
+            } catch (err) {
+                console.warn('Error reading DjVu pages count:', err);
+            }
+
+            // Jump to user's saved reading position
+            if (state.currentPage && state.currentPage > 1) {
+                try {
+                    viewer.configure({ pageNumber: state.currentPage });
+                } catch (_) {}
+            }
+            updatePageUI();
+            saveUserBookWorkspace();
+            showSyncToast('📖 DjVu документ підвантажено');
+        }).catch(err => {
+            console.warn('DjVu loadDocument error:', err);
+            dom.loading.style.display = 'none';
+        });
+    }
+
     // DjVu LOADER: Uses DjVu.js Viewer with CORS arrayBuffer
     function loadDjvuDirect(url) {
         if (!url) {
@@ -1228,17 +1285,10 @@
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.arrayBuffer();
             }).then(buf => {
-                dom.djvuMount.innerHTML = '';
-                const viewer = new DjVu.Viewer();
-                viewer.render(dom.djvuMount);
-                viewer.loadDocument(buf);
-                dom.loading.style.display = 'none';
-                showSyncToast('📖 DjVu документ підвантажено');
-                updatePageUI();
+                initDjVuViewer(buf);
             }).catch(err => {
                 console.warn('DjVu direct fetch error:', err);
                 dom.loading.style.display = 'none';
-                // Fallback: embed via iframe or show direct view
                 dom.docFrame.src = url;
                 dom.docFrame.style.display = 'block';
                 if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
@@ -1470,10 +1520,23 @@
         state.currentPage = p;
         updatePageUI();
 
-        // Update iframe anchor if in PDF mode
+        // 1. DjVu.js Viewer page navigation
+        if (state.djvuViewer && state.djvuViewer.configure) {
+            try {
+                state.djvuViewer.configure({ pageNumber: p });
+            } catch (err) {
+                console.warn('DjVu configure page error:', err);
+            }
+        }
+
+        // 2. Iframe anchor (PDF mode)
         if (dom.docFrame && dom.docFrame.style.display !== 'none' && dom.docFrame.src) {
             const base = dom.docFrame.src.split('#')[0];
-            dom.docFrame.src = `${base}#page=${p}&toolbar=1&navpanes=0`;
+            try {
+                dom.docFrame.contentWindow.location.replace(`${base}#page=${p}&toolbar=1&navpanes=0`);
+            } catch (_) {
+                dom.docFrame.src = `${base}#page=${p}&toolbar=1&navpanes=0`;
+            }
         }
 
         saveUserBookWorkspace();
@@ -2262,9 +2325,32 @@
     // ========================================================
     // 10. TEXT SELECTION & FLOATING TOOLBAR
     // ========================================================
-    function handleTextSelection() {
+    function getActiveSelection() {
         const selection = window.getSelection();
-        const text = selection ? selection.toString().trim() : '';
+        if (selection && selection.toString().trim()) {
+            return {
+                text: selection.toString().trim(),
+                range: selection.rangeCount > 0 ? selection.getRangeAt(0) : null
+            };
+        }
+        if (dom.djvuMount) {
+            const el = dom.djvuMount.querySelector('*') || dom.djvuMount;
+            if (el && el.shadowRoot && el.shadowRoot.getSelection) {
+                const sSel = el.shadowRoot.getSelection();
+                if (sSel && sSel.toString().trim()) {
+                    return {
+                        text: sSel.toString().trim(),
+                        range: sSel.rangeCount > 0 ? sSel.getRangeAt(0) : null
+                    };
+                }
+            }
+        }
+        return { text: '', range: null };
+    }
+
+    function handleTextSelection() {
+        const selObj = getActiveSelection();
+        const text = selObj.text;
 
         if (!text || text.length < 2) {
             dom.selectionToolbar.style.display = 'none';
@@ -2272,11 +2358,22 @@
         }
 
         state.selectedText = text;
-        const range = selection.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
+        if (dom.inputChessMoves) {
+            dom.inputChessMoves.value = text;
+        }
 
-        dom.selectionToolbar.style.top = `${Math.max(10, rect.top - 46)}px`;
-        dom.selectionToolbar.style.left = `${rect.left + rect.width / 2}px`;
+        let rect = null;
+        if (selObj.range) {
+            rect = selObj.range.getBoundingClientRect();
+        }
+
+        if (rect && rect.width > 0) {
+            dom.selectionToolbar.style.top = `${Math.max(10, rect.top - 46)}px`;
+            dom.selectionToolbar.style.left = `${rect.left + rect.width / 2}px`;
+        } else {
+            dom.selectionToolbar.style.top = '70px';
+            dom.selectionToolbar.style.left = '50%';
+        }
         dom.selectionToolbar.style.display = 'flex';
     }
 

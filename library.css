@@ -1414,19 +1414,63 @@ html.dark .lib-stats {
     color: #555;
 }
 
+html.dark .books-list-block {
+    background: rgba(18, 22, 34, 0.88) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+}
+
+html.dark .books-table thead th,
 html.dark .books-table th {
-    background: rgba(255, 255, 255, 0.03);
-    color: #666;
-    border-bottom-color: rgba(255, 255, 255, 0.06);
+    background: rgba(26, 32, 50, 0.96) !important;
+    color: #94a3b8 !important;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 html.dark .books-table td {
-    border-bottom-color: rgba(255, 255, 255, 0.04);
-    color: #ccc;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+    color: #e2e8f0 !important;
+}
+
+html.dark .books-table td.col-title {
+    color: #f8fafc !important;
+    font-weight: 600;
+}
+
+html.dark .books-table td.col-author {
+    color: #cbd5e1 !important;
+}
+
+html.dark .books-table td.col-year,
+html.dark .books-table td.col-pages,
+html.dark .books-table td.col-size {
+    color: #94a3b8 !important;
 }
 
 html.dark .books-table tbody tr:hover td {
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(56, 189, 248, 0.09) !important;
+    color: #ffffff !important;
+}
+
+html.dark .sort-controls .sort-label {
+    color: #cbd5e1 !important;
+}
+
+html.dark .lib-stats {
+    color: #94a3b8 !important;
+}
+
+html.dark .sort-btn {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    color: #e2e8f0 !important;
+}
+
+html.dark .sort-btn:hover,
+html.dark .sort-btn.active {
+    background: #d4af37 !important;
+    color: #0f172a !important;
+    border-color: #d4af37 !important;
 }
 
 html.dark .download-btn-js,

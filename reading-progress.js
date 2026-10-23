@@ -198,6 +198,34 @@
                 console.warn('[ReadingProgress] Sync from Firestore error:', err.message || err);
             }
             return this.getAll(uid);
+        },
+
+        /**
+         * Remove a book from reading progress
+         */
+        async removeProgress(uid, bookId) {
+            if (!bookId) return false;
+            const currentUid = uid || (getUser() ? getUser().uid : 'guest');
+            const list = loadLocal(currentUid);
+            const cleanId = String(bookId).trim();
+            const filtered = list.filter(b => String(b.id).trim() !== cleanId);
+            saveLocal(currentUid, filtered);
+            window.dispatchEvent(new CustomEvent('chessVaultReadingProgressUpdated', { detail: { id: cleanId, removed: true } }));
+
+            if (currentUid && currentUid !== 'guest') {
+                const firestore = getDb();
+                if (firestore) {
+                    try {
+                        await firestore
+                            .collection('user_reading').doc(currentUid)
+                            .collection('books').doc(safeId(cleanId))
+                            .delete();
+                    } catch (err) {
+                        console.warn('[ReadingProgress] Firestore delete error:', err.message || err);
+                    }
+                }
+            }
+            return true;
         }
     };
 
