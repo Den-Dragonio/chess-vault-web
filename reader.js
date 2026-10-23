@@ -49,6 +49,10 @@
         viewport: document.getElementById('reader-viewport'),
         loading: document.getElementById('reader-loading'),
         loadingText: document.getElementById('loading-status-text'),
+        downloadProgressWrap: document.getElementById('reader-download-progress-wrap'),
+        downloadProgressFill: document.getElementById('reader-download-fill'),
+        downloadProgressPercent: document.getElementById('reader-download-percent'),
+        downloadProgressBytes: document.getElementById('reader-download-bytes'),
         docFrame: document.getElementById('reader-doc-frame'),
         djvuWrap: document.getElementById('reader-djvu-wrap'),
         djvuMount: document.getElementById('djvu-viewer-mount'),
@@ -250,38 +254,299 @@
     }
 
     // ========================================================
+    // 2.5 INDEXEDDB USER BOOK CACHE ENGINE (Offline & Personal Copy)
+    // ========================================================
+    const IDB_NAME = 'ChessVault_UserBooksDB';
+    const IDB_VERSION = 1;
+    const IDB_STORE = 'user_books';
+
+    function openBooksDB() {
+        return new Promise((resolve, reject) => {
+            if (!window.indexedDB) {
+                reject(new Error('IndexedDB not supported'));
+                return;
+            }
+            const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(IDB_STORE)) {
+                    db.createObjectStore(IDB_STORE, { keyPath: 'key' });
+                }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    async function getCachedBookBlob(bookId, uid) {
+        try {
+            const db = await openBooksDB();
+            const userKey = `book_${uid || 'guest'}_${bookId}`;
+            const guestKey = `book_guest_${bookId}`;
+            const rawKey = `book_${bookId}`;
+
+            return new Promise((resolve) => {
+                const tx = db.transaction(IDB_STORE, 'readonly');
+                const store = tx.objectStore(IDB_STORE);
+                const req = store.get(userKey);
+                req.onsuccess = () => {
+                    if (req.result && req.result.blob) {
+                        resolve(req.result.blob);
+                        return;
+                    }
+                    const reqGuest = store.get(guestKey);
+                    reqGuest.onsuccess = () => {
+                        if (reqGuest.result && reqGuest.result.blob) {
+                            resolve(reqGuest.result.blob);
+                            return;
+                        }
+                        const reqRaw = store.get(rawKey);
+                        reqRaw.onsuccess = () => {
+                            resolve(reqRaw.result ? reqRaw.result.blob : null);
+                        };
+                        reqRaw.onerror = () => resolve(null);
+                    };
+                    reqGuest.onerror = () => resolve(null);
+                };
+                req.onerror = () => resolve(null);
+            });
+        } catch (e) {
+            console.warn('IndexedDB read error:', e);
+            return null;
+        }
+    }
+
+    async function saveCachedBookBlob(bookId, uid, blob, meta = {}) {
+        if (!blob) return;
+        try {
+            const db = await openBooksDB();
+            const userKey = `book_${uid || 'guest'}_${bookId}`;
+            const rawKey = `book_${bookId}`;
+            const record = {
+                key: userKey,
+                bookId,
+                uid: uid || 'guest',
+                format: meta.format || bookParam.format,
+                title: meta.title || bookParam.title,
+                size: blob.size,
+                savedAt: Date.now(),
+                blob
+            };
+
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(IDB_STORE, 'readwrite');
+                const store = tx.objectStore(IDB_STORE);
+                store.put(record);
+                store.put({ ...record, key: rawKey });
+                tx.oncomplete = () => resolve(true);
+                tx.onerror = () => reject(tx.error);
+            });
+        } catch (e) {
+            console.warn('IndexedDB write error:', e);
+        }
+    }
+
+    async function downloadBookWithProgress(urls, onProgress) {
+        if (!Array.isArray(urls)) urls = [urls];
+        let lastError = null;
+
+        for (const url of urls) {
+            if (!url) continue;
+            try {
+                const response = await fetch(url, { mode: 'cors' });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const contentLength = response.headers.get('content-length');
+                const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
+                const reader = response.body.getReader();
+                const chunks = [];
+                let receivedBytes = 0;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    receivedBytes += value.length;
+                    if (typeof onProgress === 'function') {
+                        onProgress(receivedBytes, totalBytes);
+                    }
+                }
+
+                let mime = 'application/pdf';
+                if (bookParam.format === 'djvu') mime = 'image/vnd.djvu';
+                else if (bookParam.format === 'docx') mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+                return new Blob(chunks, { type: mime });
+            } catch (err) {
+                console.warn(`Download attempt failed for ${url}:`, err);
+                lastError = err;
+            }
+        }
+        throw lastError || new Error('Не вдалося завантажити книгу');
+    }
+
+    // ========================================================
     // 3. DOCUMENT LOADERS (PDF, DjVu, DOCX + Local Drag & Drop)
     // ========================================================
-    function loadDocument() {
-        const fileUrl = bookParam.file;
+    async function loadDocument() {
         let format = bookParam.format;
 
         // Auto-detect format from file extension if needed
         if (!format || format === '---') {
-            const ext = fileUrl.split('.').pop().toLowerCase();
+            const ext = (bookParam.file || bookParam.id).split('.').pop().toLowerCase();
             if (ext) format = ext;
         }
 
-        // Завжди показуємо підказку для відкриття локального файлу при бажанні
         if (dom.dropBar) dom.dropBar.style.display = 'flex';
 
-        if (!fileUrl) {
-            showDocError('Посилання на файл в електронному архіві відсутнє (книга у черзі на оцифрування).');
+        const uid = state.currentUser ? state.currentUser.uid : 'guest';
+
+        // 1. ПЕРЕВІРЯЄМО ОСОБИСТУ КОПІЮ В INDEXEDDB (миттєве офлайн-відкриття 0ms)
+        dom.loading.style.display = 'flex';
+        dom.loadingText.textContent = `Пошук персональної копії книги...`;
+
+        try {
+            const cachedBlob = await getCachedBookBlob(bookParam.id, uid);
+            if (cachedBlob && cachedBlob.size > 1024) {
+                dom.loading.style.display = 'none';
+                if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
+                showSyncToast('⚡ Відкрито збережену персональну копію (IndexedDB)');
+                displayDocumentBlob(cachedBlob, format);
+                return;
+            }
+        } catch (e) {
+            console.warn('Error reading cached blob:', e);
+        }
+
+        // 2. ДЖЕРЕЛА ДЛЯ ЗАВАНТАЖЕННЯ (Том 1, Том 2, Cache)
+        const candidateUrls = [];
+        if (bookParam.file) candidateUrls.push(bookParam.file);
+
+        if (window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE)) {
+            const b = window.CHESS_BOOKS_CACHE.find(x => 
+                (x.id && x.id.toLowerCase() === (bookParam.id || '').toLowerCase()) ||
+                (x.title && x.title.toLowerCase() === (bookParam.title || '').toLowerCase())
+            );
+            if (b && b.url && !candidateUrls.includes(b.url)) {
+                candidateUrls.push(b.url);
+            }
+        }
+
+        if (bookParam.id) {
+            const vol1 = `https://archive.org/download/1971_20260223/${encodeURIComponent(bookParam.id)}`;
+            const vol2 = `https://archive.org/download/1971_20260223_vol2/${encodeURIComponent(bookParam.id)}`;
+            if (!candidateUrls.includes(vol1)) candidateUrls.push(vol1);
+            if (!candidateUrls.includes(vol2)) candidateUrls.push(vol2);
+        }
+
+        if (candidateUrls.length === 0) {
+            showDocError('Посилання на файл відсутнє. Оберіть файл з комп’ютера для читання.');
             return;
         }
 
+        // 3. ВІДОБРАЖАЄМО ПРОГРЕС-БАР ЗАВАНТАЖЕННЯ
         dom.loading.style.display = 'flex';
-        dom.loadingText.textContent = `Завантаження документа (${format.toUpperCase()})...`;
+        dom.loadingText.textContent = `Завантаження та збереження персональної копії...`;
+        if (dom.downloadProgressWrap) {
+            dom.downloadProgressWrap.style.display = 'block';
+            if (dom.downloadProgressFill) dom.downloadProgressFill.style.width = '0%';
+            if (dom.downloadProgressPercent) dom.downloadProgressPercent.textContent = '0%';
+            if (dom.downloadProgressBytes) dom.downloadProgressBytes.textContent = 'З’єднання з сервером...';
+        }
 
+        try {
+            const blob = await downloadBookWithProgress(candidateUrls, (received, total) => {
+                if (total > 0) {
+                    const pct = Math.min(100, Math.round((received / total) * 100));
+                    if (dom.downloadProgressFill) dom.downloadProgressFill.style.width = `${pct}%`;
+                    if (dom.downloadProgressPercent) dom.downloadProgressPercent.textContent = `${pct}%`;
+                    const rMB = (received / (1024 * 1024)).toFixed(1);
+                    const tMB = (total / (1024 * 1024)).toFixed(1);
+                    if (dom.downloadProgressBytes) dom.downloadProgressBytes.textContent = `${rMB} / ${tMB} MB`;
+                } else {
+                    const rMB = (received / (1024 * 1024)).toFixed(1);
+                    if (dom.downloadProgressBytes) dom.downloadProgressBytes.textContent = `${rMB} MB завантажено`;
+                    if (dom.downloadProgressFill) dom.downloadProgressFill.style.width = '70%';
+                }
+            });
+
+            // Зберігаємо персональну копію в локальну БД браузера!
+            await saveCachedBookBlob(bookParam.id, uid, blob, { format, title: bookParam.title });
+
+            if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
+            dom.loading.style.display = 'none';
+            showSyncToast('📖 Персональну копію книги збережено у вашу бібліотеку!');
+
+            displayDocumentBlob(blob, format);
+            return;
+        } catch (downloadErr) {
+            console.warn('Stream download fallback to direct iframe viewer:', downloadErr);
+            if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
+
+            // Безшовний fallback до прямого відкриття у вбудованому iframe
+            const directUrl = candidateUrls[0];
+            if (format === 'pdf') {
+                loadPdfDirect(directUrl);
+            } else if (format === 'djvu') {
+                loadDjvuDirect(directUrl);
+            } else if (format === 'docx' || format === 'doc') {
+                loadDocxDirect(directUrl);
+            } else {
+                loadPdfDirect(directUrl);
+            }
+        }
+    }
+
+    // DISPLAY DOCUMENT FROM BLOB (Personal copy)
+    function displayDocumentBlob(blob, format) {
+        const blobUrl = URL.createObjectURL(blob);
         if (format === 'pdf') {
-            loadPdfDirect(fileUrl);
+            dom.docFrame.style.display = 'block';
+            if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
+            if (dom.contentWrap) dom.contentWrap.style.display = 'none';
+            dom.docFrame.src = `${blobUrl}#page=${state.currentPage}&toolbar=1&navpanes=0`;
+            dom.loading.style.display = 'none';
+            updatePageUI();
         } else if (format === 'djvu') {
-            loadDjvuDirect(fileUrl);
-        } else if (format === 'docx' || format === 'doc') {
-            loadDocxDirect(fileUrl);
-        } else {
-            // Default to PDF direct iframe
-            loadPdfDirect(fileUrl);
+            if (typeof DjVu !== 'undefined' && DjVu.Viewer && dom.djvuMount) {
+                dom.docFrame.style.display = 'none';
+                dom.contentWrap.style.display = 'none';
+                dom.djvuWrap.style.display = 'block';
+                blob.arrayBuffer().then(buf => {
+                    dom.djvuMount.innerHTML = '';
+                    const viewer = new DjVu.Viewer();
+                    viewer.render(dom.djvuMount);
+                    viewer.loadDocument(buf);
+                    dom.loading.style.display = 'none';
+                    updatePageUI();
+                }).catch(() => {
+                    dom.docFrame.src = blobUrl;
+                    dom.docFrame.style.display = 'block';
+                    dom.loading.style.display = 'none';
+                });
+            } else {
+                dom.docFrame.src = blobUrl;
+                dom.docFrame.style.display = 'block';
+                dom.loading.style.display = 'none';
+            }
+        } else if (format === 'docx') {
+            blob.arrayBuffer().then(async (buf) => {
+                if (typeof mammoth !== 'undefined') {
+                    const result = await mammoth.convertToHtml({ arrayBuffer: buf });
+                    dom.loading.style.display = 'none';
+                    dom.docFrame.style.display = 'none';
+                    if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
+                    dom.contentWrap.style.display = 'block';
+                    dom.contentWrap.innerHTML = `<div class="reader-docx-container">${result.value}</div>`;
+                    const totalChars = (result.value.replace(/<[^>]*>/g, '') || '').length;
+                    state.totalPages = Math.max(1, Math.round(totalChars / 2200));
+                    dom.labelTotalPages.textContent = state.totalPages;
+                    dom.inputCurrentPage.max = state.totalPages;
+                    updatePageUI();
+                }
+            });
         }
     }
 
@@ -401,54 +666,19 @@
     function handleLocalFileSelected(file) {
         if (!file) return;
         const fname = file.name.toLowerCase();
+        const uid = state.currentUser ? state.currentUser.uid : 'guest';
+        let ext = 'pdf';
+        if (fname.endsWith('.djvu')) ext = 'djvu';
+        else if (fname.endsWith('.docx') || fname.endsWith('.doc')) ext = 'docx';
+
         dom.loading.style.display = 'flex';
-        dom.loadingText.textContent = `Читання локального файлу ${file.name}...`;
+        dom.loadingText.textContent = `Читання та збереження локального файлу ${file.name}...`;
 
-        const reader = new FileReader();
+        // Зберігаємо файл у IndexedDB як особисту копію користувача!
+        saveCachedBookBlob(bookParam.id, uid, file, { format: ext, title: file.name });
 
-        if (fname.endsWith('.pdf')) {
-            reader.onload = (e) => {
-                const blob = new Blob([e.target.result], { type: 'application/pdf' });
-                const blobUrl = URL.createObjectURL(blob);
-                dom.docFrame.src = blobUrl;
-                dom.docFrame.style.display = 'block';
-                if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
-                if (dom.contentWrap) dom.contentWrap.style.display = 'none';
-                dom.loading.style.display = 'none';
-                showSyncToast(`📂 Локальний PDF "${file.name}" завантажено!`);
-            };
-            reader.readAsArrayBuffer(file);
-        } else if (fname.endsWith('.djvu')) {
-            reader.onload = (e) => {
-                if (typeof DjVu !== 'undefined' && DjVu.Viewer && dom.djvuMount) {
-                    dom.djvuMount.innerHTML = '';
-                    const viewer = new DjVu.Viewer();
-                    viewer.render(dom.djvuMount);
-                    viewer.loadDocument(e.target.result);
-                    dom.djvuWrap.style.display = 'block';
-                    dom.docFrame.style.display = 'none';
-                    if (dom.contentWrap) dom.contentWrap.style.display = 'none';
-                    dom.loading.style.display = 'none';
-                    showSyncToast(`📂 Локальний DjVu "${file.name}" відкрито!`);
-                } else {
-                    dom.loading.style.display = 'none';
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        } else if (fname.endsWith('.docx')) {
-            reader.onload = async (e) => {
-                if (typeof mammoth !== 'undefined') {
-                    const result = await mammoth.convertToHtml({ arrayBuffer: e.target.result });
-                    dom.loading.style.display = 'none';
-                    dom.docFrame.style.display = 'none';
-                    if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
-                    dom.contentWrap.style.display = 'block';
-                    dom.contentWrap.innerHTML = `<div class="reader-docx-container">${result.value}</div>`;
-                    showSyncToast(`📂 Локальний DOCX відкрито!`);
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        }
+        displayDocumentBlob(file, ext);
+        showSyncToast(`📂 Файл "${file.name}" збережено як вашу особисту копію!`);
     }
 
     // ========================================================
@@ -1254,25 +1484,27 @@
 
     function showDocError(msg) {
         dom.loading.style.display = 'none';
+        if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
         if (dom.contentWrap) {
             dom.contentWrap.style.display = 'block';
             const hasDirectFile = Boolean(bookParam.file);
             dom.contentWrap.innerHTML = `
                 <div style="text-align: center; padding: 60px 20px;">
-                    <div style="font-size: 3rem; margin-bottom: 12px;">${hasDirectFile ? '⚠️' : '⏳'}</div>
-                    <h3 style="margin-bottom: 8px;">${hasDirectFile ? 'Не вдалося автоматично відкрити книгу' : 'Книга очікує завантаження в онлайн-архів (Том 2)'}</h3>
+                    <div style="font-size: 3rem; margin-bottom: 12px;">📂</div>
+                    <h3 style="margin-bottom: 8px;">Відкриття персональної копії книги</h3>
                     <p style="color: var(--reader-text-muted); max-width: 480px; margin: 0 auto 16px;">
-                        ${hasDirectFile ? escapeHtml(msg) : 'Цей том очікує синхронізації з сервером. Ви вже зараз можете читати його локальну копію або тренуватися на шахівниці праворуч.'}
+                        ${escapeHtml(msg || 'Оберіть файл книги з комп’ютера, щоб зберегти його у вашу особисту бібліотеку.')}
                     </p>
-                    ${hasDirectFile ? `
-                        <a href="${bookParam.file}" target="_blank" class="btn-add-note" style="text-decoration: none; padding: 8px 16px;">
-                            🔗 Відкрити файл напряму
-                        </a>
-                    ` : `
-                        <button onclick="document.getElementById('input-local-file').click()" class="btn-add-note" style="padding: 10px 20px; font-size: 0.95rem; cursor: pointer; border: none; border-radius: 8px;">
-                            📂 Відкрити локальний файл з диска
+                    <div style="display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap;">
+                        <button type="button" onclick="document.getElementById('input-local-file').click()" class="btn-add-note" style="padding: 12px 24px; font-size: 0.95rem; cursor: pointer; border: none; border-radius: 8px; font-weight: 600;">
+                            📂 Обрати файл з пристрою
                         </button>
-                    `}
+                        ${hasDirectFile ? `
+                            <a href="${bookParam.file}" target="_blank" class="btn-add-note" style="text-decoration: none; padding: 12px 24px; font-size: 0.95rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);">
+                                🔗 Відкрити за прямим посиланням
+                            </a>
+                        ` : ''}
+                    </div>
                 </div>
             `;
         }

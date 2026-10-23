@@ -93,8 +93,17 @@
         <!-- READER VIEWPORT -->
         <section class="reader-viewport" id="reader-viewport">
             <div class="reader-loading" id="reader-loading">
-                <div class="reader-spinner"></div>
-                <p id="loading-status-text">Завантаження книги...</p>
+                <div class="reader-spinner" id="reader-spinner"></div>
+                <p id="loading-status-text">Завантаження персональної копії книги...</p>
+                <div class="reader-download-progress-wrap" id="reader-download-progress-wrap" style="display: none;">
+                    <div class="reader-download-track">
+                        <div class="reader-download-fill" id="reader-download-fill" style="width: 0%;"></div>
+                    </div>
+                    <div class="reader-download-meta">
+                        <span id="reader-download-percent">0%</span>
+                        <span id="reader-download-bytes">0 / 0 MB</span>
+                    </div>
+                </div>
             </div>
 
             <!-- 1. Native Iframe viewer for PDF & Web documents (zero CORS issues) -->
@@ -220,12 +229,6 @@
                             <button type="button" class="editor-btn" id="btn-editor-start" title="Стандартна розстановка">♟️ Початкова</button>
                             <button type="button" class="editor-btn" id="btn-editor-turn" title="Змінити чергу ходу">⚪/⚫ Хід</button>
                         </div>
-                    </div>
-
-                    <!-- Engine Status (Stockfish Ready Architecture) -->
-                    <div class="engine-status-bar" id="engine-status-bar">
-                        <span>🤖 Рушій Stockfish: <b style="color: #22c55e;">Готовий</b></span>
-                        <span class="engine-eval-score" id="engine-eval-score">0.0</span>
                     </div>
                 </div>
 

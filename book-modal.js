@@ -363,7 +363,7 @@ function renderModalSkeleton(book) {
                 </div>
                 <div class="bd-hero-actions">
                     <button class="bd-btn-read" id="bd-read-btn">
-                        📖 <span data-i18n="modal_btn_read_online">${window.i18n ? window.i18n.t('modal_btn_read_online') : 'Читати онлайн'}</span>
+                        <span data-i18n="modal_btn_read_online">${window.i18n ? window.i18n.t('modal_btn_read_online') : '📖 Читати онлайн'}</span>
                     </button>
                     <button class="bd-btn-download" id="bd-download-btn"
                             data-url="${escHtml(book.url || '')}"
@@ -781,7 +781,7 @@ function renderModalFull(book, meta) {
                 </div>
                 <div class="bd-hero-actions">
                     <button class="bd-btn-read" id="bd-read-btn">
-                        📖 <span data-i18n="modal_btn_read_online">${window.i18n ? window.i18n.t('modal_btn_read_online') : 'Читати онлайн'}</span>
+                        <span data-i18n="modal_btn_read_online">${window.i18n ? window.i18n.t('modal_btn_read_online') : '📖 Читати онлайн'}</span>
                     </button>
                     ${downloadButtonsHTML}
                     ${typeof plGetModalButtonHTML === 'function' ? plGetModalButtonHTML(book) : ''}
@@ -1136,8 +1136,8 @@ function onReadOnlineClick(book) {
         : null;
 
     const page = (progress && progress.currentPage) ? progress.currentPage : 1;
-    let fileUrl = (book.inArchive !== false) ? (book.url || '') : '';
-    if (!fileUrl && book.inArchive !== false && bookId) {
+    let fileUrl = book.url || '';
+    if (!fileUrl && bookId) {
         fileUrl = `https://archive.org/download/1971_20260223/${encodeURIComponent(bookId)}`;
     }
     if (fileUrl && (fileUrl.includes(' ') || /[\u0400-\u04FF]/.test(fileUrl))) {
