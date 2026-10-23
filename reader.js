@@ -54,6 +54,7 @@
         settingEvalOff: document.getElementById('setting-eval-off'),
         settingArrowBest: document.getElementById('setting-arrow-best'),
         settingArrowThreat: document.getElementById('setting-arrow-threat'),
+        settingEngineLines: document.getElementById('setting-engine-lines'),
         settingBtnFullscreen: document.getElementById('setting-btn-fullscreen'),
         authGateModal: document.getElementById('reader-auth-gate-modal'),
         boardArrowsSvg: document.getElementById('board-arrows-svg'),
@@ -135,7 +136,8 @@
             dockSide: localStorage.getItem('chess_vault_reader_dock_side') || 'right',
             evalMode: localStorage.getItem('chess_vault_reader_eval_mode') || 'full', // 'full' | 'numbers' | 'off'
             arrowBest: localStorage.getItem('chess_vault_reader_arrow_best') !== 'false',
-            arrowThreat: localStorage.getItem('chess_vault_reader_arrow_threat') !== 'false'
+            arrowThreat: localStorage.getItem('chess_vault_reader_arrow_threat') !== 'false',
+            engineLines: localStorage.getItem('chess_vault_reader_engine_lines') !== 'false'
         },
         isDockCollapsed: localStorage.getItem('chess_vault_reader_dock_collapsed') === 'true',
         activeTab: 'board',
@@ -421,8 +423,16 @@
             dom.engineEvalPv.textContent = stockfishState.pvSan || 'Stockfish аналізує позицію...';
         }
 
+        applyEngineLinesVisibility();
         updateEvalBarUI();
         updateBoardArrows();
+    }
+
+    function applyEngineLinesVisibility() {
+        const show = state.settings.engineLines !== false;
+        if (dom.engineEvalBox) {
+            dom.engineEvalBox.style.display = show ? 'flex' : 'none';
+        }
     }
 
     function evaluateCurrentBoardPosition() {
@@ -2110,6 +2120,7 @@
             dom.settingEvalNumbers.classList.toggle('active', state.settings.evalMode === 'numbers');
             dom.settingEvalOff.classList.toggle('active', state.settings.evalMode === 'off');
         }
+        if (dom.settingEngineLines) dom.settingEngineLines.checked = state.settings.engineLines !== false;
         if (dom.settingArrowBest) dom.settingArrowBest.checked = state.settings.arrowBest;
         if (dom.settingArrowThreat) dom.settingArrowThreat.checked = state.settings.arrowThreat;
 
@@ -2215,6 +2226,13 @@
         }
         if (dom.settingEvalOff) {
             dom.settingEvalOff.addEventListener('click', () => applyEvalMode('off'));
+        }
+        if (dom.settingEngineLines) {
+            dom.settingEngineLines.addEventListener('change', (e) => {
+                state.settings.engineLines = e.target.checked;
+                localStorage.setItem('chess_vault_reader_engine_lines', String(state.settings.engineLines));
+                applyEngineLinesVisibility();
+            });
         }
         if (dom.settingArrowBest) {
             dom.settingArrowBest.addEventListener('change', (e) => {

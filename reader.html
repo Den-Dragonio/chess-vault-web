@@ -336,10 +336,20 @@
                     </div>
                 </div>
 
-                <!-- Group 3: Стрілки ходів на дошці -->
+                <!-- Group 3: Стрілки ходів на дошці та аналіз -->
                 <div class="reader-setting-group">
-                    <div class="setting-group-label">Стрілки та підказки ходів</div>
-                    <div class="setting-group-desc">Динамічні підказки від двигуна на шахівниці:</div>
+                    <div class="setting-group-label">Стрілки та аналіз Stockfish</div>
+                    <div class="setting-group-desc">Динамічні підказки та лінії рушія:</div>
+                    <div class="setting-checkbox-row">
+                        <label class="setting-toggle-label">
+                            <input type="checkbox" id="setting-engine-lines" checked>
+                            <span class="setting-toggle-switch"></span>
+                            <span class="setting-toggle-text">
+                                <strong style="color: #38bdf8;">⚡ Лінії та оцінка Stockfish</strong>
+                                <small>Показувати блок найкращої лінії ходів (PV) над списком ходів</small>
+                            </span>
+                        </label>
+                    </div>
                     <div class="setting-checkbox-row">
                         <label class="setting-toggle-label">
                             <input type="checkbox" id="setting-arrow-best" checked>
