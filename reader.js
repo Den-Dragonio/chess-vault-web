@@ -107,6 +107,16 @@
         btnSaveNote: document.getElementById('btn-save-note'),
         notesList: document.getElementById('notes-list'),
         // Selection toolbar
+        // Zoom controls
+        btnZoomOut: document.getElementById('btn-zoom-out'),
+        labelZoomLevel: document.getElementById('label-zoom-level'),
+        btnZoomIn: document.getElementById('btn-zoom-in'),
+        settingZoomControl: document.getElementById('setting-zoom-control'),
+        // Stockfish Engine Eval
+        engineEvalBox: document.getElementById('engine-eval-box'),
+        engineEvalScorePill: document.getElementById('engine-eval-score-pill'),
+        engineEvalDepth: document.getElementById('engine-eval-depth'),
+        engineEvalPv: document.getElementById('engine-eval-pv'),
         selectionToolbar: document.getElementById('selection-toolbar'),
         selBtnChess: document.getElementById('sel-btn-chess'),
         selBtnHighlight: document.getElementById('sel-btn-highlight'),
@@ -225,7 +235,205 @@
        20, 30, 10,  0,  0, 10, 30, 20
     ];
 
+    // ========================================================
+    // ⚡ REAL STOCKFISH CHESS ENGINE INTEGRATION (Worker + PST Fallback)
+    // ========================================================
+    let stockfishWorker = null;
+    let stockfishReady = false;
+    let lastEvaluatedFEN = null;
+    const stockfishState = {
+        depth: 0,
+        scoreCp: 0,
+        scoreMate: null,
+        textScore: '0.0',
+        whitePercent: 50,
+        pvSan: '',
+        bestMove: null
+    };
+
+    function initStockfish() {
+        if (typeof Worker === 'undefined') {
+            console.warn('Web Workers not supported, falling back to built-in evaluation.');
+            return;
+        }
+        try {
+            stockfishWorker = new Worker('stockfish.js');
+            stockfishWorker.onmessage = (event) => {
+                const line = typeof event.data === 'string' ? event.data : '';
+                if (line === 'readyok' || line.includes('Stockfish')) {
+                    stockfishReady = true;
+                    requestStockfishEval();
+                } else if (line.startsWith('info ') && (line.includes('score cp') || line.includes('score mate'))) {
+                    parseStockfishInfo(line);
+                } else if (line.startsWith('bestmove ')) {
+                    const parts = line.split(/\s+/);
+                    const uci = parts[1];
+                    if (uci && uci.length >= 4) {
+                        stockfishState.bestMove = { from: uci.slice(0, 2), to: uci.slice(2, 4) };
+                        updateBoardArrows();
+                    }
+                }
+            };
+            stockfishWorker.postMessage('uci');
+            stockfishWorker.postMessage('ucinewgame');
+            stockfishWorker.postMessage('isready');
+        } catch (err) {
+            console.warn('Stockfish Worker init error:', err);
+        }
+    }
+
+    function requestStockfishEval() {
+        if (!chessState.game) return;
+        const currentFen = chessState.game.fen();
+        if (currentFen === lastEvaluatedFEN) return;
+        lastEvaluatedFEN = currentFen;
+
+        stockfishState.depth = 0;
+        stockfishState.pvSan = '';
+
+        if (dom.engineEvalDepth) dom.engineEvalDepth.textContent = 'обчислення...';
+        if (dom.engineEvalPv) dom.engineEvalPv.textContent = 'Аналіз позиції двигуном Stockfish...';
+
+        if (stockfishWorker) {
+            stockfishWorker.postMessage('stop');
+            stockfishWorker.postMessage('position fen ' + currentFen);
+            stockfishWorker.postMessage('go depth 14');
+        } else {
+            updateEvalBarUI();
+            updateBoardArrows();
+        }
+    }
+
+    function parseStockfishInfo(line) {
+        if (!chessState.game) return;
+
+        const depthMatch = line.match(/\bdepth\s+(\d+)/);
+        const depth = depthMatch ? parseInt(depthMatch[1], 10) : 0;
+        if (depth < stockfishState.depth && depth < 8) return;
+        stockfishState.depth = depth;
+
+        const cpMatch = line.match(/\bscore\s+cp\s+(-?\d+)/);
+        const mateMatch = line.match(/\bscore\s+mate\s+(-?\d+)/);
+        const turn = chessState.game.turn();
+
+        let textScore = '0.0';
+        let whitePercent = 50;
+        let evalPawns = 0;
+
+        if (mateMatch) {
+            const m = parseInt(mateMatch[1], 10);
+            stockfishState.scoreMate = m;
+            const absM = Math.abs(m);
+            if (turn === 'w') {
+                textScore = m > 0 ? `+M${absM}` : `-M${absM}`;
+                whitePercent = m > 0 ? 100 : 0;
+                evalPawns = m > 0 ? 999 : -999;
+            } else {
+                textScore = m > 0 ? `-M${absM}` : `+M${absM}`;
+                whitePercent = m > 0 ? 0 : 100;
+                evalPawns = m > 0 ? -999 : 999;
+            }
+        } else if (cpMatch) {
+            stockfishState.scoreMate = null;
+            let cp = parseInt(cpMatch[1], 10);
+            if (turn === 'b') cp = -cp;
+            stockfishState.scoreCp = cp;
+            evalPawns = cp / 100;
+            if (Math.abs(evalPawns) < 0.05) {
+                textScore = '0.0';
+            } else if (evalPawns > 0) {
+                textScore = `+${evalPawns.toFixed(1)}`;
+            } else {
+                textScore = `${evalPawns.toFixed(1)}`;
+            }
+            const winProb = 1 / (1 + Math.pow(10, -evalPawns / 4));
+            whitePercent = Math.min(95, Math.max(5, Math.round(winProb * 100)));
+        }
+
+        stockfishState.textScore = textScore;
+        stockfishState.whitePercent = whitePercent;
+
+        // Parse PV and format into readable SAN notation like Lichess
+        const pvIdx = line.indexOf(' pv ');
+        if (pvIdx !== -1) {
+            const pvStr = line.slice(pvIdx + 4).trim();
+            const uciMoves = pvStr.split(/\s+/).slice(0, 8);
+            if (uciMoves.length > 0) {
+                const first = uciMoves[0];
+                if (first.length >= 4) {
+                    stockfishState.bestMove = { from: first.slice(0, 2), to: first.slice(2, 4) };
+                }
+
+                try {
+                    const tempGame = new Chess(chessState.game.fen());
+                    const sanMoves = [];
+                    for (let i = 0; i < uciMoves.length; i++) {
+                        const u = uciMoves[i];
+                        if (u.length < 4) break;
+                        const from = u.slice(0, 2);
+                        const to = u.slice(2, 4);
+                        const promotion = u.length > 4 ? u[4] : undefined;
+                        const moveTurn = tempGame.turn();
+                        const fullMoveNum = Math.floor(tempGame.history().length / 2) + 1;
+                        const moveObj = tempGame.move({ from, to, promotion });
+                        if (!moveObj) break;
+
+                        if (moveTurn === 'w' || sanMoves.length === 0) {
+                            sanMoves.push(`${fullMoveNum}.${moveTurn === 'b' ? '..' : ''} ${moveObj.san}`);
+                        } else {
+                            sanMoves.push(moveObj.san);
+                        }
+                    }
+                    stockfishState.pvSan = sanMoves.join(' ');
+                } catch (_) {
+                    stockfishState.pvSan = uciMoves.join(' ');
+                }
+            }
+        }
+
+        renderStockfishUI();
+    }
+
+    function renderStockfishUI() {
+        if (dom.engineEvalScorePill) {
+            dom.engineEvalScorePill.textContent = stockfishState.textScore;
+            const s = stockfishState.textScore;
+            if (s.startsWith('+')) {
+                dom.engineEvalScorePill.style.background = 'rgba(34, 197, 94, 0.2)';
+                dom.engineEvalScorePill.style.borderColor = 'rgba(34, 197, 94, 0.4)';
+                dom.engineEvalScorePill.style.color = '#22c55e';
+            } else if (s.startsWith('-')) {
+                dom.engineEvalScorePill.style.background = 'rgba(239, 68, 68, 0.2)';
+                dom.engineEvalScorePill.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                dom.engineEvalScorePill.style.color = '#ef4444';
+            } else {
+                dom.engineEvalScorePill.style.background = 'rgba(255, 255, 255, 0.1)';
+                dom.engineEvalScorePill.style.borderColor = 'var(--reader-border)';
+                dom.engineEvalScorePill.style.color = 'var(--reader-text)';
+            }
+        }
+
+        if (dom.engineEvalDepth) {
+            dom.engineEvalDepth.textContent = `d=${stockfishState.depth || 12}`;
+        }
+
+        if (dom.engineEvalPv) {
+            dom.engineEvalPv.textContent = stockfishState.pvSan || 'Stockfish аналізує позицію...';
+        }
+
+        updateEvalBarUI();
+        updateBoardArrows();
+    }
+
     function evaluateCurrentBoardPosition() {
+        if (stockfishState && stockfishState.depth > 0) {
+            return {
+                evalScore: stockfishState.scoreCp / 100,
+                textScore: stockfishState.textScore,
+                whitePercent: stockfishState.whitePercent
+            };
+        }
+
         if (!chessState.game) return { evalScore: 0, textScore: '0.0', whitePercent: 50 };
 
         if (chessState.game.in_checkmate && chessState.game.in_checkmate()) {
@@ -286,7 +494,6 @@
             textScore = `${evalPawns.toFixed(1)}`;
         }
 
-        // Winning probability sigmoid mapping (5% to 95%)
         const winProb = 1 / (1 + Math.pow(10, -evalPawns / 4));
         const whitePercent = Math.min(95, Math.max(5, Math.round(winProb * 100)));
 
@@ -303,7 +510,6 @@
 
         const { evalScore, textScore, whitePercent } = evaluateCurrentBoardPosition();
 
-        // 1. Оновлення компактного текстового значення (для режиму 'numbers')
         if (compactScore) {
             compactScore.textContent = textScore;
             if (evalScore > 0.05) compactScore.style.color = '#22c55e';
@@ -322,7 +528,6 @@
             return;
         }
 
-        // 'full': показуємо повну вертикальну шкалу ело-бару
         if (compactScore) compactScore.style.display = 'none';
         if (!evalWrap || !fillWhite || !fillBlack) return;
         evalWrap.classList.remove('is-hidden');
@@ -353,6 +558,7 @@
     }
 
     function initChessEvalBar() {
+        initStockfish();
         updateEvalBarUI();
     }
 
@@ -503,9 +709,9 @@
 
         const flipped = chessState.boardFlipped;
 
-        // 1. Зелена стрілка найкращого ходу (делікатна, тонка, елегантна)
+        // 1. Зелена стрілка найкращого ходу (Stockfish або PST)
         if (state.settings.arrowBest) {
-            const best = findBestMove(chessState.game);
+            const best = (stockfishState && stockfishState.bestMove) || findBestMove(chessState.game);
             if (best) {
                 const p1 = squareToSvgCoords(best.from, flipped);
                 const p2 = squareToSvgCoords(best.to, flipped);
@@ -791,7 +997,7 @@
             console.warn('Error reading cached blob:', e);
         }
 
-        // 2. ДЖЕРЕЛА ДЛЯ ЗАВАНТАЖЕННЯ (Том 1, CORS proxy, Fallbacks)
+        // 2. ДЖЕРЕЛА ДЛЯ ЗАВАНТАЖЕННЯ (Прямі URL)
         const candidateUrls = [];
         const addCandidate = (u) => {
             if (!u || typeof u !== 'string') return;
@@ -812,18 +1018,11 @@
                 (x.title && x.title.toLowerCase() === (bookParam.title || '').toLowerCase())
             );
             if (b && b.url) {
-                // Офіційний CORS-проксі Archive.org дозволяє стрімінг та збереження персональної копії в IndexedDB
-                if (b.url.includes('archive.org/download/')) {
-                    addCandidate(b.url.replace('archive.org/download/', 'archive.org/cors/'));
-                }
                 addCandidate(b.url);
             }
         }
 
         if (bookParam.file) {
-            if (bookParam.file.includes('archive.org/download/')) {
-                addCandidate(bookParam.file.replace('archive.org/download/', 'archive.org/cors/'));
-            }
             addCandidate(bookParam.file);
         }
 
@@ -834,7 +1033,6 @@
             } catch (_) {
                 encId = encodeURIComponent(fullId);
             }
-            addCandidate(`https://archive.org/cors/1971_20260223/${encId}`);
             addCandidate(`https://archive.org/download/1971_20260223/${encId}`);
         }
 
@@ -843,9 +1041,36 @@
             return;
         }
 
-        // 3. ВІДОБРАЖАЄМО ПРОГРЕС-БАР ЗАВАНТАЖЕННЯ
+        const directUrl = candidateUrls[0];
+
+        // 3. МИТТЄВЕ ВІДКРИТТЯ ДЛЯ PDF (Native Iframe - 0s очікування)
+        if (format === 'pdf') {
+            dom.loading.style.display = 'none';
+            if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
+            loadPdfDirect(directUrl);
+            // Асинхронне збереження персональної копії без затримки читання
+            downloadBookWithProgress([directUrl], () => {}).then(blob => {
+                if (blob && blob.size > 1024) {
+                    saveCachedBookBlob(bookParam.id, uid, blob, { format, title: bookParam.title });
+                }
+            }).catch(() => {});
+            return;
+        }
+
+        // 4. ДЛЯ DJVU ТА DOCX
+        if (format === 'djvu') {
+            loadDjvuDirect(directUrl);
+            return;
+        }
+
+        if (format === 'docx' || format === 'doc') {
+            loadDocxDirect(directUrl);
+            return;
+        }
+
+        // 5. ВІДОБРАЖАЄМО ПРОГРЕС-БАР ЗАВАНТАЖЕННЯ ДЛЯ ІНШИХ ФАЙЛІВ
         dom.loading.style.display = 'flex';
-        dom.loadingText.textContent = `Завантаження та збереження персональної копії...`;
+        dom.loadingText.textContent = `Завантаження персональної копії...`;
         if (dom.downloadProgressWrap) {
             dom.downloadProgressWrap.style.display = 'block';
             if (dom.downloadProgressFill) dom.downloadProgressFill.style.width = '0%';
@@ -879,26 +1104,9 @@
             displayDocumentBlob(blob, format);
             return;
         } catch (downloadErr) {
-            console.warn('Stream download fallback:', downloadErr);
+            console.warn('Download fallback:', downloadErr);
             if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
-
-            // Якщо помилка 404 (файлу немає на сервері або очікує синхронізації):
-            if (downloadErr && downloadErr.message && downloadErr.message.includes('404')) {
-                showDocError('Ця книга наразі очікує синхронізації з онлайн-архівом (Том 2). Ви можете відкрити власну локальну копію з пристрою.');
-                return;
-            }
-
-            // Прямий fallback
-            const directUrl = candidateUrls.find(u => !u.includes('/cors/')) || candidateUrls[0];
-            if (format === 'pdf') {
-                loadPdfDirect(directUrl);
-            } else if (format === 'djvu') {
-                loadDjvuDirect(directUrl);
-            } else if (format === 'docx' || format === 'doc') {
-                loadDocxDirect(directUrl);
-            } else {
-                loadPdfDirect(directUrl);
-            }
+            loadPdfDirect(directUrl);
         }
     }
 
@@ -1003,9 +1211,7 @@
             dom.contentWrap.style.display = 'none';
             dom.djvuWrap.style.display = 'block';
 
-            const corsUrl = url.includes('archive.org/download/') ? url.replace('archive.org/download/', 'archive.org/cors/') : url;
-
-            fetch(corsUrl).then(res => {
+            fetch(url).then(res => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.arrayBuffer();
             }).then(buf => {
@@ -1014,19 +1220,24 @@
                 viewer.render(dom.djvuMount);
                 viewer.loadDocument(buf);
                 dom.loading.style.display = 'none';
-                showSyncToast('📖 DjVu документ підвантажено в онлайн-переглядачі');
+                showSyncToast('📖 DjVu документ підвантажено');
                 updatePageUI();
             }).catch(err => {
-                console.warn('DjVu direct fetch failed:', err);
+                console.warn('DjVu direct fetch error:', err);
                 dom.loading.style.display = 'none';
-                showDocError('Ця книга (DjVu) наразі очікує синхронізації з сервером. Ви можете обрати локальний файл для читання.');
+                // Fallback: embed via iframe or show direct view
+                dom.docFrame.src = url;
+                dom.docFrame.style.display = 'block';
+                if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
+                showSyncToast('📖 Документ відкрито через системний переглядач');
             });
             return;
         }
 
         // Якщо бібліотека недоступна в браузері:
         dom.loading.style.display = 'none';
-        showDocError('Переглядач DjVu наразі недоступний. Ви можете завантажити книгу або відкрити її локально.');
+        dom.docFrame.src = url;
+        dom.docFrame.style.display = 'block';
     }
 
     // DOCX LOADER: via mammoth.js
@@ -1320,52 +1531,15 @@
                     const key = piece.color === 'w' ? piece.type.toUpperCase() : piece.type.toLowerCase();
                     pieceSpan.className = `chess-piece ${piece.color === 'w' ? 'white' : 'black'}`;
                     pieceSpan.textContent = PIECE_SYMBOLS[key] || '';
-                    pieceSpan.setAttribute('draggable', 'true');
-
-                    pieceSpan.addEventListener('dragstart', (e) => {
-                        e.stopPropagation();
-                        e.dataTransfer.setData('text/plain', squareName);
-                        e.dataTransfer.effectAllowed = 'move';
-                        chessState.selectedSquare = squareName;
-                        highlightPossibleMoves(squareName);
-                    });
-
+                    pieceSpan.addEventListener('pointerdown', (e) => handlePiecePointerDown(e, squareName, piece));
                     sqDiv.appendChild(pieceSpan);
                 }
 
-                // Drag & Drop цільової клітинки
-                sqDiv.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                    sqDiv.classList.add('drag-hover');
-                });
-                sqDiv.addEventListener('dragleave', () => {
-                    sqDiv.classList.remove('drag-hover');
-                });
-                sqDiv.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    sqDiv.classList.remove('drag-hover');
-                    const fromSq = e.dataTransfer.getData('text/plain');
-                    if (!fromSq || fromSq === squareName) return;
-
-                    const move = chessState.game.move({
-                        from: fromSq,
-                        to: squareName,
-                        promotion: 'q'
-                    });
-                    chessState.selectedSquare = null;
-                    if (move) {
-                        chessState.moveHistory.push(move.san);
-                        chessState.currentMoveIndex = chessState.moveHistory.length - 1;
-                        updateMovesLogUI();
-                        renderChessBoard();
-                        saveUserBookWorkspace();
-                    } else {
-                        renderChessBoard();
+                sqDiv.addEventListener('pointerdown', (e) => {
+                    if (e.target === sqDiv || e.target.classList.contains('coord-rank') || e.target.classList.contains('coord-file')) {
+                        handleSquareClick(squareName);
                     }
                 });
-
-                sqDiv.addEventListener('click', () => handleSquareClick(squareName));
                 dom.chessGrid.appendChild(sqDiv);
             }
         }
@@ -1377,15 +1551,199 @@
         updateBoardArrows();
     }
 
+    // Pointer Events Drag & Drop Controller
+    let activeDrag = null;
+
+    function handlePiecePointerDown(e, squareName, piece) {
+        if (e.button && e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const pieceKey = piece.color === 'w' ? piece.type.toUpperCase() : piece.type.toLowerCase();
+        activeDrag = {
+            type: 'board',
+            fromSquare: squareName,
+            piece: piece,
+            pieceKey: pieceKey,
+            startX: e.clientX,
+            startY: e.clientY,
+            moved: false,
+            el: e.currentTarget
+        };
+
+        window.addEventListener('pointermove', onGlobalPointerMove, { passive: false });
+        window.addEventListener('pointerup', onGlobalPointerUp, { passive: false });
+        window.addEventListener('pointercancel', onGlobalPointerUp, { passive: false });
+    }
+
+    function handlePalettePiecePointerDown(e, pieceKey) {
+        if (e.button && e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        activeDrag = {
+            type: 'palette',
+            pieceKey: pieceKey,
+            startX: e.clientX,
+            startY: e.clientY,
+            moved: false,
+            el: e.currentTarget
+        };
+
+        window.addEventListener('pointermove', onGlobalPointerMove, { passive: false });
+        window.addEventListener('pointerup', onGlobalPointerUp, { passive: false });
+        window.addEventListener('pointercancel', onGlobalPointerUp, { passive: false });
+    }
+
+    function onGlobalPointerMove(e) {
+        if (!activeDrag) return;
+        const dx = e.clientX - activeDrag.startX;
+        const dy = e.clientY - activeDrag.startY;
+
+        if (!activeDrag.moved && Math.hypot(dx, dy) > 4) {
+            activeDrag.moved = true;
+            let ghost = document.getElementById('chess-drag-ghost');
+            if (!ghost) {
+                ghost = document.createElement('div');
+                ghost.id = 'chess-drag-ghost';
+                document.body.appendChild(ghost);
+            }
+            ghost.textContent = PIECE_SYMBOLS[activeDrag.pieceKey] || '';
+            const isWhite = activeDrag.pieceKey === activeDrag.pieceKey.toUpperCase();
+            ghost.className = `chess-drag-ghost ${isWhite ? 'white' : 'black'}`;
+            ghost.style.display = 'flex';
+            activeDrag.ghostEl = ghost;
+
+            if (activeDrag.type === 'board') {
+                chessState.selectedSquare = activeDrag.fromSquare;
+                highlightPossibleMoves(activeDrag.fromSquare);
+            }
+            if (activeDrag.el) {
+                activeDrag.el.style.opacity = '0.3';
+            }
+        }
+
+        if (activeDrag.moved && activeDrag.ghostEl) {
+            activeDrag.ghostEl.style.left = `${e.clientX}px`;
+            activeDrag.ghostEl.style.top = `${e.clientY}px`;
+
+            const elemUnder = document.elementFromPoint(e.clientX, e.clientY);
+            const sqUnder = elemUnder ? elemUnder.closest('.chess-square') : null;
+            document.querySelectorAll('.chess-square.drag-hover').forEach(s => s.classList.remove('drag-hover'));
+            if (sqUnder) {
+                sqUnder.classList.add('drag-hover');
+            }
+        }
+    }
+
+    function onGlobalPointerUp(e) {
+        window.removeEventListener('pointermove', onGlobalPointerMove);
+        window.removeEventListener('pointerup', onGlobalPointerUp);
+        window.removeEventListener('pointercancel', onGlobalPointerUp);
+
+        if (!activeDrag) return;
+        const drag = activeDrag;
+        activeDrag = null;
+
+        if (drag.ghostEl) {
+            drag.ghostEl.style.display = 'none';
+        }
+        if (drag.el) {
+            drag.el.style.opacity = '1';
+        }
+        document.querySelectorAll('.chess-square.drag-hover').forEach(s => s.classList.remove('drag-hover'));
+
+        if (!drag.moved) {
+            if (drag.type === 'board') {
+                handleSquareClick(drag.fromSquare);
+            }
+            return;
+        }
+
+        const elemUnder = document.elementFromPoint(e.clientX, e.clientY);
+        const sqUnder = elemUnder ? elemUnder.closest('.chess-square') : null;
+        const targetSquare = sqUnder ? sqUnder.dataset.square : null;
+
+        if (drag.type === 'palette') {
+            if (targetSquare) {
+                const col = drag.pieceKey === drag.pieceKey.toUpperCase() ? 'w' : 'b';
+                const typ = drag.pieceKey.toLowerCase();
+                chessState.game.put({ type: typ, color: col }, targetSquare);
+                renderChessBoard();
+                requestStockfishEval();
+                saveUserBookWorkspace();
+                showSyncToast(`Встановлено ${PIECE_SYMBOLS[drag.pieceKey]} на ${targetSquare}`);
+            }
+            return;
+        }
+
+        if (drag.type === 'board') {
+            const fromSq = drag.fromSquare;
+
+            // Перетягнуто ЗА межі шахівниці -> видалення фігури з дошки в редакторі!
+            if (!targetSquare) {
+                chessState.game.remove(fromSq);
+                chessState.selectedSquare = null;
+                showSyncToast('🗑️ Фігуру прибрано з дошки');
+                renderChessBoard();
+                requestStockfishEval();
+                saveUserBookWorkspace();
+                return;
+            }
+
+            if (targetSquare === fromSq) {
+                chessState.selectedSquare = null;
+                renderChessBoard();
+                return;
+            }
+
+            if (chessState.editorActivePiece) {
+                chessState.game.remove(fromSq);
+                const col = drag.pieceKey === drag.pieceKey.toUpperCase() ? 'w' : 'b';
+                const typ = drag.pieceKey.toLowerCase();
+                chessState.game.put({ type: typ, color: col }, targetSquare);
+                chessState.selectedSquare = null;
+                renderChessBoard();
+                requestStockfishEval();
+                saveUserBookWorkspace();
+                return;
+            }
+
+            const move = chessState.game.move({
+                from: fromSq,
+                to: targetSquare,
+                promotion: 'q'
+            });
+
+            if (move) {
+                chessState.selectedSquare = null;
+                chessState.moveHistory.push(move.san);
+                chessState.currentMoveIndex = chessState.moveHistory.length - 1;
+                updateMovesLogUI();
+                renderChessBoard();
+                requestStockfishEval();
+                saveUserBookWorkspace();
+            } else {
+                chessState.game.remove(fromSq);
+                const col = drag.pieceKey === drag.pieceKey.toUpperCase() ? 'w' : 'b';
+                const typ = drag.pieceKey.toLowerCase();
+                chessState.game.put({ type: typ, color: col }, targetSquare);
+                chessState.selectedSquare = null;
+                renderChessBoard();
+                requestStockfishEval();
+                saveUserBookWorkspace();
+            }
+        }
+    }
+
     function handleSquareClick(square) {
-        // A) Якщо активна фігура в редакторі -> ставимо/видаляємо її
         if (chessState.editorActivePiece) {
             placePieceInEditor(square, chessState.editorActivePiece);
+            requestStockfishEval();
             saveUserBookWorkspace();
             return;
         }
 
-        // B) Звичайний режим гри ходами
         if (!chessState.selectedSquare) {
             const piece = chessState.game.get(square);
             if (piece) {
@@ -1416,6 +1774,7 @@
                 chessState.currentMoveIndex = chessState.moveHistory.length - 1;
                 updateMovesLogUI();
                 renderChessBoard();
+                requestStockfishEval();
                 saveUserBookWorkspace();
             } else {
                 const piece = chessState.game.get(square);
@@ -1913,6 +2272,7 @@
 
         // Board Editor
         dom.paletteBtns.forEach(btn => {
+            btn.addEventListener('pointerdown', (e) => handlePalettePiecePointerDown(e, btn.dataset.piece));
             btn.addEventListener('click', () => {
                 const p = btn.dataset.piece;
                 if (chessState.editorActivePiece === p) {
@@ -1930,6 +2290,9 @@
         dom.btnEditorClear.addEventListener('click', clearChessBoard);
         dom.btnEditorStart.addEventListener('click', resetToStartingPosition);
         dom.btnEditorTurn.addEventListener('click', toggleEditorTurn);
+
+        // Zoom Controls initialization
+        initZoomControls();
 
         // Selection toolbar
         document.addEventListener('mouseup', handleTextSelection);
@@ -1982,6 +2345,82 @@
             const file = e.dataTransfer.files && e.dataTransfer.files[0];
             if (file) handleLocalFileSelected(file);
         });
+    }
+
+    // ========================================================
+    // ZOOM CONTROLS (Reader scale & text magnification)
+    // ========================================================
+    function initZoomControls() {
+        const savedZoom = localStorage.getItem('chess_vault_reader_zoom');
+        if (savedZoom) {
+            state.zoom = parseFloat(savedZoom) || 1.0;
+        }
+
+        if (dom.labelZoomLevel) {
+            dom.labelZoomLevel.textContent = `${Math.round(state.zoom * 100)}%`;
+            dom.labelZoomLevel.addEventListener('click', () => setReaderZoom(1.0));
+        }
+
+        if (dom.btnZoomOut) {
+            dom.btnZoomOut.addEventListener('click', () => setReaderZoom(state.zoom - 0.15));
+        }
+
+        if (dom.btnZoomIn) {
+            dom.btnZoomIn.addEventListener('click', () => setReaderZoom(state.zoom + 0.15));
+        }
+
+        if (dom.settingZoomControl) {
+            const btns = dom.settingZoomControl.querySelectorAll('.setting-segment-btn');
+            btns.forEach(btn => {
+                const z = parseFloat(btn.dataset.zoom);
+                btn.classList.toggle('active', Math.abs(z - state.zoom) < 0.08);
+                btn.addEventListener('click', () => setReaderZoom(z));
+            });
+        }
+
+        applyZoomToDocument();
+    }
+
+    function setReaderZoom(newZoom) {
+        state.zoom = Math.max(0.7, Math.min(2.2, Math.round(newZoom * 100) / 100));
+        localStorage.setItem('chess_vault_reader_zoom', state.zoom.toString());
+
+        if (dom.labelZoomLevel) {
+            dom.labelZoomLevel.textContent = `${Math.round(state.zoom * 100)}%`;
+        }
+
+        if (dom.settingZoomControl) {
+            const btns = dom.settingZoomControl.querySelectorAll('.setting-segment-btn');
+            btns.forEach(btn => {
+                const z = parseFloat(btn.dataset.zoom);
+                btn.classList.toggle('active', Math.abs(z - state.zoom) < 0.08);
+            });
+        }
+
+        applyZoomToDocument();
+    }
+
+    function applyZoomToDocument() {
+        const z = state.zoom || 1.0;
+        if (dom.docFrame) {
+            dom.docFrame.style.transformOrigin = 'top center';
+            if (z === 1.0) {
+                dom.docFrame.style.transform = '';
+                dom.docFrame.style.width = '100%';
+                dom.docFrame.style.height = '100%';
+            } else {
+                dom.docFrame.style.transform = `scale(${z})`;
+                dom.docFrame.style.width = `${100 / z}%`;
+                dom.docFrame.style.height = `${100 / z}%`;
+            }
+        }
+        if (dom.djvuMount) {
+            dom.djvuMount.style.transformOrigin = 'top center';
+            dom.djvuMount.style.transform = z === 1.0 ? '' : `scale(${z})`;
+        }
+        if (dom.contentWrap) {
+            dom.contentWrap.style.fontSize = `${1.05 * z}rem`;
+        }
     }
 
     // UTILITIES

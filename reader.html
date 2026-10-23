@@ -75,6 +75,12 @@
         </div>
 
         <div class="reader-topbar-right">
+            <!-- Quick Zoom Controls -->
+            <div class="reader-zoom-group">
+                <button type="button" class="reader-zoom-btn" id="btn-zoom-out" title="Зменшити шрифт / масштаб">−</button>
+                <button type="button" class="reader-zoom-level" id="label-zoom-level" title="Скинути до 100%">100%</button>
+                <button type="button" class="reader-zoom-btn" id="btn-zoom-in" title="Збільшити шрифт / масштаб">+</button>
+            </div>
             <button type="button" class="reader-tool-btn" id="btn-reader-settings" title="Налаштування читалки та дошки">
                 <span>⚙️</span>
                 <span>Налаштування</span>
@@ -187,6 +193,18 @@
                             <button type="button" class="board-step-btn" id="btn-board-last" title="В кінець">▶|</button>
                             <button type="button" class="board-step-btn" id="btn-board-flip" title="Повернути дошку">🔄</button>
                             <span class="board-eval-compact-score" id="board-eval-compact-score" style="display: none;">+0.0</span>
+                        </div>
+
+                        <!-- Stockfish Engine Evaluation & Lichess Lines Banner -->
+                        <div class="engine-eval-box" id="engine-eval-box">
+                            <div class="engine-eval-row">
+                                <span class="engine-eval-badge">⚡ Stockfish</span>
+                                <span class="engine-eval-score-pill" id="engine-eval-score-pill">+0.0</span>
+                                <span class="engine-eval-depth" id="engine-eval-depth">depth 12</span>
+                            </div>
+                            <div class="engine-eval-pv" id="engine-eval-pv" title="Найкраща лінія продовження за оцінкою Stockfish">
+                                1. e4 e5 2. Nf3 Nc6 3. Bc4
+                            </div>
                         </div>
 
                         <!-- Moves Sequence Log (Parsed from book text) -->
@@ -344,7 +362,20 @@
                     </div>
                 </div>
 
-                <!-- Group 4: Повноекранний режим -->
+                <!-- Group 4: Масштаб тексту та сторінки -->
+                <div class="reader-setting-group">
+                    <div class="setting-group-label">Масштаб тексту книги</div>
+                    <div class="setting-group-desc">Збільшення розміру сторінки та шрифту:</div>
+                    <div class="setting-segmented-control" id="setting-zoom-control">
+                        <button type="button" class="setting-segment-btn" data-zoom="0.85">85%</button>
+                        <button type="button" class="setting-segment-btn active" data-zoom="1.0">100%</button>
+                        <button type="button" class="setting-segment-btn" data-zoom="1.25">125%</button>
+                        <button type="button" class="setting-segment-btn" data-zoom="1.5">150%</button>
+                        <button type="button" class="setting-segment-btn" data-zoom="1.75">175%</button>
+                    </div>
+                </div>
+
+                <!-- Group 5: Повноекранний режим -->
                 <div class="reader-setting-group">
                     <div class="setting-group-label">Екран</div>
                     <div class="setting-group-desc">Масштабування робочої області:</div>
