@@ -789,162 +789,126 @@ body, html {
 }
 
 /* ========================================================
-   ⚡ READER ELO RATING BAR WIDGET (next to board & moves)
+   ⚡ CHESS POSITION EVALUATION BAR (Eval Bar: White vs Black)
    ======================================================== */
-.reader-elo-card {
+.board-play-area {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 8px;
     width: 100%;
-    margin-top: 10px;
-    background: rgba(0, 0, 0, 0.15);
-    border: 1px solid var(--reader-border);
-    border-radius: 10px;
-    padding: 10px 12px;
+    max-width: 350px;
+}
+
+.board-eval-wrap {
+    width: 24px;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    transition: all 0.25s ease;
-}
-
-.reader-elo-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-
-.reader-elo-title-wrap {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--reader-text);
-}
-
-.reader-elo-icon {
-    font-size: 0.95rem;
-}
-
-.reader-elo-title {
-    color: var(--reader-text-muted);
-}
-
-.reader-elo-badge {
-    padding: 2px 7px;
-    border-radius: 999px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.4px;
-    white-space: nowrap;
-    background: rgba(59, 130, 246, 0.18);
-    color: #60a5fa;
-    border: 1px solid rgba(59, 130, 246, 0.3);
-}
-
-.reader-elo-badge.level-beginner,
-.reader-elo-badge.level-novice {
-    background: rgba(16, 185, 129, 0.18);
-    color: #10b981;
-    border-color: rgba(16, 185, 129, 0.35);
-}
-
-.reader-elo-badge.level-intermediate {
-    background: rgba(59, 130, 246, 0.18);
-    color: #60a5fa;
-    border-color: rgba(59, 130, 246, 0.35);
-}
-
-.reader-elo-badge.level-advanced {
-    background: rgba(245, 158, 11, 0.18);
-    color: #fbbf24;
-    border-color: rgba(245, 158, 11, 0.35);
-}
-
-.reader-elo-badge.level-master {
-    background: rgba(168, 85, 247, 0.18);
-    color: #c084fc;
-    border-color: rgba(168, 85, 247, 0.35);
-}
-
-/* Toggle button in reader */
-.reader-elo-toggle-btn {
-    border: 1px solid var(--reader-border);
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--reader-text-muted);
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    padding: 3px 8px;
     border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    overflow: hidden;
+    background: #2b2b29;
+    border: 1.5px solid rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
     user-select: none;
+    transition: opacity 0.2s ease, width 0.2s ease;
 }
 
-.reader-elo-toggle-btn:hover {
-    background: rgba(255, 255, 255, 0.15);
-    color: var(--reader-text);
+.board-eval-wrap.is-hidden {
+    display: none !important;
 }
 
-.reader-elo-toggle-btn.active {
-    background: #10b981;
-    color: #fff;
-    border-color: #10b981;
-    box-shadow: 0 0 8px rgba(16, 185, 129, 0.35);
-}
-
-.reader-elo-body {
+.board-eval-bar {
+    width: 100%;
+    height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    transition: all 0.25s ease;
-}
-
-.reader-elo-card.is-hidden .reader-elo-body {
-    display: none;
-}
-
-.reader-elo-track {
-    width: 100%;
-    height: 6px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 999px;
-    overflow: hidden;
     position: relative;
 }
 
-.reader-elo-fill {
-    height: 100%;
-    border-radius: 999px;
-    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
-    box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+.board-eval-fill-black {
+    background: #2b2b29;
+    width: 100%;
+    height: 50%;
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 4px;
+    overflow: hidden;
 }
 
-.reader-elo-fill.level-beginner,
-.reader-elo-fill.level-novice {
-    background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
-    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+.board-eval-fill-white {
+    background: #ffffff;
+    width: 100%;
+    height: 50%;
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 4px;
+    overflow: hidden;
 }
 
-.reader-elo-fill.level-intermediate {
-    background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
-    box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+.board-eval-score {
+    font-size: 0.64rem;
+    font-weight: 800;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: -0.2px;
+    line-height: 1;
 }
 
-.reader-elo-fill.level-advanced {
-    background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
-    box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+.board-eval-fill-black .board-eval-score {
+    color: #ffffff;
 }
 
-.reader-elo-fill.level-master {
-    background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%);
-    box-shadow: 0 0 8px rgba(139, 92, 246, 0.5);
+.board-eval-fill-white .board-eval-score {
+    color: #1a1a1a;
 }
 
-.reader-elo-desc {
-    font-size: 0.72rem;
-    color: var(--reader-text-muted);
-    line-height: 1.35;
+/* Board Coordinates (Files a-h & Ranks 1-8) */
+.coord-rank {
+    position: absolute;
+    top: 2px;
+    left: 3px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: none;
+    user-select: none;
+    z-index: 2;
+    transition: color 0.15s ease;
+}
+
+.coord-file {
+    position: absolute;
+    bottom: 2px;
+    right: 3px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: none;
+    user-select: none;
+    z-index: 2;
+    transition: color 0.15s ease;
+}
+
+.chess-square.light .coord-rank,
+.chess-square.light .coord-file {
+    color: var(--board-dark);
+}
+
+.chess-square.dark .coord-rank,
+.chess-square.dark .coord-file {
+    color: var(--board-light);
+}
+
+/* Eval Bar Toggle Button in Controls */
+.eval-toggle-btn.active {
+    background: #10b981 !important;
+    color: #ffffff !important;
+    border-color: #10b981 !important;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
 }
 
 /* BOARD EDITOR PANEL */

@@ -136,90 +136,203 @@
     };
 
     // ========================================================
-    // ⚡ ELO RATING BAR WIDGET (Dock / Board side)
+    // ⚡ REAL CHESS POSITION EVALUATION ENGINE (Eval Bar)
+    // Evaluates current board advantage: White (+) vs Black (-)
     // ========================================================
-    function resolveBookElo() {
-        // 1. З параметрів URL
-        let eloDisplay = urlParams.get('eloDisplay');
-        let eloLevel = urlParams.get('eloLevel');
-        let eloPercent = parseInt(urlParams.get('eloPercent'), 10);
+    const PIECE_VALS = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
 
-        // 2. З глобального кешу книг (books-cache.js)
-        if (!eloDisplay && window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE)) {
-            const bId = (bookParam.id || '').toLowerCase();
-            const bTitle = (bookParam.title || '').toLowerCase();
-            const found = window.CHESS_BOOKS_CACHE.find(b => 
-                (b.id && b.id.toLowerCase() === bId) ||
-                (b.title && b.title.toLowerCase() === bTitle) ||
-                (b.title && bTitle.includes(b.title.toLowerCase()))
-            );
-            if (found) {
-                eloDisplay = found.eloDisplay;
-                eloLevel = found.eloLevel;
-                eloPercent = found.eloPercent;
+    const PAWN_PST = [
+        0,  0,  0,  0,  0,  0,  0,  0,
+       50, 50, 50, 50, 50, 50, 50, 50,
+       10, 10, 20, 30, 30, 20, 10, 10,
+        5,  5, 10, 25, 25, 10,  5,  5,
+        0,  0,  0, 20, 20,  0,  0,  0,
+        5, -5,-10,  0,  0,-10, -5,  5,
+        5, 10, 10,-20,-20, 10, 10,  5,
+        0,  0,  0,  0,  0,  0,  0,  0
+    ];
+
+    const KNIGHT_PST = [
+      -50,-40,-30,-30,-30,-30,-40,-50,
+      -40,-20,  0,  0,  0,  0,-20,-40,
+      -30,  0, 10, 15, 15, 10,  0,-30,
+      -30,  5, 15, 20, 20, 15,  5,-30,
+      -30,  0, 15, 20, 20, 15,  0,-30,
+      -30,  5, 10, 15, 15, 10,  5,-30,
+      -40,-20,  0,  5,  5,  0,-20,-40,
+      -50,-40,-30,-30,-30,-30,-40,-50
+    ];
+
+    const BISHOP_PST = [
+      -20,-10,-10,-10,-10,-10,-10,-20,
+      -10,  0,  0,  0,  0,  0,  0,-10,
+      -10,  0,  5, 10, 10,  5,  0,-10,
+      -10,  5,  5, 10, 10,  5,  5,-10,
+      -10,  0, 10, 10, 10, 10,  0,-10,
+      -10, 10, 10, 10, 10, 10, 10,-10,
+      -10,  5,  0,  0,  0,  0,  5,-10,
+      -20,-10,-10,-10,-10,-10,-10,-20
+    ];
+
+    const ROOK_PST = [
+        0,  0,  0,  0,  0,  0,  0,  0,
+        5, 10, 10, 10, 10, 10, 10,  5,
+       -5,  0,  0,  0,  0,  0,  0, -5,
+       -5,  0,  0,  0,  0,  0,  0, -5,
+       -5,  0,  0,  0,  0,  0,  0, -5,
+       -5,  0,  0,  0,  0,  0,  0, -5,
+       -5,  0,  0,  0,  0,  0,  0, -5,
+        0,  0,  0,  5,  5,  0,  0,  0
+    ];
+
+    const QUEEN_PST = [
+      -20,-10,-10, -5, -5,-10,-10,-20,
+      -10,  0,  0,  0,  0,  0,  0,-10,
+      -10,  0,  5,  5,  5,  5,  0,-10,
+       -5,  0,  5,  5,  5,  5,  0, -5,
+        0,  0,  5,  5,  5,  5,  0, -5,
+      -10,  5,  5,  5,  5,  5,  0,-10,
+      -10,  0,  5,  0,  0,  0,  0,-10,
+      -20,-10,-10, -5, -5,-10,-10,-20
+    ];
+
+    const KING_PST = [
+      -30,-40,-40,-50,-50,-40,-40,-30,
+      -30,-40,-40,-50,-50,-40,-40,-30,
+      -30,-40,-40,-50,-50,-40,-40,-30,
+      -30,-40,-40,-50,-50,-40,-40,-30,
+      -20,-30,-30,-40,-40,-30,-30,-20,
+      -10,-20,-20,-20,-20,-20,-20,-10,
+       20, 20,  0,  0,  0,  0, 20, 20,
+       20, 30, 10,  0,  0, 10, 30, 20
+    ];
+
+    function evaluateCurrentBoardPosition() {
+        if (!chessState.game) return { evalScore: 0, textScore: '0.0', whitePercent: 50 };
+
+        if (chessState.game.in_checkmate && chessState.game.in_checkmate()) {
+            const turn = chessState.game.turn();
+            if (turn === 'w') {
+                return { evalScore: -999, textScore: '-M', whitePercent: 0 };
+            } else {
+                return { evalScore: 999, textScore: '+M', whitePercent: 100 };
             }
         }
 
-        // 3. Fallbacks за замовчуванням
-        if (!eloDisplay) eloDisplay = '1400–1800';
-        if (!eloLevel) eloLevel = 'intermediate';
-        if (isNaN(eloPercent) || !eloPercent) eloPercent = 50;
+        if (chessState.game.in_draw && chessState.game.in_draw()) {
+            return { evalScore: 0, textScore: '0.0', whitePercent: 50 };
+        }
 
-        return { eloDisplay, eloLevel, eloPercent };
+        const board = chessState.game.board();
+        let score = 0;
+
+        for (let r = 0; r < 8; r++) {
+            for (let f = 0; f < 8; f++) {
+                const piece = board[r][f];
+                if (!piece) continue;
+
+                const t = piece.type.toLowerCase();
+                const val = PIECE_VALS[t] || 0;
+                let pstVal = 0;
+
+                if (t === 'p') pstVal = PAWN_PST[r * 8 + f];
+                else if (t === 'n') pstVal = KNIGHT_PST[r * 8 + f];
+                else if (t === 'b') pstVal = BISHOP_PST[r * 8 + f];
+                else if (t === 'r') pstVal = ROOK_PST[r * 8 + f];
+                else if (t === 'q') pstVal = QUEEN_PST[r * 8 + f];
+                else if (t === 'k') pstVal = KING_PST[r * 8 + f];
+
+                if (piece.color === 'w') {
+                    score += (val + pstVal);
+                } else {
+                    let blackPst = 0;
+                    const br = 7 - r;
+                    if (t === 'p') blackPst = PAWN_PST[br * 8 + f];
+                    else if (t === 'n') blackPst = KNIGHT_PST[br * 8 + f];
+                    else if (t === 'b') blackPst = BISHOP_PST[br * 8 + f];
+                    else if (t === 'r') blackPst = ROOK_PST[br * 8 + f];
+                    else if (t === 'q') blackPst = QUEEN_PST[br * 8 + f];
+                    else if (t === 'k') blackPst = KING_PST[br * 8 + f];
+                    score -= (val + blackPst);
+                }
+            }
+        }
+
+        const evalPawns = score / 100;
+        let textScore = '0.0';
+        if (Math.abs(evalPawns) < 0.05) {
+            textScore = '0.0';
+        } else if (evalPawns > 0) {
+            textScore = `+${evalPawns.toFixed(1)}`;
+        } else {
+            textScore = `${evalPawns.toFixed(1)}`;
+        }
+
+        // Winning probability sigmoid mapping (5% to 95%)
+        const winProb = 1 / (1 + Math.pow(10, -evalPawns / 4));
+        const whitePercent = Math.min(95, Math.max(5, Math.round(winProb * 100)));
+
+        return { evalScore: evalPawns, textScore, whitePercent };
     }
 
-    function initReaderEloWidget() {
-        const eloCard = document.getElementById('reader-elo-card');
-        const badge = document.getElementById('reader-elo-badge');
-        const fill = document.getElementById('reader-elo-fill');
-        const desc = document.getElementById('reader-elo-desc');
-        const toggleBtn = document.getElementById('btn-toggle-reader-elo');
-        const toggleStatus = document.getElementById('reader-elo-toggle-status');
-        if (!eloCard) return;
+    function updateEvalBarUI() {
+        const evalWrap = document.getElementById('board-eval-wrap');
+        const fillWhite = document.getElementById('board-eval-fill-white');
+        const fillBlack = document.getElementById('board-eval-fill-black');
+        const scoreWhite = document.getElementById('board-eval-score-white');
+        const scoreBlack = document.getElementById('board-eval-score-black');
 
-        const { eloDisplay, eloLevel, eloPercent } = resolveBookElo();
+        if (!evalWrap || !fillWhite || !fillBlack) return;
 
-        if (badge) {
-            badge.textContent = `⚡ ${eloDisplay}`;
-            badge.className = `reader-elo-badge level-${eloLevel}`;
-        }
-        if (fill) {
-            fill.style.width = `${eloPercent}%`;
-            fill.className = `reader-elo-fill level-${eloLevel}`;
-        }
-        if (desc) {
-            const isEn = window.i18n && window.i18n.currentLang === 'en';
-            let descText = `Рекомендовано для клубних гравців (${eloDisplay} ELO)`;
-            if (eloLevel === 'novice' || eloLevel === 'beginner') {
-                descText = isEn ? `Recommended: Beginners & Novices (${eloDisplay} ELO)` : `Рекомендовано: початківці та розрядники (${eloDisplay} ELO)`;
-            } else if (eloLevel === 'intermediate') {
-                descText = isEn ? `Recommended: Club players (${eloDisplay} ELO)` : `Рекомендовано: клубні гравці (${eloDisplay} ELO)`;
-            } else if (eloLevel === 'advanced') {
-                descText = isEn ? `Recommended: Advanced & Masters (${eloDisplay} ELO)` : `Рекомендовано: кандидати у майстри та майстри (${eloDisplay} ELO)`;
-            } else if (eloLevel === 'master') {
-                descText = isEn ? `Recommended: Grandmasters (${eloDisplay} ELO)` : `Рекомендовано: майстри та гросмейстери (${eloDisplay} ELO)`;
-            }
-            desc.textContent = descText;
+        const { evalScore, textScore, whitePercent } = evaluateCurrentBoardPosition();
+
+        const isFlipped = chessState.boardFlipped;
+        const bottomPercent = isFlipped ? (100 - whitePercent) : whitePercent;
+        const topPercent = 100 - bottomPercent;
+
+        if (isFlipped) {
+            // Black is at bottom, White is at top
+            fillBlack.style.height = `${bottomPercent}%`;
+            fillWhite.style.height = `${topPercent}%`;
+            fillBlack.style.order = '2';
+            fillWhite.style.order = '1';
+        } else {
+            // White is at bottom, Black is at top
+            fillWhite.style.height = `${bottomPercent}%`;
+            fillBlack.style.height = `${topPercent}%`;
+            fillWhite.style.order = '2';
+            fillBlack.style.order = '1';
         }
 
-        // Відновлюємо збережений стан показу/приховування шкали
-        const saved = localStorage.getItem('chess_vault_reader_show_elo');
+        if (evalScore >= 0) {
+            if (scoreWhite) scoreWhite.textContent = textScore;
+            if (scoreBlack) scoreBlack.textContent = '';
+        } else {
+            if (scoreBlack) scoreBlack.textContent = textScore;
+            if (scoreWhite) scoreWhite.textContent = '';
+        }
+    }
+
+    function initChessEvalBar() {
+        const toggleBtn = document.getElementById('btn-toggle-eval');
+        const evalWrap = document.getElementById('board-eval-wrap');
+        if (!toggleBtn || !evalWrap) return;
+
+        const saved = localStorage.getItem('chess_vault_show_eval_bar');
         const isShown = saved !== 'false';
-        eloCard.classList.toggle('is-hidden', !isShown);
-        if (toggleBtn) toggleBtn.classList.toggle('active', isShown);
-        if (toggleStatus) toggleStatus.textContent = isShown ? 'УВІМК' : 'ВИМК';
+        evalWrap.classList.toggle('is-hidden', !isShown);
+        toggleBtn.classList.toggle('active', isShown);
 
-        if (toggleBtn) {
-            toggleBtn.addEventListener('click', () => {
-                const nowHidden = eloCard.classList.toggle('is-hidden');
-                const show = !nowHidden;
-                toggleBtn.classList.toggle('active', show);
-                if (toggleStatus) toggleStatus.textContent = show ? 'УВІМК' : 'ВИМК';
-                try {
-                    localStorage.setItem('chess_vault_reader_show_elo', show ? 'true' : 'false');
-                } catch (e) {}
-            });
-        }
+        toggleBtn.addEventListener('click', () => {
+            const nowHidden = evalWrap.classList.toggle('is-hidden');
+            const show = !nowHidden;
+            toggleBtn.classList.toggle('active', show);
+            try {
+                localStorage.setItem('chess_vault_show_eval_bar', show ? 'true' : 'false');
+            } catch (_) {}
+        });
+
+        updateEvalBarUI();
     }
 
     // ========================================================
@@ -234,7 +347,7 @@
         applyDockCollapsed(state.isDockCollapsed);
 
         initChessGame();
-        initReaderEloWidget();
+        initChessEvalBar();
 
         // 1. Спочатку завантажуємо локальний стан воркспейсу юзера для цієї книги
         loadUserBookWorkspace();
@@ -482,10 +595,16 @@
             displayDocumentBlob(blob, format);
             return;
         } catch (downloadErr) {
-            console.warn('Stream download fallback to direct iframe viewer:', downloadErr);
+            console.warn('Stream download fallback:', downloadErr);
             if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
 
-            // Безшовний fallback до прямого відкриття у вбудованому iframe
+            // Якщо помилка 404 (файлу немає на сервері), не відкриваємо фрейм архіву!
+            if (downloadErr && downloadErr.message && downloadErr.message.includes('404')) {
+                showDocError('Файл цієї книги наразі відсутній на сервері. Ви можете відкрити файл локально з комп’ютера.');
+                return;
+            }
+
+            // Безшовний fallback до прямого відкриття у вбудованому iframe тільки при CORS
             const directUrl = candidateUrls[0];
             if (format === 'pdf') {
                 loadPdfDirect(directUrl);
@@ -898,6 +1017,22 @@
                     sqDiv.classList.add('selected');
                 }
 
+                // 1. Підпис вертикалі (ранг 1-8) на крайній лівій клітинці поточної орієнтації
+                if (f === files[0]) {
+                    const rankLabel = document.createElement('span');
+                    rankLabel.className = 'coord-rank';
+                    rankLabel.textContent = (r + 1);
+                    sqDiv.appendChild(rankLabel);
+                }
+
+                // 2. Підпис горизонталі (файл a-h) на нижньому ряду поточної орієнтації
+                if (r === ranks[7]) {
+                    const fileLabel = document.createElement('span');
+                    fileLabel.className = 'coord-file';
+                    fileLabel.textContent = String.fromCharCode(97 + f);
+                    sqDiv.appendChild(fileLabel);
+                }
+
                 const piece = board[7 - r][f];
                 if (piece) {
                     const pieceSpan = document.createElement('span');
@@ -911,6 +1046,9 @@
                 dom.chessGrid.appendChild(sqDiv);
             }
         }
+
+        // Оновлюємо показник переваги на дошці в реальному часі (+1.2 / -3.0)
+        updateEvalBarUI();
     }
 
     function handleSquareClick(square) {
@@ -1485,6 +1623,8 @@
     function showDocError(msg) {
         dom.loading.style.display = 'none';
         if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
+        if (dom.docFrame) dom.docFrame.style.display = 'none';
+        if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
         if (dom.contentWrap) {
             dom.contentWrap.style.display = 'block';
             const hasDirectFile = Boolean(bookParam.file);

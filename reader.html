@@ -158,9 +158,21 @@
                 <!-- VIEW 1: CHESSBOARD -->
                 <div class="reader-dock-view active" id="view-board">
                     <div class="board-container-card">
-                        <!-- Chessboard Canvas / Grid -->
-                        <div class="board-wrapper" id="board-wrapper">
-                            <div class="chess-grid" id="chess-grid"></div>
+                        <!-- Chessboard Canvas with Position Evaluation Bar (White vs Black) -->
+                        <div class="board-play-area">
+                            <div class="board-eval-wrap" id="board-eval-wrap" title="Оцінка поточної позиції на дошці">
+                                <div class="board-eval-bar" id="board-eval-bar">
+                                    <div class="board-eval-fill-black" id="board-eval-fill-black">
+                                        <span class="board-eval-score" id="board-eval-score-black"></span>
+                                    </div>
+                                    <div class="board-eval-fill-white" id="board-eval-fill-white">
+                                        <span class="board-eval-score" id="board-eval-score-white">+0.0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="board-wrapper" id="board-wrapper">
+                                <div class="chess-grid" id="chess-grid"></div>
+                            </div>
                         </div>
 
                         <!-- Replay Controls -->
@@ -170,31 +182,12 @@
                             <button type="button" class="board-step-btn" id="btn-board-next" title="Хід вперед">▶</button>
                             <button type="button" class="board-step-btn" id="btn-board-last" title="В кінець">▶|</button>
                             <button type="button" class="board-step-btn" id="btn-board-flip" title="Повернути дошку">🔄</button>
+                            <button type="button" class="board-step-btn eval-toggle-btn active" id="btn-toggle-eval" title="Показати/приховати шкалу оцінки позиції (Eval Bar)">📊</button>
                         </div>
 
                         <!-- Moves Sequence Log (Parsed from book text) -->
                         <div class="board-moves-log" id="board-moves-log">
                             <span style="color: var(--reader-text-muted); font-size: 0.75rem;">Виділіть шахові ходи в тексті книги (наприклад, "1. e4 e5 2. Nf3 Nc6") або розставте фігури в редакторі.</span>
-                        </div>
-
-                        <!-- ELO Rating Bar Widget with On/Off Toggle -->
-                        <div class="reader-elo-card" id="reader-elo-card">
-                            <div class="reader-elo-header">
-                                <div class="reader-elo-title-wrap">
-                                    <span class="reader-elo-icon">⚡</span>
-                                    <span class="reader-elo-title">Рівень книги:</span>
-                                    <span class="reader-elo-badge" id="reader-elo-badge">1400–1800</span>
-                                </div>
-                                <button type="button" class="reader-elo-toggle-btn active" id="btn-toggle-reader-elo" title="Показати/приховати шкалу ELO">
-                                    <span id="reader-elo-toggle-status">УВІМК</span>
-                                </button>
-                            </div>
-                            <div class="reader-elo-body" id="reader-elo-body">
-                                <div class="reader-elo-track">
-                                    <div class="reader-elo-fill" id="reader-elo-fill" style="width: 50%;"></div>
-                                </div>
-                                <div class="reader-elo-desc" id="reader-elo-desc">Рекомендовано: клубний гравець (1400–1800 ELO)</div>
-                            </div>
                         </div>
                     </div>
 
