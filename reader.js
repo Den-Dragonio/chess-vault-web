@@ -38,13 +38,23 @@
         inputCurrentPage: document.getElementById('input-current-page'),
         labelTotalPages: document.getElementById('label-total-pages'),
         labelPercentage: document.getElementById('label-percentage'),
-        btnZoomOut: document.getElementById('btn-zoom-out'),
-        btnZoomReset: document.getElementById('btn-zoom-reset'),
-        btnZoomIn: document.getElementById('btn-zoom-in'),
-        btnToggleDockSide: document.getElementById('btn-toggle-dock-side'),
-        dockSideLabel: document.getElementById('dock-side-label'),
-        btnToggleTheme: document.getElementById('btn-toggle-theme'),
-        btnFullscreen: document.getElementById('btn-fullscreen'),
+        btnReaderSettings: document.getElementById('btn-reader-settings'),
+        btnQuickNote: document.getElementById('btn-quick-note'),
+        settingsModal: document.getElementById('reader-settings-modal'),
+        btnCloseSettings: document.getElementById('btn-close-settings'),
+        btnDoneSettings: document.getElementById('btn-done-settings'),
+        settingDockLeft: document.getElementById('setting-dock-left'),
+        settingDockRight: document.getElementById('setting-dock-right'),
+        settingEvalFull: document.getElementById('setting-eval-full'),
+        settingEvalNumbers: document.getElementById('setting-eval-numbers'),
+        settingEvalOff: document.getElementById('setting-eval-off'),
+        settingArrowBest: document.getElementById('setting-arrow-best'),
+        settingArrowThreat: document.getElementById('setting-arrow-threat'),
+        settingBtnFullscreen: document.getElementById('setting-btn-fullscreen'),
+        authGateModal: document.getElementById('reader-auth-gate-modal'),
+        boardArrowsSvg: document.getElementById('board-arrows-svg'),
+        boardArrowsGroup: document.getElementById('board-arrows-group'),
+        boardEvalCompactScore: document.getElementById('board-eval-compact-score'),
         workspace: document.getElementById('reader-workspace'),
         viewport: document.getElementById('reader-viewport'),
         loading: document.getElementById('reader-loading'),
@@ -63,7 +73,6 @@
         dock: document.getElementById('reader-dock'),
         btnToggleDockCollapse: document.getElementById('btn-toggle-dock-collapse'),
         dockCollapseArrow: document.getElementById('dock-collapse-arrow'),
-        btnDockQuickSide: document.getElementById('btn-dock-quick-side'),
         dockTabs: document.querySelectorAll('.reader-dock-tab'),
         dockViews: {
             board: document.getElementById('view-board'),
@@ -108,7 +117,12 @@
         zoom: 1.0,
         pdfDoc: null,
         isHighlightActive: false,
-        dockSide: localStorage.getItem('chess_vault_reader_dock_side') || 'right',
+        settings: {
+            dockSide: localStorage.getItem('chess_vault_reader_dock_side') || 'right',
+            evalMode: localStorage.getItem('chess_vault_reader_eval_mode') || 'full', // 'full' | 'numbers' | 'off'
+            arrowBest: localStorage.getItem('chess_vault_reader_arrow_best') !== 'false',
+            arrowThreat: localStorage.getItem('chess_vault_reader_arrow_threat') !== 'false'
+        },
         isDockCollapsed: localStorage.getItem('chess_vault_reader_dock_collapsed') === 'true',
         activeTab: 'board',
         selectedText: '',
@@ -281,23 +295,44 @@
         const fillBlack = document.getElementById('board-eval-fill-black');
         const scoreWhite = document.getElementById('board-eval-score-white');
         const scoreBlack = document.getElementById('board-eval-score-black');
-
-        if (!evalWrap || !fillWhite || !fillBlack) return;
+        const compactScore = dom.boardEvalCompactScore;
 
         const { evalScore, textScore, whitePercent } = evaluateCurrentBoardPosition();
+
+        // 1. Оновлення компактного текстового значення (для режиму 'numbers')
+        if (compactScore) {
+            compactScore.textContent = textScore;
+            if (evalScore > 0.05) compactScore.style.color = '#22c55e';
+            else if (evalScore < -0.05) compactScore.style.color = '#ef4444';
+            else compactScore.style.color = 'var(--reader-text)';
+        }
+
+        const mode = state.settings.evalMode || 'full';
+        if (mode === 'off') {
+            if (evalWrap) evalWrap.classList.add('is-hidden');
+            if (compactScore) compactScore.style.display = 'none';
+            return;
+        } else if (mode === 'numbers') {
+            if (evalWrap) evalWrap.classList.add('is-hidden');
+            if (compactScore) compactScore.style.display = 'inline-flex';
+            return;
+        }
+
+        // 'full': показуємо повну вертикальну шкалу ело-бару
+        if (compactScore) compactScore.style.display = 'none';
+        if (!evalWrap || !fillWhite || !fillBlack) return;
+        evalWrap.classList.remove('is-hidden');
 
         const isFlipped = chessState.boardFlipped;
         const bottomPercent = isFlipped ? (100 - whitePercent) : whitePercent;
         const topPercent = 100 - bottomPercent;
 
         if (isFlipped) {
-            // Black is at bottom, White is at top
             fillBlack.style.height = `${bottomPercent}%`;
             fillWhite.style.height = `${topPercent}%`;
             fillBlack.style.order = '2';
             fillWhite.style.order = '1';
         } else {
-            // White is at bottom, Black is at top
             fillWhite.style.height = `${bottomPercent}%`;
             fillBlack.style.height = `${topPercent}%`;
             fillWhite.style.order = '2';
@@ -314,36 +349,235 @@
     }
 
     function initChessEvalBar() {
-        const toggleBtn = document.getElementById('btn-toggle-eval');
-        const evalWrap = document.getElementById('board-eval-wrap');
-        if (!toggleBtn || !evalWrap) return;
-
-        const saved = localStorage.getItem('chess_vault_show_eval_bar');
-        const isShown = saved !== 'false';
-        evalWrap.classList.toggle('is-hidden', !isShown);
-        toggleBtn.classList.toggle('active', isShown);
-
-        toggleBtn.addEventListener('click', () => {
-            const nowHidden = evalWrap.classList.toggle('is-hidden');
-            const show = !nowHidden;
-            toggleBtn.classList.toggle('active', show);
-            try {
-                localStorage.setItem('chess_vault_show_eval_bar', show ? 'true' : 'false');
-            } catch (_) {}
-        });
-
         updateEvalBarUI();
+    }
+
+    // ========================================================
+    // ⚡ CHESS ARROWS & ENGINE SUGGESTIONS (Best Move & Threat)
+    // ========================================================
+    function evaluateGameScore(game) {
+        if (!game) return 0;
+        const board = game.board();
+        let score = 0;
+        for (let r = 0; r < 8; r++) {
+            for (let f = 0; f < 8; f++) {
+                const piece = board[r][f];
+                if (!piece) continue;
+                const val = PIECE_VALS[piece.type] || 0;
+                const t = piece.type;
+                if (piece.color === 'w') {
+                    const wr = 7 - r;
+                    let pst = 0;
+                    if (t === 'p') pst = PAWN_PST[wr * 8 + f];
+                    else if (t === 'n') pst = KNIGHT_PST[wr * 8 + f];
+                    else if (t === 'b') pst = BISHOP_PST[wr * 8 + f];
+                    else if (t === 'r') pst = ROOK_PST[wr * 8 + f];
+                    else if (t === 'q') pst = QUEEN_PST[wr * 8 + f];
+                    else if (t === 'k') pst = KING_PST[wr * 8 + f];
+                    score += (val + pst);
+                } else {
+                    const br = r;
+                    let pst = 0;
+                    if (t === 'p') pst = PAWN_PST[br * 8 + f];
+                    else if (t === 'n') pst = KNIGHT_PST[br * 8 + f];
+                    else if (t === 'b') pst = BISHOP_PST[br * 8 + f];
+                    else if (t === 'r') pst = ROOK_PST[br * 8 + f];
+                    else if (t === 'q') pst = QUEEN_PST[br * 8 + f];
+                    else if (t === 'k') pst = KING_PST[br * 8 + f];
+                    score -= (val + pst);
+                }
+            }
+        }
+        return score / 100;
+    }
+
+    function findBestMove(game) {
+        if (!game || game.game_over()) return null;
+        const moves = game.moves({ verbose: true });
+        if (!moves || moves.length === 0) return null;
+
+        const isWhite = game.turn() === 'w';
+        let bestScore = isWhite ? -Infinity : Infinity;
+        let bestMove = moves[0];
+
+        for (const m of moves) {
+            game.move(m);
+            const score = evaluateGameScore(game);
+            game.undo();
+
+            if (isWhite) {
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = m;
+                }
+            } else {
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestMove = m;
+                }
+            }
+        }
+        return bestMove;
+    }
+
+    function findOpponentThreat(game) {
+        if (!game || game.game_over()) return null;
+        try {
+            const fen = game.fen();
+            const parts = fen.split(' ');
+            const oppColor = parts[1] === 'w' ? 'b' : 'w';
+            parts[1] = oppColor;
+            parts[3] = '-'; // скидаємо бите поле
+            const sim = new Chess();
+            if (!sim.load(parts.join(' '))) return null;
+
+            const oppMoves = sim.moves({ verbose: true });
+            if (!oppMoves || oppMoves.length === 0) return null;
+
+            const isOppWhite = oppColor === 'w';
+            let bestOppScore = isOppWhite ? -Infinity : Infinity;
+            let threatMove = null;
+
+            for (const m of oppMoves) {
+                sim.move(m);
+                const score = evaluateGameScore(sim);
+                sim.undo();
+
+                if (isOppWhite) {
+                    if (score > bestOppScore) {
+                        bestOppScore = score;
+                        threatMove = m;
+                    }
+                } else {
+                    if (score < bestOppScore) {
+                        bestOppScore = score;
+                        threatMove = m;
+                    }
+                }
+            }
+            return threatMove;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function squareToSvgCoords(square, flipped) {
+        const f = square.charCodeAt(0) - 97;
+        const r = parseInt(square[1], 10) - 1;
+        let x, y;
+        if (flipped) {
+            x = (7 - f) * 100 + 50;
+            y = r * 100 + 50;
+        } else {
+            x = f * 100 + 50;
+            y = (7 - r) * 100 + 50;
+        }
+        return { x, y };
+    }
+
+    function updateBoardArrows() {
+        if (!dom.boardArrowsGroup) return;
+        dom.boardArrowsGroup.innerHTML = '';
+        if (!chessState.game) return;
+
+        const flipped = chessState.boardFlipped;
+
+        // 1. Зелена стрілка найкращого ходу
+        if (state.settings.arrowBest) {
+            const best = findBestMove(chessState.game);
+            if (best) {
+                const p1 = squareToSvgCoords(best.from, flipped);
+                const p2 = squareToSvgCoords(best.to, flipped);
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist > 15) {
+                    const startX = p1.x + (dx / dist) * 16;
+                    const startY = p1.y + (dy / dist) * 16;
+                    const endX = p2.x - (dx / dist) * 26;
+                    const endY = p2.y - (dy / dist) * 26;
+
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', startX);
+                    line.setAttribute('y1', startY);
+                    line.setAttribute('x2', endX);
+                    line.setAttribute('y2', endY);
+                    line.setAttribute('class', 'board-arrow-line arrow-best');
+                    line.setAttribute('marker-end', 'url(#arrow-head-best)');
+                    dom.boardArrowsGroup.appendChild(line);
+                }
+            }
+        }
+
+        // 2. Червона стрілка загрози суперника
+        if (state.settings.arrowThreat) {
+            const threat = findOpponentThreat(chessState.game);
+            if (threat) {
+                const p1 = squareToSvgCoords(threat.from, flipped);
+                const p2 = squareToSvgCoords(threat.to, flipped);
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist > 15) {
+                    const startX = p1.x + (dx / dist) * 16;
+                    const startY = p1.y + (dy / dist) * 16;
+                    const endX = p2.x - (dx / dist) * 26;
+                    const endY = p2.y - (dy / dist) * 26;
+
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', startX);
+                    line.setAttribute('y1', startY);
+                    line.setAttribute('x2', endX);
+                    line.setAttribute('y2', endY);
+                    line.setAttribute('class', 'board-arrow-line arrow-threat');
+                    line.setAttribute('marker-end', 'url(#arrow-head-threat)');
+                    dom.boardArrowsGroup.appendChild(line);
+                }
+            }
+        }
     }
 
     // ========================================================
     // 2. INITIALIZATION
     // ========================================================
+    function resolveTotalPages() {
+        let pages = parseInt(urlParams.get('pages')) || 0;
+        if (!pages && window.CHESS_PAGE_COUNTS) {
+            const id = bookParam.id;
+            const title = bookParam.title;
+            if (window.CHESS_PAGE_COUNTS[id]) pages = window.CHESS_PAGE_COUNTS[id];
+            else if (window.CHESS_PAGE_COUNTS[id.toLowerCase()]) pages = window.CHESS_PAGE_COUNTS[id.toLowerCase()];
+            else if (title && window.CHESS_PAGE_COUNTS[title]) pages = window.CHESS_PAGE_COUNTS[title];
+            else if (title && window.CHESS_PAGE_COUNTS[title.toLowerCase()]) pages = window.CHESS_PAGE_COUNTS[title.toLowerCase()];
+            else {
+                const clean = (title || id || '').toLowerCase().replace(/\.[^/.]+$/, '').trim();
+                for (const [k, count] of Object.entries(window.CHESS_PAGE_COUNTS)) {
+                    const normK = k.toLowerCase().replace(/\.[^/.]+$/, '').trim();
+                    if (normK.includes(clean) || clean.includes(normK)) {
+                        pages = count;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!pages && window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE)) {
+            const found = window.CHESS_BOOKS_CACHE.find(b => b && (b.id === bookParam.id || b.title === bookParam.title));
+            if (found && found.pages) pages = parseInt(found.pages) || 0;
+        }
+        return pages > 0 ? pages : 100;
+    }
+
     function init() {
         document.title = `${bookParam.title} — Онлайн Читалка | Chess Vault`;
         dom.topbarTitle.textContent = bookParam.title;
         dom.topbarAuthor.textContent = bookParam.author;
 
-        applyDockSide(state.dockSide);
+        state.totalPages = resolveTotalPages();
+        if (dom.labelTotalPages) dom.labelTotalPages.textContent = state.totalPages;
+        if (dom.inputCurrentPage) dom.inputCurrentPage.max = state.totalPages;
+        updatePageUI();
+
+        applyDockSide(state.settings.dockSide);
         applyDockCollapsed(state.isDockCollapsed);
 
         initChessGame();
@@ -352,12 +586,15 @@
         // 1. Спочатку завантажуємо локальний стан воркспейсу юзера для цієї книги
         loadUserBookWorkspace();
 
-        // 2. Слухаємо Firebase Auth для персональної хмарної синхронізації
+        // 2. Перевірка авторизації (читання дозволено тільки зареєстрованим юзерам)
         if (typeof firebase !== 'undefined' && firebase.auth) {
             firebase.auth().onAuthStateChanged(user => {
                 state.currentUser = user;
                 if (user) {
+                    if (dom.authGateModal) dom.authGateModal.style.display = 'none';
                     loadUserBookWorkspaceFromFirestore(user.uid);
+                } else {
+                    if (dom.authGateModal) dom.authGateModal.style.display = 'flex';
                 }
             });
         }
@@ -1039,8 +1276,50 @@
                     const key = piece.color === 'w' ? piece.type.toUpperCase() : piece.type.toLowerCase();
                     pieceSpan.className = `chess-piece ${piece.color === 'w' ? 'white' : 'black'}`;
                     pieceSpan.textContent = PIECE_SYMBOLS[key] || '';
+                    pieceSpan.setAttribute('draggable', 'true');
+
+                    pieceSpan.addEventListener('dragstart', (e) => {
+                        e.stopPropagation();
+                        e.dataTransfer.setData('text/plain', squareName);
+                        e.dataTransfer.effectAllowed = 'move';
+                        chessState.selectedSquare = squareName;
+                        highlightPossibleMoves(squareName);
+                    });
+
                     sqDiv.appendChild(pieceSpan);
                 }
+
+                // Drag & Drop цільової клітинки
+                sqDiv.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    sqDiv.classList.add('drag-hover');
+                });
+                sqDiv.addEventListener('dragleave', () => {
+                    sqDiv.classList.remove('drag-hover');
+                });
+                sqDiv.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    sqDiv.classList.remove('drag-hover');
+                    const fromSq = e.dataTransfer.getData('text/plain');
+                    if (!fromSq || fromSq === squareName) return;
+
+                    const move = chessState.game.move({
+                        from: fromSq,
+                        to: squareName,
+                        promotion: 'q'
+                    });
+                    chessState.selectedSquare = null;
+                    if (move) {
+                        chessState.moveHistory.push(move.san);
+                        chessState.currentMoveIndex = chessState.moveHistory.length - 1;
+                        updateMovesLogUI();
+                        renderChessBoard();
+                        saveUserBookWorkspace();
+                    } else {
+                        renderChessBoard();
+                    }
+                });
 
                 sqDiv.addEventListener('click', () => handleSquareClick(squareName));
                 dom.chessGrid.appendChild(sqDiv);
@@ -1049,6 +1328,9 @@
 
         // Оновлюємо показник переваги на дошці в реальному часі (+1.2 / -3.0)
         updateEvalBarUI();
+
+        // Оновлюємо стрілки ходів (зелена - кращий хід, червона - загроза)
+        updateBoardArrows();
     }
 
     function handleSquareClick(square) {
@@ -1389,18 +1671,51 @@
     // 9. DOCK CONTROLS & TABS (Left / Right & Collapse)
     // ========================================================
     function applyDockSide(side) {
-        state.dockSide = side === 'left' ? 'left' : 'right';
-        localStorage.setItem('chess_vault_reader_dock_side', state.dockSide);
+        const actual = side === 'left' ? 'left' : 'right';
+        state.settings.dockSide = actual;
+        localStorage.setItem('chess_vault_reader_dock_side', actual);
 
         dom.workspace.classList.remove('dock-left', 'dock-right');
-        dom.workspace.classList.add(`dock-${state.dockSide}`);
+        dom.workspace.classList.add(`dock-${actual}`);
 
-        dom.dockSideLabel.textContent = state.dockSide === 'left' ? 'Праворуч' : 'Ліворуч';
+        if (dom.settingDockLeft && dom.settingDockRight) {
+            dom.settingDockLeft.classList.toggle('active', actual === 'left');
+            dom.settingDockRight.classList.toggle('active', actual === 'right');
+        }
     }
 
-    function toggleDockSide() {
-        applyDockSide(state.dockSide === 'left' ? 'right' : 'left');
+    function applyEvalMode(mode) {
+        state.settings.evalMode = mode;
+        localStorage.setItem('chess_vault_reader_eval_mode', mode);
+
+        if (dom.settingEvalFull) dom.settingEvalFull.classList.toggle('active', mode === 'full');
+        if (dom.settingEvalNumbers) dom.settingEvalNumbers.classList.toggle('active', mode === 'numbers');
+        if (dom.settingEvalOff) dom.settingEvalOff.classList.toggle('active', mode === 'off');
+
+        updateEvalBarUI();
         saveUserBookWorkspace();
+    }
+
+    function openSettingsModal() {
+        if (!dom.settingsModal) return;
+        if (dom.settingDockLeft && dom.settingDockRight) {
+            dom.settingDockLeft.classList.toggle('active', state.settings.dockSide === 'left');
+            dom.settingDockRight.classList.toggle('active', state.settings.dockSide === 'right');
+        }
+        if (dom.settingEvalFull && dom.settingEvalNumbers && dom.settingEvalOff) {
+            dom.settingEvalFull.classList.toggle('active', state.settings.evalMode === 'full');
+            dom.settingEvalNumbers.classList.toggle('active', state.settings.evalMode === 'numbers');
+            dom.settingEvalOff.classList.toggle('active', state.settings.evalMode === 'off');
+        }
+        if (dom.settingArrowBest) dom.settingArrowBest.checked = state.settings.arrowBest;
+        if (dom.settingArrowThreat) dom.settingArrowThreat.checked = state.settings.arrowThreat;
+
+        dom.settingsModal.style.display = 'flex';
+    }
+
+    function closeSettingsModal() {
+        if (!dom.settingsModal) return;
+        dom.settingsModal.style.display = 'none';
     }
 
     function applyDockCollapsed(collapsed) {
@@ -1409,10 +1724,10 @@
 
         if (state.isDockCollapsed) {
             dom.dock.classList.add('collapsed');
-            dom.dockCollapseArrow.textContent = state.dockSide === 'right' ? '◂' : '▸';
+            dom.dockCollapseArrow.textContent = state.settings.dockSide === 'right' ? '◂' : '▸';
         } else {
             dom.dock.classList.remove('collapsed');
-            dom.dockCollapseArrow.textContent = state.dockSide === 'right' ? '▸' : '◂';
+            dom.dockCollapseArrow.textContent = state.settings.dockSide === 'right' ? '▸' : '◂';
         }
     }
 
@@ -1468,8 +1783,67 @@
             if (e.key === 'ArrowRight') goToPage(state.currentPage + 1);
         });
 
-        dom.btnToggleDockSide.addEventListener('click', toggleDockSide);
-        dom.btnDockQuickSide.addEventListener('click', toggleDockSide);
+        // Settings modal controls
+        if (dom.btnReaderSettings) {
+            dom.btnReaderSettings.addEventListener('click', openSettingsModal);
+        }
+        if (dom.btnCloseSettings) {
+            dom.btnCloseSettings.addEventListener('click', closeSettingsModal);
+        }
+        if (dom.btnDoneSettings) {
+            dom.btnDoneSettings.addEventListener('click', closeSettingsModal);
+        }
+        if (dom.settingsModal) {
+            dom.settingsModal.addEventListener('click', (e) => {
+                if (e.target === dom.settingsModal) closeSettingsModal();
+            });
+        }
+        if (dom.settingDockLeft) {
+            dom.settingDockLeft.addEventListener('click', () => applyDockSide('left'));
+        }
+        if (dom.settingDockRight) {
+            dom.settingDockRight.addEventListener('click', () => applyDockSide('right'));
+        }
+        if (dom.settingEvalFull) {
+            dom.settingEvalFull.addEventListener('click', () => applyEvalMode('full'));
+        }
+        if (dom.settingEvalNumbers) {
+            dom.settingEvalNumbers.addEventListener('click', () => applyEvalMode('numbers'));
+        }
+        if (dom.settingEvalOff) {
+            dom.settingEvalOff.addEventListener('click', () => applyEvalMode('off'));
+        }
+        if (dom.settingArrowBest) {
+            dom.settingArrowBest.addEventListener('change', (e) => {
+                state.settings.arrowBest = e.target.checked;
+                localStorage.setItem('chess_vault_reader_arrow_best', String(state.settings.arrowBest));
+                updateBoardArrows();
+            });
+        }
+        if (dom.settingArrowThreat) {
+            dom.settingArrowThreat.addEventListener('change', (e) => {
+                state.settings.arrowThreat = e.target.checked;
+                localStorage.setItem('chess_vault_reader_arrow_threat', String(state.settings.arrowThreat));
+                updateBoardArrows();
+            });
+        }
+        if (dom.settingBtnFullscreen) {
+            dom.settingBtnFullscreen.addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                } else {
+                    document.exitFullscreen().catch(() => {});
+                }
+            });
+        }
+        if (dom.btnQuickNote) {
+            dom.btnQuickNote.addEventListener('click', () => {
+                switchDockTab('notes');
+                if (dom.noteInput) dom.noteInput.focus();
+                showSyncToast('📝 Введіть нотатку або коментар до поточної сторінки');
+            });
+        }
+
         dom.btnToggleDockCollapse.addEventListener('click', toggleDockCollapsed);
 
         dom.dockTabs.forEach(tab => {
@@ -1563,23 +1937,6 @@
             dom.viewport.style.outline = 'none';
             const file = e.dataTransfer.files && e.dataTransfer.files[0];
             if (file) handleLocalFileSelected(file);
-        });
-
-        // Fullscreen & Theme
-        dom.btnFullscreen.addEventListener('click', () => {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(() => {});
-            } else {
-                document.exitFullscreen().catch(() => {});
-            }
-        });
-
-        dom.btnToggleTheme.addEventListener('click', () => {
-            const isDark = document.documentElement.classList.contains('dark');
-            const next = isDark ? 'light' : 'dark';
-            localStorage.setItem('chess_theme', next);
-            if (window.applyTheme) window.applyTheme(next);
-            else document.documentElement.classList.toggle('dark', next === 'dark');
         });
     }
 

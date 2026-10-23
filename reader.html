@@ -25,6 +25,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="firebase-init.js?v=8"></script>
     <script src="reading-progress.js?v=1"></script>
+    <script src="page_counts.js?v=6"></script>
     <script src="books-cache.js?v=2"></script>
     <!-- PDF.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -45,13 +46,13 @@
                 <span>←</span>
                 <span class="nav-text">Бібліотека</span>
             </a>
-            <button type="button" class="reader-tool-btn" id="btn-toggle-highlight" title="Увімкнути/вимкнути виділення тексту">
-                <span>🖍️</span>
-                <span>Виділення</span>
-            </button>
             <button type="button" class="reader-tool-btn" id="btn-add-bookmark" title="Додати закладку на поточну сторінку">
                 <span>🔖</span>
                 <span>Закладка</span>
+            </button>
+            <button type="button" class="reader-tool-btn" id="btn-quick-note" title="Створити нотатку до поточної сторінки">
+                <span>📝</span>
+                <span>Нотатка</span>
             </button>
             <div class="reader-book-meta">
                 <div class="reader-book-title" id="topbar-book-title">Завантаження книги...</div>
@@ -74,17 +75,10 @@
         </div>
 
         <div class="reader-topbar-right">
-            <div class="reader-nav-group">
-                <button type="button" class="reader-icon-btn" id="btn-zoom-out" title="Зменшити">−</button>
-                <button type="button" class="reader-icon-btn" id="btn-zoom-reset" style="font-size: 0.76rem; width: 44px;" title="Скинути масштаб">100%</button>
-                <button type="button" class="reader-icon-btn" id="btn-zoom-in" title="Збільшити">+</button>
-            </div>
-            <button type="button" class="reader-tool-btn" id="btn-toggle-dock-side" title="Перемістити шахівницю ліворуч/праворуч">
-                <span>⇄</span>
-                <span id="dock-side-label">Ліворуч</span>
+            <button type="button" class="reader-tool-btn" id="btn-reader-settings" title="Налаштування читалки та дошки">
+                <span>⚙️</span>
+                <span>Налаштування</span>
             </button>
-            <button type="button" class="reader-icon-btn" id="btn-toggle-theme" title="Змінити тему">🌓</button>
-            <button type="button" class="reader-icon-btn" id="btn-fullscreen" title="На весь екран">⛶</button>
         </div>
     </header>
 
@@ -150,7 +144,6 @@
                         <span id="tab-badge-notes" style="opacity: 0.8;">(0)</span>
                     </button>
                 </div>
-                <button type="button" class="reader-dock-action-btn" id="btn-dock-quick-side" title="Перемістити панель ліворуч/праворуч">⇄</button>
             </div>
 
             <!-- Dock Body -->
@@ -172,6 +165,17 @@
                             </div>
                             <div class="board-wrapper" id="board-wrapper">
                                 <div class="chess-grid" id="chess-grid"></div>
+                                <svg class="board-arrows-svg" id="board-arrows-svg" viewBox="0 0 800 800">
+                                    <defs>
+                                        <marker id="arrow-head-best" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto">
+                                            <path d="M 0 0 L 6 3 L 0 6 z" fill="#22c55e" />
+                                        </marker>
+                                        <marker id="arrow-head-threat" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto">
+                                            <path d="M 0 0 L 6 3 L 0 6 z" fill="#ef4444" />
+                                        </marker>
+                                    </defs>
+                                    <g id="board-arrows-group"></g>
+                                </svg>
                             </div>
                         </div>
 
@@ -182,7 +186,7 @@
                             <button type="button" class="board-step-btn" id="btn-board-next" title="Хід вперед">▶</button>
                             <button type="button" class="board-step-btn" id="btn-board-last" title="В кінець">▶|</button>
                             <button type="button" class="board-step-btn" id="btn-board-flip" title="Повернути дошку">🔄</button>
-                            <button type="button" class="board-step-btn eval-toggle-btn active" id="btn-toggle-eval" title="Показати/приховати шкалу оцінки позиції (Eval Bar)">📊</button>
+                            <span class="board-eval-compact-score" id="board-eval-compact-score" style="display: none;">+0.0</span>
                         </div>
 
                         <!-- Moves Sequence Log (Parsed from book text) -->
@@ -269,6 +273,115 @@
             <span>📋</span>
             <span>Копіювати</span>
         </button>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div class="reader-modal-overlay" id="reader-settings-modal" style="display: none;">
+        <div class="reader-modal-card" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+            <div class="reader-modal-header">
+                <div class="reader-modal-title-wrap">
+                    <span class="reader-modal-icon">⚙️</span>
+                    <h3 id="settings-modal-title">Налаштування читалки</h3>
+                </div>
+                <button type="button" class="reader-modal-close" id="btn-close-settings" title="Закрити">✕</button>
+            </div>
+            
+            <div class="reader-modal-body">
+                <!-- Group 1: Розташування панелі / дошки -->
+                <div class="reader-setting-group">
+                    <div class="setting-group-label">Розташування шахівниці</div>
+                    <div class="setting-group-desc">Оберіть, з якого боку екрана розміщувати інтерактивну панель:</div>
+                    <div class="setting-segmented-control">
+                        <button type="button" class="setting-segment-btn" id="setting-dock-left" data-side="left">
+                            <span>◧</span> Ліворуч
+                        </button>
+                        <button type="button" class="setting-segment-btn active" id="setting-dock-right" data-side="right">
+                            Праворуч <span>◨</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Group 2: Оцінка позиції (Eval Bar) -->
+                <div class="reader-setting-group">
+                    <div class="setting-group-label">Оцінка позиції (Elo / Stockfish)</div>
+                    <div class="setting-group-desc">Формат відображення аналізу поточної позиції:</div>
+                    <div class="setting-segmented-control">
+                        <button type="button" class="setting-segment-btn active" id="setting-eval-full" data-eval="full">
+                            <span>📊</span> Шкала + Бали
+                        </button>
+                        <button type="button" class="setting-segment-btn" id="setting-eval-numbers" data-eval="numbers">
+                            <span>🔢</span> Тільки цифри
+                        </button>
+                        <button type="button" class="setting-segment-btn" id="setting-eval-off" data-eval="off">
+                            <span>🚫</span> Вимкнено
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Group 3: Стрілки ходів на дошці -->
+                <div class="reader-setting-group">
+                    <div class="setting-group-label">Стрілки та підказки ходів</div>
+                    <div class="setting-group-desc">Динамічні підказки від двигуна на шахівниці:</div>
+                    <div class="setting-checkbox-row">
+                        <label class="setting-toggle-label">
+                            <input type="checkbox" id="setting-arrow-best" checked>
+                            <span class="setting-toggle-switch"></span>
+                            <span class="setting-toggle-text">
+                                <strong style="color: #22c55e;">🟢 Стрілка найкращого ходу</strong>
+                                <small>Показує рекомендований хід для активної сторони</small>
+                            </span>
+                        </label>
+                    </div>
+                    <div class="setting-checkbox-row">
+                        <label class="setting-toggle-label">
+                            <input type="checkbox" id="setting-arrow-threat" checked>
+                            <span class="setting-toggle-switch"></span>
+                            <span class="setting-toggle-text">
+                                <strong style="color: #ef4444;">🔴 Стрілка загрози суперника</strong>
+                                <small>Показує безпосередню небезпеку або атаку суперника</small>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Group 4: Повноекранний режим -->
+                <div class="reader-setting-group">
+                    <div class="setting-group-label">Екран</div>
+                    <div class="setting-group-desc">Масштабування робочої області:</div>
+                    <button type="button" class="setting-action-btn" id="setting-btn-fullscreen">
+                        <span>⛶</span> Перемкнути режим на весь екран
+                    </button>
+                </div>
+            </div>
+
+            <div class="reader-modal-footer">
+                <button type="button" class="reader-btn-primary" id="btn-done-settings">Зберегти та закрити</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AUTH GATE MODAL (If unauthenticated user opens reader) -->
+    <div class="reader-modal-overlay" id="reader-auth-gate-modal" style="display: none;">
+        <div class="reader-modal-card auth-gate-card" role="dialog" aria-modal="true">
+            <div class="reader-modal-header">
+                <div class="reader-modal-title-wrap">
+                    <span class="reader-modal-icon">🔒</span>
+                    <h3>Потрібна авторизація</h3>
+                </div>
+            </div>
+            <div class="reader-modal-body">
+                <p style="margin-bottom: 12px; font-size: 0.95rem; line-height: 1.5;">
+                    Онлайн-читання книг, персональні закладки та збереження ходів на шахівниці доступні лише для зареєстрованих користувачів <strong>Chess Vault</strong>.
+                </p>
+                <p style="color: var(--reader-text-muted); font-size: 0.85rem;">
+                    Будь ласка, увійдіть у свій акаунт або пройдіть швидку безкоштовну реєстрацію.
+                </p>
+            </div>
+            <div class="reader-modal-footer" style="justify-content: flex-end; gap: 8px;">
+                <a href="library.html" class="reader-btn-secondary">До каталогу</a>
+                <a href="index.html?auth=login" class="reader-btn-primary">Увійти в акаунт 🔑</a>
+            </div>
+        </div>
     </div>
 
     <!-- MAIN READER LOGIC SCRIPT -->

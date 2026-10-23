@@ -1276,3 +1276,346 @@ body, html {
         display: none;
     }
 }
+
+/* ========================================================
+   BOARD ARROWS & COMPACT EVAL
+   ======================================================== */
+.board-arrows-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 12;
+}
+
+.board-arrow-line {
+    stroke-linecap: round;
+    opacity: 0.85;
+    filter: drop-shadow(0 2px 5px rgba(0,0,0,0.45));
+    transition: opacity 0.2s ease;
+}
+
+.board-arrow-line.arrow-best {
+    stroke: #22c55e;
+    stroke-width: 22;
+}
+
+.board-arrow-line.arrow-threat {
+    stroke: #ef4444;
+    stroke-width: 20;
+    stroke-dasharray: 8 4;
+}
+
+.board-eval-compact-score {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--reader-border);
+    color: var(--reader-text);
+    font-size: 0.82rem;
+    font-weight: 700;
+    font-family: monospace;
+    min-width: 50px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Drag & drop pieces */
+.chess-piece {
+    cursor: grab;
+    user-select: none;
+    -webkit-user-drag: element;
+}
+
+.chess-piece:active {
+    cursor: grabbing;
+}
+
+.chess-square.drag-hover {
+    outline: 3px dashed #22c55e !important;
+    outline-offset: -3px;
+    background: rgba(34, 197, 94, 0.28) !important;
+}
+
+/* ========================================================
+   READER SETTINGS & AUTH GATE MODALS
+   ======================================================== */
+.reader-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    animation: fadeIn 0.18s ease-out;
+}
+
+.reader-modal-card {
+    background: var(--reader-card-bg);
+    border: 1px solid var(--reader-border);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: popModal 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes popModal {
+    from { opacity: 0; transform: scale(0.95) translateY(8px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.reader-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--reader-border);
+}
+
+.reader-modal-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.reader-modal-icon {
+    font-size: 1.3rem;
+}
+
+.reader-modal-header h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--reader-text);
+}
+
+.reader-modal-close {
+    background: transparent;
+    border: none;
+    color: var(--reader-text-muted);
+    font-size: 1.2rem;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.15s;
+}
+
+.reader-modal-close:hover {
+    background: var(--reader-border);
+    color: var(--reader-text);
+}
+
+.reader-modal-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.reader-setting-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.setting-group-label {
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: var(--reader-text);
+}
+
+.setting-group-desc {
+    font-size: 0.78rem;
+    color: var(--reader-text-muted);
+    margin-bottom: 4px;
+}
+
+.setting-segmented-control {
+    display: flex;
+    background: var(--reader-bg);
+    border: 1px solid var(--reader-border);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 3px;
+}
+
+.setting-segment-btn {
+    flex: 1;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--reader-text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.setting-segment-btn.active {
+    background: var(--reader-card-bg);
+    color: var(--reader-accent);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--reader-border);
+}
+
+.setting-checkbox-row {
+    padding: 6px 0;
+}
+
+.setting-toggle-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.setting-toggle-label input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.setting-toggle-switch {
+    width: 38px;
+    height: 22px;
+    background: var(--reader-border);
+    border-radius: 12px;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.setting-toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.setting-toggle-label input[type="checkbox"]:checked + .setting-toggle-switch {
+    background: #22c55e;
+}
+
+.setting-toggle-label input[type="checkbox"]:checked + .setting-toggle-switch::after {
+    transform: translateX(16px);
+}
+
+.setting-toggle-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.setting-toggle-text strong {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.setting-toggle-text small {
+    font-size: 0.74rem;
+    color: var(--reader-text-muted);
+}
+
+.setting-action-btn {
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--reader-border);
+    background: var(--reader-bg);
+    color: var(--reader-text);
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.15s;
+}
+
+.setting-action-btn:hover {
+    background: var(--reader-card-bg);
+    border-color: var(--reader-accent);
+    color: var(--reader-accent);
+}
+
+.reader-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 14px 20px;
+    border-top: 1px solid var(--reader-border);
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.reader-btn-primary {
+    background: var(--reader-accent);
+    color: #111;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.reader-btn-primary:hover {
+    opacity: 0.9;
+}
+
+.reader-btn-secondary {
+    background: transparent;
+    color: var(--reader-text-muted);
+    border: 1px solid var(--reader-border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.reader-btn-secondary:hover {
+    background: var(--reader-border);
+    color: var(--reader-text);
+}

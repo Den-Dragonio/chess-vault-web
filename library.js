@@ -275,8 +275,7 @@ function renderTable(books) {
         return;
     }
     container.innerHTML = books.map((b, idx) => {
-        const isAvailable = b.inArchive !== false && Boolean(b.url);
-        const queuedText = isEn ? 'Queued' : 'Очікує';
+        const bookUrl = b.url || (b.id ? `https://archive.org/download/1971_20260223/${encodeURIComponent(b.id)}` : '');
 
         return `
         <tr data-book-idx="${idx}" style="cursor:pointer">
@@ -287,15 +286,15 @@ function renderTable(books) {
             <td class="col-format"><span class="badge format-${b.format}">${b.format}</span></td>
             <td class="col-size">${b.sizeDisplay}</td>
             <td class="col-action">
-                <button class="download-link download-btn-js ${isAvailable ? '' : 'download-btn-queued'}"
-                        data-url="${b.url || ''}"
-                        data-available="${isAvailable ? 'true' : 'false'}"
+                <button class="download-link download-btn-js"
+                        data-url="${bookUrl}"
+                        data-available="true"
                         data-title="${(b.title || '').replace(/"/g, '&quot;')}"
                         data-author="${(b.author || '').replace(/"/g, '&quot;')}"
                         data-id="${(b.id || '').replace(/"/g, '&quot;')}"
                         data-format="${b.format || 'pdf'}"
                         data-size="${b.sizeDisplay || '—'}">
-                    <span>${isAvailable ? '⬇' : '⏳'}</span><span>${isAvailable ? dlText : queuedText}</span>
+                    <span>⬇</span><span>${dlText}</span>
                 </button>
             </td>
         </tr>
