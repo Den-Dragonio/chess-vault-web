@@ -1292,20 +1292,20 @@ body, html {
 
 .board-arrow-line {
     stroke-linecap: round;
-    opacity: 0.85;
-    filter: drop-shadow(0 2px 5px rgba(0,0,0,0.45));
+    opacity: 0.78;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));
     transition: opacity 0.2s ease;
 }
 
 .board-arrow-line.arrow-best {
-    stroke: #22c55e;
-    stroke-width: 22;
+    stroke: #10b981;
+    stroke-width: 10;
 }
 
 .board-arrow-line.arrow-threat {
-    stroke: #ef4444;
-    stroke-width: 20;
-    stroke-dasharray: 8 4;
+    stroke: #f43f5e;
+    stroke-width: 9;
+    stroke-dasharray: 6 3;
 }
 
 .board-eval-compact-score {
@@ -1349,9 +1349,9 @@ body, html {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.65);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     z-index: 9999;
     display: flex;
     align-items: center;
@@ -1361,16 +1361,24 @@ body, html {
 }
 
 .reader-modal-card {
-    background: var(--reader-card-bg);
-    border: 1px solid var(--reader-border);
-    border-radius: 14px;
+    background: #181a22;
+    color: #e5e7eb;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
     width: 100%;
     max-width: 480px;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
     display: flex;
     flex-direction: column;
     overflow: hidden;
     animation: popModal 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html:not(.dark) .reader-modal-card {
+    background: #ffffff;
+    color: #1f2937;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.2);
 }
 
 @keyframes popModal {
@@ -1383,7 +1391,13 @@ body, html {
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--reader-border);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+html:not(.dark) .reader-modal-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    background: #f9fafb;
 }
 
 .reader-modal-title-wrap {
@@ -1393,34 +1407,49 @@ body, html {
 }
 
 .reader-modal-icon {
-    font-size: 1.3rem;
+    font-size: 1.25rem;
 }
 
 .reader-modal-header h3 {
     margin: 0;
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     font-weight: 700;
-    color: var(--reader-text);
+    color: #ffffff !important;
+    letter-spacing: -0.01em;
+}
+
+html:not(.dark) .reader-modal-header h3 {
+    color: #111827 !important;
 }
 
 .reader-modal-close {
-    background: transparent;
+    background: rgba(255, 255, 255, 0.06);
     border: none;
-    color: var(--reader-text-muted);
-    font-size: 1.2rem;
+    color: #9ca3af;
+    font-size: 1.1rem;
     cursor: pointer;
     width: 32px;
     height: 32px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 6px;
-    transition: all 0.15s;
+    border-radius: 8px;
+    transition: all 0.15s ease;
 }
 
 .reader-modal-close:hover {
-    background: var(--reader-border);
-    color: var(--reader-text);
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+}
+
+html:not(.dark) .reader-modal-close {
+    background: #f3f4f6;
+    color: #4b5563;
+}
+
+html:not(.dark) .reader-modal-close:hover {
+    background: #e5e7eb;
+    color: #111827;
 }
 
 .reader-modal-body {
@@ -1428,7 +1457,7 @@ body, html {
     display: flex;
     flex-direction: column;
     gap: 18px;
-    max-height: 70vh;
+    max-height: 72vh;
     overflow-y: auto;
 }
 
@@ -1440,47 +1469,77 @@ body, html {
 
 .setting-group-label {
     font-weight: 700;
-    font-size: 0.88rem;
-    color: var(--reader-text);
+    font-size: 0.9rem;
+    color: #f3f4f6;
+}
+
+html:not(.dark) .setting-group-label {
+    color: #1f2937;
 }
 
 .setting-group-desc {
-    font-size: 0.78rem;
-    color: var(--reader-text-muted);
-    margin-bottom: 4px;
+    font-size: 0.8rem;
+    color: #9ca3af;
+    margin-bottom: 6px;
+}
+
+html:not(.dark) .setting-group-desc {
+    color: #6b7280;
 }
 
 .setting-segmented-control {
     display: flex;
-    background: var(--reader-bg);
-    border: 1px solid var(--reader-border);
-    border-radius: 8px;
-    padding: 3px;
-    gap: 3px;
+    background: #111217;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+}
+
+html:not(.dark) .setting-segmented-control {
+    background: #f1f3f7;
+    border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .setting-segment-btn {
     flex: 1;
-    padding: 8px 10px;
-    border: none;
-    border-radius: 6px;
+    padding: 9px 12px;
+    border: 1px solid transparent;
+    border-radius: 8px;
     background: transparent;
-    color: var(--reader-text-muted);
+    color: #9ca3af;
     font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.15s ease;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
 }
 
+.setting-segment-btn:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+html:not(.dark) .setting-segment-btn:hover {
+    color: #111827;
+    background: rgba(0, 0, 0, 0.04);
+}
+
 .setting-segment-btn.active {
-    background: var(--reader-card-bg);
-    color: var(--reader-accent);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-    border: 1px solid var(--reader-border);
+    background: #242734;
+    color: #f9fafb;
+    border-color: rgba(212, 175, 55, 0.4);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+html:not(.dark) .setting-segment-btn.active {
+    background: #ffffff;
+    color: #b8860b;
+    border-color: rgba(184, 134, 11, 0.3);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 .setting-checkbox-row {
@@ -1502,14 +1561,20 @@ body, html {
 }
 
 .setting-toggle-switch {
-    width: 38px;
+    width: 40px;
     height: 22px;
-    background: var(--reader-border);
+    background: #2a2d3a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
     position: relative;
-    transition: background 0.2s;
+    transition: all 0.2s;
     flex-shrink: 0;
     margin-top: 2px;
+}
+
+html:not(.dark) .setting-toggle-switch {
+    background: #e2e8f0;
+    border-color: rgba(0, 0, 0, 0.1);
 }
 
 .setting-toggle-switch::after {
@@ -1517,20 +1582,21 @@ body, html {
     position: absolute;
     top: 2px;
     left: 2px;
-    width: 18px;
-    height: 18px;
-    background: #fff;
+    width: 16px;
+    height: 16px;
+    background: #ffffff;
     border-radius: 50%;
     transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
 .setting-toggle-label input[type="checkbox"]:checked + .setting-toggle-switch {
-    background: #22c55e;
+    background: #10b981;
+    border-color: #10b981;
 }
 
 .setting-toggle-label input[type="checkbox"]:checked + .setting-toggle-switch::after {
-    transform: translateX(16px);
+    transform: translateX(18px);
 }
 
 .setting-toggle-text {
@@ -1540,35 +1606,51 @@ body, html {
 }
 
 .setting-toggle-text strong {
-    font-size: 0.85rem;
+    font-size: 0.88rem;
     font-weight: 600;
 }
 
 .setting-toggle-text small {
-    font-size: 0.74rem;
-    color: var(--reader-text-muted);
+    font-size: 0.78rem;
+    color: #9ca3af;
+}
+
+html:not(.dark) .setting-toggle-text small {
+    color: #6b7280;
 }
 
 .setting-action-btn {
-    padding: 10px 14px;
-    border-radius: 8px;
-    border: 1px solid var(--reader-border);
-    background: var(--reader-bg);
-    color: var(--reader-text);
-    font-size: 0.84rem;
+    padding: 11px 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: #20232e;
+    color: #f3f4f6;
+    font-size: 0.86rem;
     font-weight: 600;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    transition: all 0.15s;
+    transition: all 0.15s ease;
 }
 
 .setting-action-btn:hover {
-    background: var(--reader-card-bg);
-    border-color: var(--reader-accent);
-    color: var(--reader-accent);
+    background: #292d3b;
+    border-color: #d4af37;
+    color: #ffffff;
+}
+
+html:not(.dark) .setting-action-btn {
+    background: #f3f4f6;
+    border-color: rgba(0, 0, 0, 0.1);
+    color: #1f2937;
+}
+
+html:not(.dark) .setting-action-btn:hover {
+    background: #e5e7eb;
+    border-color: #b8860b;
+    color: #b8860b;
 }
 
 .reader-modal-footer {
@@ -1576,28 +1658,36 @@ body, html {
     align-items: center;
     justify-content: flex-end;
     padding: 14px 20px;
-    border-top: 1px solid var(--reader-border);
-    background: rgba(0, 0, 0, 0.05);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+html:not(.dark) .reader-modal-footer {
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    background: #f9fafb;
 }
 
 .reader-btn-primary {
-    background: var(--reader-accent);
-    color: #111;
+    background: linear-gradient(135deg, #d4af37, #f1c40f);
+    color: #111217;
     border: none;
     border-radius: 8px;
-    padding: 8px 18px;
-    font-size: 0.85rem;
+    padding: 9px 20px;
+    font-size: 0.88rem;
     font-weight: 700;
     cursor: pointer;
-    transition: opacity 0.15s;
+    transition: all 0.15s ease;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
 }
 
 .reader-btn-primary:hover {
-    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(212, 175, 55, 0.4);
+    opacity: 0.96;
 }
 
 .reader-btn-secondary {

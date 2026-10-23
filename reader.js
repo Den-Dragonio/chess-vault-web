@@ -16,11 +16,15 @@
 
     // 1. URL & BOOK PARAMETERS
     const urlParams = new URLSearchParams(window.location.search);
+    const rawId = (urlParams.get('id') || '').replace(/\+/g, ' ').trim();
+    const rawFile = (urlParams.get('file') || '').replace(/\+/g, ' ').trim();
+    const rawTitle = (urlParams.get('title') || '').replace(/\+/g, ' ').trim();
+    const rawAuthor = (urlParams.get('author') || '').replace(/\+/g, ' ').trim();
     const bookParam = {
-        id: urlParams.get('id') || 'book_' + Date.now(),
-        file: urlParams.get('file') || '',
-        title: urlParams.get('title') || 'Шахова книга',
-        author: urlParams.get('author') || '—',
+        id: rawId || 'book_' + Date.now(),
+        file: rawFile,
+        title: rawTitle || 'Шахова книга',
+        author: rawAuthor || '—',
         format: (urlParams.get('format') || 'pdf').toLowerCase(),
         startPage: parseInt(urlParams.get('page')) || 1
     };
@@ -423,6 +427,7 @@
     function findOpponentThreat(game) {
         if (!game || game.game_over()) return null;
         try {
+            const currentScore = evaluateGameScore(game);
             const fen = game.fen();
             const parts = fen.split(' ');
             const oppColor = parts[1] === 'w' ? 'b' : 'w';
@@ -437,24 +442,40 @@
             const isOppWhite = oppColor === 'w';
             let bestOppScore = isOppWhite ? -Infinity : Infinity;
             let threatMove = null;
+            let givesCheck = false;
 
             for (const m of oppMoves) {
                 sim.move(m);
                 const score = evaluateGameScore(sim);
+                const isCheck = typeof sim.in_check === 'function' ? sim.in_check() : false;
                 sim.undo();
 
                 if (isOppWhite) {
                     if (score > bestOppScore) {
                         bestOppScore = score;
                         threatMove = m;
+                        givesCheck = isCheck;
                     }
                 } else {
                     if (score < bestOppScore) {
                         bestOppScore = score;
                         threatMove = m;
+                        givesCheck = isCheck;
                     }
                 }
             }
+
+            if (!threatMove) return null;
+
+            // ОСТОРОЖНА СТРІЛКА ЗАГРОЗИ:
+            // Показуємо загрозу ТІЛЬКИ коли дійсно є небезпека або сильний тактичний удар:
+            // 1) Взяття фігури (threatMove.captured)
+            // 2) Шах королю (givesCheck)
+            // 3) Або значний тактичний стрибок оцінки на користь суперника (> 0.8 пішака)
+            const evalDiff = isOppWhite ? (bestOppScore - currentScore) : (currentScore - bestOppScore);
+            const isTacticalThreat = Boolean(threatMove.captured) || givesCheck || (evalDiff >= 0.8);
+            if (!isTacticalThreat) return null;
+
             return threatMove;
         } catch (_) {
             return null;
@@ -482,7 +503,7 @@
 
         const flipped = chessState.boardFlipped;
 
-        // 1. Зелена стрілка найкращого ходу
+        // 1. Зелена стрілка найкращого ходу (делікатна, тонка, елегантна)
         if (state.settings.arrowBest) {
             const best = findBestMove(chessState.game);
             if (best) {
@@ -492,10 +513,10 @@
                 const dy = p2.y - p1.y;
                 const dist = Math.hypot(dx, dy);
                 if (dist > 15) {
-                    const startX = p1.x + (dx / dist) * 16;
-                    const startY = p1.y + (dy / dist) * 16;
-                    const endX = p2.x - (dx / dist) * 26;
-                    const endY = p2.y - (dy / dist) * 26;
+                    const startX = p1.x + (dx / dist) * 18;
+                    const startY = p1.y + (dy / dist) * 18;
+                    const endX = p2.x - (dx / dist) * 20;
+                    const endY = p2.y - (dy / dist) * 20;
 
                     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                     line.setAttribute('x1', startX);
@@ -509,7 +530,7 @@
             }
         }
 
-        // 2. Червона стрілка загрози суперника
+        // 2. Червона стрілка загрози суперника (обережна, показує тільки реальні небезпеки)
         if (state.settings.arrowThreat) {
             const threat = findOpponentThreat(chessState.game);
             if (threat) {
@@ -519,10 +540,10 @@
                 const dy = p2.y - p1.y;
                 const dist = Math.hypot(dx, dy);
                 if (dist > 15) {
-                    const startX = p1.x + (dx / dist) * 16;
-                    const startY = p1.y + (dy / dist) * 16;
-                    const endX = p2.x - (dx / dist) * 26;
-                    const endY = p2.y - (dy / dist) * 26;
+                    const startX = p1.x + (dx / dist) * 18;
+                    const startY = p1.y + (dy / dist) * 18;
+                    const endX = p2.x - (dx / dist) * 20;
+                    const endY = p2.y - (dy / dist) * 20;
 
                     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                     line.setAttribute('x1', startX);
@@ -770,25 +791,51 @@
             console.warn('Error reading cached blob:', e);
         }
 
-        // 2. ДЖЕРЕЛА ДЛЯ ЗАВАНТАЖЕННЯ (Том 1, Том 2, Cache)
+        // 2. ДЖЕРЕЛА ДЛЯ ЗАВАНТАЖЕННЯ (Том 1, CORS proxy, Fallbacks)
         const candidateUrls = [];
-        if (bookParam.file) candidateUrls.push(bookParam.file);
+        const addCandidate = (u) => {
+            if (!u || typeof u !== 'string') return;
+            const clean = u.trim();
+            if (clean && !candidateUrls.includes(clean)) {
+                candidateUrls.push(clean);
+            }
+        };
 
+        const cleanId = (bookParam.id || '').replace(/\.[^/.]+$/, '').trim();
+        const fullId = (bookParam.id || '').trim();
+
+        // Пошук у кеші бібліотеки (books-cache.js)
         if (window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE)) {
             const b = window.CHESS_BOOKS_CACHE.find(x => 
-                (x.id && x.id.toLowerCase() === (bookParam.id || '').toLowerCase()) ||
+                (x.id && x.id.toLowerCase() === fullId.toLowerCase()) ||
+                (x.id && x.id.replace(/\.[^/.]+$/, '').toLowerCase() === cleanId.toLowerCase()) ||
                 (x.title && x.title.toLowerCase() === (bookParam.title || '').toLowerCase())
             );
-            if (b && b.url && !candidateUrls.includes(b.url)) {
-                candidateUrls.push(b.url);
+            if (b && b.url) {
+                // Офіційний CORS-проксі Archive.org дозволяє стрімінг та збереження персональної копії в IndexedDB
+                if (b.url.includes('archive.org/download/')) {
+                    addCandidate(b.url.replace('archive.org/download/', 'archive.org/cors/'));
+                }
+                addCandidate(b.url);
             }
         }
 
-        if (bookParam.id) {
-            const vol1 = `https://archive.org/download/1971_20260223/${encodeURIComponent(bookParam.id)}`;
-            const vol2 = `https://archive.org/download/1971_20260223_vol2/${encodeURIComponent(bookParam.id)}`;
-            if (!candidateUrls.includes(vol1)) candidateUrls.push(vol1);
-            if (!candidateUrls.includes(vol2)) candidateUrls.push(vol2);
+        if (bookParam.file) {
+            if (bookParam.file.includes('archive.org/download/')) {
+                addCandidate(bookParam.file.replace('archive.org/download/', 'archive.org/cors/'));
+            }
+            addCandidate(bookParam.file);
+        }
+
+        if (fullId) {
+            let encId;
+            try {
+                encId = encodeURIComponent(decodeURIComponent(fullId));
+            } catch (_) {
+                encId = encodeURIComponent(fullId);
+            }
+            addCandidate(`https://archive.org/cors/1971_20260223/${encId}`);
+            addCandidate(`https://archive.org/download/1971_20260223/${encId}`);
         }
 
         if (candidateUrls.length === 0) {
@@ -835,14 +882,14 @@
             console.warn('Stream download fallback:', downloadErr);
             if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
 
-            // Якщо помилка 404 (файлу немає на сервері), не відкриваємо фрейм архіву!
+            // Якщо помилка 404 (файлу немає на сервері або очікує синхронізації):
             if (downloadErr && downloadErr.message && downloadErr.message.includes('404')) {
-                showDocError('Файл цієї книги наразі відсутній на сервері. Ви можете відкрити файл локально з комп’ютера.');
+                showDocError('Ця книга наразі очікує синхронізації з онлайн-архівом (Том 2). Ви можете відкрити власну локальну копію з пристрою.');
                 return;
             }
 
-            // Безшовний fallback до прямого відкриття у вбудованому iframe тільки при CORS
-            const directUrl = candidateUrls[0];
+            // Прямий fallback
+            const directUrl = candidateUrls.find(u => !u.includes('/cors/')) || candidateUrls[0];
             if (format === 'pdf') {
                 loadPdfDirect(directUrl);
             } else if (format === 'djvu') {
@@ -943,46 +990,43 @@
         updatePageUI();
     }
 
-    // DjVu LOADER: Uses DjVu.js Viewer or Embedded Archive Reader
+    // DjVu LOADER: Uses DjVu.js Viewer with CORS arrayBuffer
     function loadDjvuDirect(url) {
         if (!url) {
             showDocError('Посилання на файл DjVu відсутнє.');
             return;
         }
 
-        // Check if DjVu.js Viewer library is loaded
+        // Перевіряємо наявність DjVu.js Viewer
         if (typeof DjVu !== 'undefined' && DjVu.Viewer && dom.djvuMount) {
             dom.docFrame.style.display = 'none';
             dom.contentWrap.style.display = 'none';
             dom.djvuWrap.style.display = 'block';
 
-            try {
+            const corsUrl = url.includes('archive.org/download/') ? url.replace('archive.org/download/', 'archive.org/cors/') : url;
+
+            fetch(corsUrl).then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.arrayBuffer();
+            }).then(buf => {
                 dom.djvuMount.innerHTML = '';
                 const viewer = new DjVu.Viewer();
                 viewer.render(dom.djvuMount);
-                viewer.loadDocumentByUrl(url);
-
+                viewer.loadDocument(buf);
                 dom.loading.style.display = 'none';
                 showSyncToast('📖 DjVu документ підвантажено в онлайн-переглядачі');
-                return;
-            } catch (err) {
-                console.warn('DjVu.Viewer direct URL load warning:', err);
-            }
+                updatePageUI();
+            }).catch(err => {
+                console.warn('DjVu direct fetch failed:', err);
+                dom.loading.style.display = 'none';
+                showDocError('Ця книга (DjVu) наразі очікує синхронізації з сервером. Ви можете обрати локальний файл для читання.');
+            });
+            return;
         }
 
-        // Fallback: Embed via Archive.org BookReader / stream
-        const archiveEmbedUrl = url.replace('/download/', '/embed/');
-        dom.docFrame.style.display = 'block';
-        if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
-        if (dom.contentWrap) dom.contentWrap.style.display = 'none';
-
-        dom.docFrame.src = archiveEmbedUrl;
-        dom.docFrame.onload = () => {
-            dom.loading.style.display = 'none';
-        };
-        setTimeout(() => { dom.loading.style.display = 'none'; }, 2000);
-
-        updatePageUI();
+        // Якщо бібліотека недоступна в браузері:
+        dom.loading.style.display = 'none';
+        showDocError('Переглядач DjVu наразі недоступний. Ви можете завантажити книгу або відкрити її локально.');
     }
 
     // DOCX LOADER: via mammoth.js
