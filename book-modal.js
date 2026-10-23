@@ -727,11 +727,13 @@ function renderModalFull(book, meta) {
         downloadButtonsHTML = sortedFormats.map((f, fIdx) => {
             const isPrimary = fIdx === 0;
             const btnClass = isPrimary ? 'bd-btn-download' : 'bd-btn-download-secondary';
+            const isAvail = f.inArchive !== false && Boolean(f.url);
             const fFormat = (f.format || 'file').toUpperCase();
-            const fLabel = `⬇ ${fFormat} (${f.sizeDisplay || '—'})`;
+            const fLabel = isAvail ? `⬇ ${fFormat} (${f.sizeDisplay || '—'})` : `⏳ ${fFormat} (${isEn ? 'Queued' : 'В обробці'})`;
             return `
-                <button class="${btnClass} bd-multi-download-btn"
+                <button class="${btnClass} bd-multi-download-btn ${isAvail ? '' : 'download-btn-queued'}"
                         data-url="${escHtml(f.url || '')}"
+                        data-available="${isAvail ? 'true' : 'false'}"
                         data-title="${escHtml(book.title || '')}"
                         data-author="${escHtml(book.author || '')}"
                         data-id="${escHtml(book.id || '')}"
@@ -740,10 +742,14 @@ function renderModalFull(book, meta) {
             `;
         }).join('');
     } else {
-        const dlBtnLabel = window.i18n ? window.i18n.t('modal_btn_download', { size: book.sizeDisplay || (isEn ? 'file' : 'файл') }) : `⬇ Скачати (${book.sizeDisplay || 'файл'})`;
+        const isAvail = book.inArchive !== false && Boolean(book.url);
+        const dlBtnLabel = isAvail
+            ? (window.i18n ? window.i18n.t('modal_btn_download', { size: book.sizeDisplay || (isEn ? 'file' : 'файл') }) : `⬇ Скачати (${book.sizeDisplay || 'файл'})`)
+            : (isEn ? '⏳ In Queue (Vol. 2)' : '⏳ У черзі (Том 2)');
         downloadButtonsHTML = `
-            <button class="bd-btn-download" id="bd-download-btn"
+            <button class="bd-btn-download ${isAvail ? '' : 'download-btn-queued'}" id="bd-download-btn"
                     data-url="${escHtml(book.url || '')}"
+                    data-available="${isAvail ? 'true' : 'false'}"
                     data-title="${escHtml(book.title || '')}"
                     data-author="${escHtml(book.author || '')}"
                     data-id="${escHtml(book.id || '')}"
@@ -751,6 +757,8 @@ function renderModalFull(book, meta) {
                     data-size="${escHtml(book.sizeDisplay || '')}">${dlBtnLabel}</button>
         `;
     }
+
+    const eloPill = `<span class="bd-meta-pill bd-meta-pill-elo elo-badge-${book.eloLevel || 'intermediate'}">⚡ ELO ${book.eloDisplay || '1400–1800'}</span>`;
 
     card.innerHTML = `
         <button id="book-detail-close">✕</button>
@@ -766,6 +774,7 @@ function renderModalFull(book, meta) {
                     ${year && year !== '---' ? `<span class="bd-meta-pill">📅 ${year}</span>` : ''}
                     <span class="bd-meta-pill">💾 ${book.sizeDisplay || '—'}</span>
                     <span class="bd-meta-pill">📄 ${format.toUpperCase()}</span>
+                    ${eloPill}
                     ${langPill}
                     ${pagesPill}
                     ${journalBadge}
@@ -964,7 +973,32 @@ async function onDownloadClick(btn) {
         return;
     }
 
-    const url = btn.dataset.url;
+    let url = btn.dataset.url || '';
+    const isAvailable = btn.dataset.available !== 'false' && Boolean(url);
+
+    if (!isAvailable) {
+        const queueMsg = isEn 
+            ? '⏳ This book is currently queued for digital archiving (Vol. 2). It will become available soon!' 
+            : '⏳ Ця книга зараз у черзі на оцифрування (Том 2). Скоро вона стане доступною для скачування!';
+        if (typeof showLibToast === 'function') showLibToast(queueMsg, 'warn');
+        else if (typeof showToast === 'function') showToast(queueMsg, 'warn');
+        return;
+    }
+
+    // Safely encode filename in URL if raw spaces/Cyrillic exist
+    if (url && (url.includes(' ') || /[\u0400-\u04FF]/.test(url))) {
+        const lastSlash = url.lastIndexOf('/');
+        if (lastSlash !== -1) {
+            const base = url.substring(0, lastSlash + 1);
+            const rawFile = url.substring(lastSlash + 1);
+            try {
+                url = base + encodeURIComponent(decodeURIComponent(rawFile));
+            } catch (e) {
+                url = base + encodeURIComponent(rawFile);
+            }
+        }
+    }
+
     const title = btn.dataset.title || '';
     const author = btn.dataset.author || '';
     const filename = btn.dataset.id || btn.dataset.filename || (url ? decodeURIComponent(url.split('/').pop()) : '');
@@ -1102,9 +1136,21 @@ function onReadOnlineClick(book) {
         : null;
 
     const page = (progress && progress.currentPage) ? progress.currentPage : 1;
-    let fileUrl = book.url || '';
-    if (!fileUrl && bookId) {
+    let fileUrl = (book.inArchive !== false) ? (book.url || '') : '';
+    if (!fileUrl && book.inArchive !== false && bookId) {
         fileUrl = `https://archive.org/download/1971_20260223/${encodeURIComponent(bookId)}`;
+    }
+    if (fileUrl && (fileUrl.includes(' ') || /[\u0400-\u04FF]/.test(fileUrl))) {
+        const lastSlash = fileUrl.lastIndexOf('/');
+        if (lastSlash !== -1) {
+            const base = fileUrl.substring(0, lastSlash + 1);
+            const rawFile = fileUrl.substring(lastSlash + 1);
+            try {
+                fileUrl = base + encodeURIComponent(decodeURIComponent(rawFile));
+            } catch (e) {
+                fileUrl = base + encodeURIComponent(rawFile);
+            }
+        }
     }
     let format = (book.format || '').toLowerCase();
     if (!format || format === '---') {
@@ -1119,6 +1165,7 @@ function onReadOnlineClick(book) {
         title: book.title || '',
         author: book.author || '',
         format: format,
+        inArchive: (book.inArchive !== false) ? '1' : '0',
         cover: coverUrl,
         page: page
     });

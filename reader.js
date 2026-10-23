@@ -174,11 +174,16 @@
             if (ext) format = ext;
         }
 
-        dom.loading.style.display = 'flex';
-        dom.loadingText.textContent = `Завантаження документа (${format.toUpperCase()})...`;
-
         // Завжди показуємо підказку для відкриття локального файлу при бажанні
         if (dom.dropBar) dom.dropBar.style.display = 'flex';
+
+        if (!fileUrl) {
+            showDocError('Посилання на файл в електронному архіві відсутнє (книга у черзі на оцифрування).');
+            return;
+        }
+
+        dom.loading.style.display = 'flex';
+        dom.loadingText.textContent = `Завантаження документа (${format.toUpperCase()})...`;
 
         if (format === 'pdf') {
             loadPdfDirect(fileUrl);
@@ -1163,14 +1168,23 @@
         dom.loading.style.display = 'none';
         if (dom.contentWrap) {
             dom.contentWrap.style.display = 'block';
+            const hasDirectFile = Boolean(bookParam.file);
             dom.contentWrap.innerHTML = `
-                <div style="text-align: center; padding: 60px 20px; color: #ef4444;">
-                    <div style="font-size: 3rem; margin-bottom: 12px;">⚠️</div>
-                    <h3 style="margin-bottom: 8px;">Не вдалося автоматично відкрити книгу</h3>
-                    <p style="color: var(--reader-text-muted); max-width: 480px; margin: 0 auto 16px;">${escapeHtml(msg)}</p>
-                    <a href="${bookParam.file}" target="_blank" class="btn-add-note" style="text-decoration: none; padding: 8px 16px;">
-                        🔗 Відкрити файл напряму
-                    </a>
+                <div style="text-align: center; padding: 60px 20px;">
+                    <div style="font-size: 3rem; margin-bottom: 12px;">${hasDirectFile ? '⚠️' : '⏳'}</div>
+                    <h3 style="margin-bottom: 8px;">${hasDirectFile ? 'Не вдалося автоматично відкрити книгу' : 'Книга очікує завантаження в онлайн-архів (Том 2)'}</h3>
+                    <p style="color: var(--reader-text-muted); max-width: 480px; margin: 0 auto 16px;">
+                        ${hasDirectFile ? escapeHtml(msg) : 'Цей том очікує синхронізації з сервером. Ви вже зараз можете читати його локальну копію або тренуватися на шахівниці праворуч.'}
+                    </p>
+                    ${hasDirectFile ? `
+                        <a href="${bookParam.file}" target="_blank" class="btn-add-note" style="text-decoration: none; padding: 8px 16px;">
+                            🔗 Відкрити файл напряму
+                        </a>
+                    ` : `
+                        <button onclick="document.getElementById('input-local-file').click()" class="btn-add-note" style="padding: 10px 20px; font-size: 0.95rem; cursor: pointer; border: none; border-radius: 8px;">
+                            📂 Відкрити локальний файл з диска
+                        </button>
+                    `}
                 </div>
             `;
         }

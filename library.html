@@ -111,13 +111,19 @@
             <button class="sort-btn" onclick="sortBooks('year')">📅 <span data-i18n="lib_sort_year">Дата</span></button>
             <button class="sort-btn" onclick="sortBooks('pages')">📄 <span data-i18n="lib_sort_pages">Стор.</span></button>
             <button class="sort-btn" onclick="sortBooks('sizeRaw')">⚖️ <span data-i18n="lib_sort_size">Розмір</span></button>
+            <button class="sort-btn" id="sort-btn-elo" onclick="sortBooks('eloAvg')">⚡ <span data-i18n="lib_sort_elo">ELO</span></button>
+            <button class="elo-toggle-btn active" id="btn-toggle-elo" onclick="toggleEloColumn()" title="Показати або приховати стовпець рейтингу ELO">
+                <span class="elo-toggle-icon">⚡</span>
+                <span class="elo-toggle-label">Стовпець ELO:</span>
+                <span class="elo-toggle-status" id="elo-toggle-status">УВІМК</span>
+            </button>
             <span class="lib-stats" id="lib-stats"></span>
         </div>
 
         <!-- Блок зі списком літератури -->
         <div class="books-list-block">
             <div class="table-area">
-                <table class="books-table">
+                <table class="books-table" id="books-table">
                     <thead>
                         <tr>
                             <th class="col-author" data-i18n="lib_th_author">Автор</th>
@@ -126,12 +132,13 @@
                             <th class="col-pages" data-i18n="lib_th_pages">Стор.</th>
                             <th class="col-format" data-i18n="lib_th_format">Вид</th>
                             <th class="col-size" data-i18n="lib_th_size">Вага</th>
+                            <th class="col-elo" data-i18n="lib_th_elo">Рівень ELO</th>
                             <th class="col-action" data-i18n="lib_th_action">Дія</th>
                         </tr>
                     </thead>
                     <tbody id="books-table-body">
                         <tr>
-                            <td colspan="7" class="loading-row" data-i18n="lib_loading">⏳ Завантаження бібліотеки...</td>
+                            <td colspan="8" class="loading-row" data-i18n="lib_loading">⏳ Завантаження бібліотеки...</td>
                         </tr>
                     </tbody>
                 </table>

@@ -1,6 +1,6 @@
 const ARCHIVE_ID = '1971_20260223';
 let allBooks = [];
-let sortDirections = { author: 1, year: 1, pages: 1, sizeRaw: -1 };
+let sortDirections = { author: 1, year: 1, pages: 1, sizeRaw: -1, eloAvg: -1 };
 let currentUser = null;
 
 function sortBooksBySizeDesc(books) {
@@ -179,19 +179,29 @@ async function fetchArchiveData() {
                         || (window.CHESS_DESCRIPTIONS && (window.CHESS_DESCRIPTIONS[bookId]?.pages || window.CHESS_DESCRIPTIONS[bookId.toLowerCase()]?.pages))
                         || null;
 
-                    const isMulti = booksMap.has(bookId.toLowerCase()) && booksMap.get(bookId.toLowerCase()).formats;
+                    const existing = booksMap.get(bookId.toLowerCase()) || {};
+                    const isMulti = existing.formats;
                     if (!isMulti) {
+                        const safeUrl = `https://archive.org/download/${volId}/${encodeURIComponent(f.name)}`;
                         const bookObj = {
-                            author: match ? match[1].trim() : fileName.split('-')[0].trim(),
-                            title: match ? match[2].trim() : fileName,
-                            year: match ? match[3] : '---',
-                            pages: pages ? parseInt(pages, 10) : null,
+                            ...existing,
+                            author: match ? match[1].trim() : (existing.author || fileName.split('-')[0].trim()),
+                            title: match ? match[2].trim() : (existing.title || fileName),
+                            year: match ? match[3] : (existing.year || '---'),
+                            pages: pages ? parseInt(pages, 10) : (existing.pages || null),
                             format: f.name.split('.').pop().toLowerCase(),
                             sizeDisplay: (f.size / 1024 / 1024).toFixed(2) + ' MB',
                             sizeRaw: parseInt(f.size) || 0,
-                            url: `https://archive.org/download/${volId}/${f.name}`,
+                            url: safeUrl,
                             id: f.name,
-                            archiveVolume: volId
+                            archiveVolume: volId,
+                            inArchive: true,
+                            eloMin: existing.eloMin || 1400,
+                            eloMax: existing.eloMax || 1800,
+                            eloAvg: existing.eloAvg || 1600,
+                            eloLevel: existing.eloLevel || 'intermediate',
+                            eloDisplay: existing.eloDisplay || '1400–1800',
+                            eloPercent: existing.eloPercent || 50
                         };
                         booksMap.set(bookId.toLowerCase(), bookObj);
                     }
@@ -261,10 +271,17 @@ function renderTable(books) {
     const pageSuffix = isEn ? ' p.' : ' с.';
 
     if (books.length === 0) {
-        container.innerHTML = `<tr><td colspan="7" class="loading-row">📭 ${noBooksMsg}</td></tr>`;
+        container.innerHTML = `<tr><td colspan="8" class="loading-row">📭 ${noBooksMsg}</td></tr>`;
         return;
     }
-    container.innerHTML = books.map((b, idx) => `
+    container.innerHTML = books.map((b, idx) => {
+        const isAvailable = b.inArchive !== false && Boolean(b.url);
+        const eloDisplay = b.eloDisplay || '1400–1800';
+        const eloLevel = b.eloLevel || 'intermediate';
+        const eloPercent = b.eloPercent || 50;
+        const queuedText = isEn ? 'Queued' : 'Очікує';
+
+        return `
         <tr data-book-idx="${idx}" style="cursor:pointer">
             <td class="col-author">${b.author}</td>
             <td class="col-title">${b.title}</td>
@@ -272,19 +289,31 @@ function renderTable(books) {
             <td class="col-pages">${b.pages ? b.pages + pageSuffix : '—'}</td>
             <td class="col-format"><span class="badge format-${b.format}">${b.format}</span></td>
             <td class="col-size">${b.sizeDisplay}</td>
+            <td class="col-elo">
+                <div class="elo-bar-wrap" title="Рекомендований рейтинг: ${eloDisplay}">
+                    <div class="elo-bar-meta">
+                        <span class="elo-badge elo-badge-${eloLevel}">⚡ ${eloDisplay}</span>
+                    </div>
+                    <div class="elo-bar-track">
+                        <div class="elo-bar-fill elo-level-${eloLevel}" style="width: ${eloPercent}%;"></div>
+                    </div>
+                </div>
+            </td>
             <td class="col-action">
-                <button class="download-link download-btn-js"
-                        data-url="${b.url}"
-                        data-title="${b.title.replace(/"/g, '&quot;')}"
-                        data-author="${b.author.replace(/"/g, '&quot;')}"
-                        data-id="${b.id.replace(/"/g, '&quot;')}"
-                        data-format="${b.format}"
-                        data-size="${b.sizeDisplay}">
-                    <span>⬇</span><span>${dlText}</span>
+                <button class="download-link download-btn-js ${isAvailable ? '' : 'download-btn-queued'}"
+                        data-url="${b.url || ''}"
+                        data-available="${isAvailable ? 'true' : 'false'}"
+                        data-title="${(b.title || '').replace(/"/g, '&quot;')}"
+                        data-author="${(b.author || '').replace(/"/g, '&quot;')}"
+                        data-id="${(b.id || '').replace(/"/g, '&quot;')}"
+                        data-format="${b.format || 'pdf'}"
+                        data-size="${b.sizeDisplay || '—'}">
+                    <span>${isAvailable ? '⬇' : '⏳'}</span><span>${isAvailable ? dlText : queuedText}</span>
                 </button>
             </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 
     // Прив'язуємо обробники до кнопок скачування
     container.querySelectorAll('.download-btn-js').forEach(btn => {
@@ -360,7 +389,7 @@ function sortBooks(key) {
     const sorter = (a, b) => {
         let valA = a[key];
         let valB = b[key];
-        if (key === 'pages' || key === 'sizeRaw') {
+        if (key === 'pages' || key === 'sizeRaw' || key === 'eloAvg') {
             valA = Number(valA) || 0;
             valB = Number(valB) || 0;
             return (valA - valB) * dir;
@@ -382,6 +411,44 @@ function sortBooks(key) {
         renderTable(allBooks);
     }
 }
+
+// =============================================
+// ПЕРЕМИКАЧ СТОВПЦЯ ELO
+// =============================================
+function toggleEloColumn() {
+    const table = document.getElementById('books-table');
+    const btn = document.getElementById('btn-toggle-elo');
+    const status = document.getElementById('elo-toggle-status');
+    if (!table) return;
+
+    const isHidden = table.classList.toggle('hide-elo-col');
+    const showElo = !isHidden;
+
+    if (btn) btn.classList.toggle('active', showElo);
+    if (status) status.textContent = showElo ? 'УВІМК' : 'ВИМК';
+
+    try {
+        localStorage.setItem('chess_vault_show_elo', showElo ? 'true' : 'false');
+    } catch (e) {}
+}
+window.toggleEloColumn = toggleEloColumn;
+
+function initEloColumnState() {
+    const saved = localStorage.getItem('chess_vault_show_elo');
+    const table = document.getElementById('books-table');
+    const btn = document.getElementById('btn-toggle-elo');
+    const status = document.getElementById('elo-toggle-status');
+    if (saved === 'false') {
+        if (table) table.classList.add('hide-elo-col');
+        if (btn) btn.classList.remove('active');
+        if (status) status.textContent = 'ВИМК';
+    } else {
+        if (table) table.classList.remove('hide-elo-col');
+        if (btn) btn.classList.add('active');
+        if (status) status.textContent = 'УВІМК';
+    }
+}
+initEloColumnState();
 
 window.addEventListener('chessVaultLanguageChanged', () => {
     if (typeof renderFilteredBooks === 'function') {

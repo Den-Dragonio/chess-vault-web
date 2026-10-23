@@ -88,6 +88,7 @@ const I18N_TRANSLATIONS = {
         lib_sort_year: "Date",
         lib_sort_pages: "Pages",
         lib_sort_size: "Size",
+        lib_sort_elo: "ELO",
 
         lib_th_author: "Author",
         lib_th_title: "Book Title",
@@ -95,6 +96,7 @@ const I18N_TRANSLATIONS = {
         lib_th_pages: "Pages",
         lib_th_format: "Type",
         lib_th_size: "Size",
+        lib_th_elo: "ELO Rating",
         lib_th_action: "Action",
         lib_loading: "Loading library...",
         lib_no_books: "No books found matching your query",
@@ -322,6 +324,7 @@ const I18N_TRANSLATIONS = {
         lib_sort_year: "Дата",
         lib_sort_pages: "Стор.",
         lib_sort_size: "Розмір",
+        lib_sort_elo: "ELO",
 
         lib_th_author: "Автор",
         lib_th_title: "Назва книги",
@@ -329,6 +332,7 @@ const I18N_TRANSLATIONS = {
         lib_th_pages: "Стор.",
         lib_th_format: "Вид",
         lib_th_size: "Вага",
+        lib_th_elo: "Рівень ELO",
         lib_th_action: "Дія",
         lib_loading: "Завантаження бібліотеки...",
         lib_no_books: "Книг за вашим запитом не знайдено",
