@@ -207,9 +207,16 @@
                             </div>
                         </div>
 
+                        <!-- Moves Input Bar: manual entry / paste -->
+                        <div class="moves-input-bar">
+                            <input type="text" id="input-chess-moves" class="input-chess-moves" placeholder="Вставте ходи (напр. 1.e4 c5 2.Nf3...) і натисніть Enter">
+                            <button type="button" id="btn-paste-moves" class="btn-paste-moves" title="Вставити з буфера обміну (Ctrl+V)">📋 Вставити</button>
+                            <button type="button" id="btn-load-moves" class="btn-load-moves" title="Завантажити ходи на дошку">↵</button>
+                        </div>
+
                         <!-- Moves Sequence Log (Parsed from book text) -->
                         <div class="board-moves-log" id="board-moves-log">
-                            <span style="color: var(--reader-text-muted); font-size: 0.75rem;">Виділіть шахові ходи в тексті книги (наприклад, "1. e4 e5 2. Nf3 Nc6") або розставте фігури в редакторі.</span>
+                            <span style="color: var(--reader-text-muted); font-size: 0.75rem;">Виділіть шахові ходи в тексті книги або вставте їх у поле вище.</span>
                         </div>
                     </div>
 

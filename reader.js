@@ -118,6 +118,9 @@
         engineEvalScorePill: document.getElementById('engine-eval-score-pill'),
         engineEvalDepth: document.getElementById('engine-eval-depth'),
         engineEvalPv: document.getElementById('engine-eval-pv'),
+        inputChessMoves: document.getElementById('input-chess-moves'),
+        btnPasteMoves: document.getElementById('btn-paste-moves'),
+        btnLoadMoves: document.getElementById('btn-load-moves'),
         selectionToolbar: document.getElementById('selection-toolbar'),
         selBtnChess: document.getElementById('sel-btn-chess'),
         selBtnHighlight: document.getElementById('sel-btn-highlight'),
@@ -1858,35 +1861,127 @@
     // ========================================================
     // 7. NOTATION PARSER & REPLAY
     // ========================================================
+    // ========================================================
+    // 7. NOTATION PARSER & REPLAY (Smart Figurine & Cyrillic Translator)
+    // ========================================================
     function parseChessMovesFromText(rawText) {
-        if (!rawText) return [];
+        if (!rawText || typeof rawText !== 'string') return [];
 
-        let clean = rawText
-            .replace(/[ОO0]-[ОO0]-[ОO0]/g, 'O-O-O')
-            .replace(/[ОO0]-[ОO0]/g, 'O-O')
+        let text = rawText
+            // 1. Unicode figurines
+            .replace(/[\u2654\u265A]/g, 'K')
+            .replace(/[\u2655\u265B]/g, 'Q')
+            .replace(/[\u2656\u265C]/g, 'R')
+            .replace(/[\u2657\u265D]/g, 'B')
+            .replace(/[\u2658\u265E]/g, 'N')
+            .replace(/[\u2659\u265F]/g, '')
+            // 2. Castling
+            .replace(/[ОO0]-[ОO0]-[ОO0]/gi, 'O-O-O')
+            .replace(/[ОO0]-[ОO0]/gi, 'O-O')
+            // 3. Cyrillic pieces
             .replace(/Кр/gi, 'K')
             .replace(/Ф/g, 'Q')
             .replace(/Л/g, 'R')
-            .replace(/С/g, 'B')
-            .replace(/К/g, 'N')
-            .replace(/п/g, '')
-            .replace(/[:xх]/g, 'x')
-            .replace(/\b\d+\s*\.{1,3}/g, ' ');
+            .replace(/С(?=[a-hа-яx:1-8])/g, 'B')
+            .replace(/К(?=[a-hа-яx:1-8])/g, 'N')
+            // 4. Soviet typography font mapping (Knight encoded as Д/д)
+            .replace(/[Дд](?=[a-hа-яЬx:1-8])/g, 'N')
+            // 5. Font letter Ь/ь -> b
+            .replace(/[Ьь](?=[1-8])/g, 'b')
+            // 6. Cyrillic files mapping
+            .replace(/а(?=[1-8x:])/gi, 'a')
+            .replace(/б(?=[1-8x:])/gi, 'b')
+            .replace(/с(?=[1-8x:])/g, 'c')
+            .replace(/д(?=[1-8x:])/g, 'd')
+            .replace(/е(?=[1-8x:])/gi, 'e')
+            .replace(/ф(?=[1-8x:])/gi, 'f')
+            .replace(/г(?=[1-8x:])/gi, 'g')
+            .replace(/h(?=[1-8x:])/gi, 'h')
+            // 7. Captures symbol (: and x and Cyrillic х)
+            .replace(/[:xх]/g, 'x');
 
-        const tokens = clean.split(/\s+/).filter(t => t.trim().length > 0);
-        const validMoves = [];
-        const testGame = new Chess();
+        // Remove move numbers like '1.', '2.', '12...' and punctuation
+        text = text.replace(/\b\d+\s*\.{1,3}/g, ' ')
+                   .replace(/[\(\)\,\!\?\#\+\;]/g, ' ');
 
-        for (const token of tokens) {
-            const sanitized = token.replace(/[\!\?\#\+\,]/g, '').trim();
-            if (!sanitized) continue;
+        const tokens = text.split(/\s+/).filter(Boolean);
+        if (tokens.length === 0) return [];
+
+        function getCandidates(g, token) {
+            const list = [];
+
+            // 1. Direct move attempt
             try {
-                const m = testGame.move(sanitized, { sloppy: true });
-                if (m) validMoves.push(m.san);
+                const m = g.move(token, { sloppy: true });
+                if (m) {
+                    g.undo();
+                    list.push(m);
+                }
             } catch (_) {}
+
+            // 2. Pawn capture e.g. 'cd', 'cxd', 'ed', 'fe'
+            const pawnCap = token.match(/^([a-h])x?([a-h])$/);
+            if (pawnCap) {
+                const fromF = pawnCap[1];
+                const toF = pawnCap[2];
+                const found = g.moves({ verbose: true }).find(m => m.piece === 'p' && m.from[0] === fromF && m.to[0] === toF);
+                if (found && !list.some(x => x.san === found.san)) list.push(found);
+            }
+
+            // 3. Piece-less capture e.g. 'xd4', ':d4', 'xc6'
+            if (token.startsWith('x') || token.startsWith(':')) {
+                const target = token.replace(/[:x]/g, '');
+                const caps = g.moves({ verbose: true }).filter(m => m.to === target && m.captured);
+                caps.sort((a, b) => {
+                    const order = { n: 1, b: 2, r: 3, q: 4, p: 5, k: 6 };
+                    return (order[a.piece] || 9) - (order[b.piece] || 9);
+                });
+                caps.forEach(c => {
+                    if (!list.some(x => x.san === c.san)) list.push(c);
+                });
+            }
+
+            // 4. Try piece prefixes if token is a coordinate like 'f3', 'c6'
+            if (/^[a-h][1-8]$/.test(token)) {
+                for (const p of ['N', 'B', 'R', 'Q', 'K']) {
+                    try {
+                        const m = g.move(p + token, { sloppy: true });
+                        if (m) {
+                            g.undo();
+                            if (!list.some(x => x.san === m.san)) {
+                                if (p === 'N') list.unshift(m);
+                                else list.push(m);
+                            }
+                        }
+                    } catch (_) {}
+                }
+            }
+
+            return list;
         }
 
-        return validMoves;
+        let bestMoves = [];
+
+        function search(idx, g, currentMoves) {
+            if (currentMoves.length > bestMoves.length) {
+                bestMoves = [...currentMoves];
+            }
+            if (idx >= tokens.length) return;
+
+            const token = tokens[idx];
+            const candidates = getCandidates(g, token);
+
+            for (const cand of candidates) {
+                g.move(cand);
+                search(idx + 1, g, [...currentMoves, cand.san]);
+                g.undo();
+                if (bestMoves.length === tokens.length) return;
+            }
+        }
+
+        const testGame = new Chess();
+        search(0, testGame, []);
+        return bestMoves;
     }
 
     function loadMovesToBoard(movesArray) {
@@ -1910,6 +2005,7 @@
         chessState.currentMoveIndex = chessState.moveHistory.length - 1;
         updateMovesLogUI();
         renderChessBoard();
+        requestStockfishEval();
         switchDockTab('board');
         saveUserBookWorkspace();
         showSyncToast(`♟️ Завантажено ${chessState.moveHistory.length} ходів на дошку!`);
@@ -1942,6 +2038,7 @@
         chessState.currentMoveIndex = targetIndex;
         updateMovesLogUI();
         renderChessBoard();
+        requestStockfishEval();
         saveUserBookWorkspace();
     }
 
@@ -2316,10 +2413,71 @@
         document.addEventListener('mouseup', handleTextSelection);
 
         dom.selBtnChess.addEventListener('click', () => {
+            if (dom.inputChessMoves) dom.inputChessMoves.value = state.selectedText;
             const moves = parseChessMovesFromText(state.selectedText);
             loadMovesToBoard(moves);
             dom.selectionToolbar.style.display = 'none';
         });
+
+        // Manual moves entry & paste
+        function handleManualMovesSubmit() {
+            const raw = dom.inputChessMoves ? dom.inputChessMoves.value.trim() : '';
+            if (!raw) return;
+            const moves = parseChessMovesFromText(raw);
+            if (moves && moves.length > 0) {
+                loadMovesToBoard(moves);
+                if (dom.inputChessMoves) dom.inputChessMoves.value = '';
+            } else {
+                showSyncToast('⚠️ Не вдалося розпізнати шахові ходи', 'warn');
+            }
+        }
+
+        async function handlePasteMovesClick() {
+            try {
+                if (navigator.clipboard && navigator.clipboard.readText) {
+                    const clipText = await navigator.clipboard.readText();
+                    if (clipText && clipText.trim()) {
+                        if (dom.inputChessMoves) dom.inputChessMoves.value = clipText.trim();
+                        handleManualMovesSubmit();
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.warn('Clipboard read error:', err);
+            }
+            if (dom.inputChessMoves) {
+                dom.inputChessMoves.focus();
+                showSyncToast('Вставте текст комбінацією Ctrl+V (або Cmd+V)');
+            }
+        }
+
+        if (dom.inputChessMoves) {
+            dom.inputChessMoves.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleManualMovesSubmit();
+                }
+            });
+            dom.inputChessMoves.addEventListener('paste', () => {
+                setTimeout(handleManualMovesSubmit, 60);
+            });
+        }
+
+        if (dom.btnLoadMoves) {
+            dom.btnLoadMoves.addEventListener('click', handleManualMovesSubmit);
+        }
+
+        if (dom.btnPasteMoves) {
+            dom.btnPasteMoves.addEventListener('click', handlePasteMovesClick);
+        }
+
+        if (dom.boardMovesLog) {
+            dom.boardMovesLog.addEventListener('click', () => {
+                if (chessState.moveHistory.length === 0 && dom.inputChessMoves) {
+                    dom.inputChessMoves.focus();
+                }
+            });
+        }
 
         dom.selBtnHighlight.addEventListener('click', () => {
             showSyncToast('Текст виділено!');

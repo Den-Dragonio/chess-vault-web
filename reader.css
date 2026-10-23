@@ -754,6 +754,65 @@ body, html {
     cursor: not-allowed;
 }
 
+/* Moves Input Bar (Manual notation paste & entry) */
+.moves-input-bar {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid var(--reader-border);
+    border-radius: 8px;
+    padding: 3px 6px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.moves-input-bar:focus-within {
+    border-color: var(--reader-accent);
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.25);
+}
+
+.input-chess-moves {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--reader-text);
+    font-size: 0.78rem;
+    font-family: inherit;
+    padding: 4px 2px;
+}
+
+.input-chess-moves::placeholder {
+    color: var(--reader-text-muted);
+    font-size: 0.73rem;
+}
+
+.btn-paste-moves,
+.btn-load-moves {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--reader-border);
+    border-radius: 6px;
+    color: var(--reader-text);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+
+.btn-paste-moves:hover,
+.btn-load-moves:hover {
+    background: var(--reader-accent);
+    color: #0f172a;
+    border-color: var(--reader-accent);
+}
+
 /* Notation sequence parsed from book */
 .board-moves-log {
     width: 100%;
