@@ -23,7 +23,13 @@
 }
 
 html.dark .pl-shelf-title {
-    color: #eee;
+    color: #ffffff !important;
+}
+
+@media (prefers-color-scheme: dark) {
+    html:not(.light) .pl-shelf-title {
+        color: #ffffff !important;
+    }
 }
 
 .pl-shelf-subtitle {
@@ -33,27 +39,52 @@ html.dark .pl-shelf-title {
 }
 
 html.dark .pl-shelf-subtitle {
-    color: #aaa;
+    color: #cbd5e1 !important;
 }
+
+@media (prefers-color-scheme: dark) {
+    html:not(.light) .pl-shelf-subtitle {
+        color: #cbd5e1 !important;
+    }
+}
+
 
 /* ---- SHELF WRAPPER & GRID ---- */
 .pl-shelf-wrapper {
     position: relative;
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .pl-shelf-grid {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap !important;
     align-items: stretch;
     gap: 18px;
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+    cursor: grab;
+}
+
+.pl-shelf-grid::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
 }
 
 /* ---- INDIVIDUAL BOOKSHELF CARD ---- */
 .pl-shelf-card {
     position: relative;
     width: 145px;
+    min-width: 145px;
+    flex-shrink: 0;
     min-height: 180px;
     background: rgba(255, 255, 255, 0.65);
     backdrop-filter: blur(16px);
@@ -80,15 +111,33 @@ html.dark .pl-shelf-subtitle {
 }
 
 html.dark .pl-shelf-card {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.09);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+    background: #1c2237 !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35) !important;
+    color: #f8fafc !important;
+}
+
+@media (prefers-color-scheme: dark) {
+    html:not(.light) .pl-shelf-card {
+        background: #1c2237 !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35) !important;
+        color: #f8fafc !important;
+    }
 }
 
 html.dark .pl-shelf-card:hover {
-    box-shadow: 0 16px 35px rgba(212, 175, 55, 0.25);
-    border-color: rgba(212, 175, 55, 0.45);
-    background: rgba(255, 255, 255, 0.07);
+    box-shadow: 0 16px 35px rgba(212, 175, 55, 0.28) !important;
+    border-color: rgba(212, 175, 55, 0.6) !important;
+    background: #242c47 !important;
+}
+
+@media (prefers-color-scheme: dark) {
+    html:not(.light) .pl-shelf-card:hover {
+        box-shadow: 0 16px 35px rgba(212, 175, 55, 0.28) !important;
+        border-color: rgba(212, 175, 55, 0.6) !important;
+        background: #242c47 !important;
+    }
 }
 
 /* ---- 1. FIRST CARD: TRANSLUCENT "+ НОВИЙ ПЛЕЙЛИСТ" ---- */
@@ -107,15 +156,31 @@ html.dark .pl-shelf-card:hover {
 }
 
 html.dark .pl-shelf-card.pl-card-create {
-    background: rgba(255, 255, 255, 0.02);
-    border-color: rgba(212, 175, 55, 0.35);
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 2px dashed rgba(212, 175, 55, 0.45) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+    html:not(.light) .pl-shelf-card.pl-card-create {
+        background: rgba(255, 255, 255, 0.03) !important;
+        border: 2px dashed rgba(212, 175, 55, 0.45) !important;
+    }
 }
 
 html.dark .pl-shelf-card.pl-card-create:hover {
-    background: rgba(212, 175, 55, 0.12);
-    border-color: #d4af37;
-    border-style: solid;
+    background: rgba(212, 175, 55, 0.15) !important;
+    border-color: #d4af37 !important;
+    border-style: solid !important;
 }
+
+@media (prefers-color-scheme: dark) {
+    html:not(.light) .pl-shelf-card.pl-card-create:hover {
+        background: rgba(212, 175, 55, 0.15) !important;
+        border-color: #d4af37 !important;
+        border-style: solid !important;
+    }
+}
+
 
 /* Circle holding the plus icon */
 .pl-create-icon-wrap {
@@ -201,11 +266,23 @@ html.dark .pl-shelf-card.pl-card-create:hover .pl-create-plus-icon::after {
 }
 
 html.dark .pl-create-label {
-    color: #aaa;
+    color: #cbd5e1 !important;
+}
+
+@media (prefers-color-scheme: dark) {
+    html:not(.light) .pl-create-label {
+        color: #cbd5e1 !important;
+    }
 }
 
 html.dark .pl-shelf-card.pl-card-create:hover .pl-create-label {
-    color: #fff;
+    color: #ffffff !important;
+}
+
+@media (prefers-color-scheme: dark) {
+    html:not(.light) .pl-shelf-card.pl-card-create:hover .pl-create-label {
+        color: #ffffff !important;
+    }
 }
 
 /* ---- 2. PINNED & CUSTOM PLAYLIST CARDS ---- */
@@ -241,7 +318,13 @@ html.dark .pl-shelf-card.pl-card-create:hover .pl-create-label {
 }
 
 html.dark .pl-card-name {
-    color: #eee;
+    color: #ffffff !important;
+}
+
+@media (prefers-color-scheme: dark) {
+    html:not(.light) .pl-card-name {
+        color: #ffffff !important;
+    }
 }
 
 .pl-card-count {
@@ -254,9 +337,17 @@ html.dark .pl-card-name {
 }
 
 html.dark .pl-card-count {
-    background: rgba(255, 255, 255, 0.08);
-    color: #aaa;
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: #cbd5e1 !important;
 }
+
+@media (prefers-color-scheme: dark) {
+    html:not(.light) .pl-card-count {
+        background: rgba(255, 255, 255, 0.12) !important;
+        color: #cbd5e1 !important;
+    }
+}
+
 
 /* ====================================================
    PLAYLIST DETAIL MODAL
@@ -1120,14 +1211,25 @@ html.dark .pl-input-confirm-btn:hover {
    ==================================================== */
 @media (max-width: 580px) {
     .pl-shelf-grid {
-        display: grid !important;
-        grid-template-columns: repeat(3, 1fr) !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
         gap: 8px !important;
         width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .pl-shelf-grid::-webkit-scrollbar {
+        display: none;
     }
 
     .pl-shelf-card {
-        width: 100% !important;
+        width: calc((100% - 16px) / 3) !important;
+        min-width: calc((100% - 16px) / 3) !important;
+        flex-shrink: 0 !important;
         min-height: 130px !important;
         padding: 12px 4px 10px !important;
         border-radius: 14px !important;

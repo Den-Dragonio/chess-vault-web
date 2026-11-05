@@ -502,12 +502,12 @@ html.dark #book-detail-card {
 html.dark #book-detail-close { background: rgba(255,255,255,0.08); color: #aaa; }
 html.dark #book-detail-close:hover { background: #fff; color: #111; }
 html.dark .bd-title { color: #eeeef8; }
-html.dark .bd-author { color: #8888a8; }
+html.dark .bd-author { color: #cbd5e1; }
 html.dark .bd-meta-pill { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.08); color: #bbbbd0; }
 html.dark .bd-divider { border-top-color: rgba(255,255,255,0.06); }
-html.dark .bd-section-label { color: #444466; }
+html.dark .bd-section-label { color: #94a3b8; }
 html.dark .bd-description { color: #c8c8e0; }
-html.dark .bd-subject-chip { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.08); color: #8888aa; }
+html.dark .bd-subject-chip { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.08); color: #dbe4f0; }
 html.dark .bd-subject-chip:hover { background: rgba(255,255,255,0.15); color: #fff; }
 html.dark .bd-btn-download { background: #e8e8f4; color: #0d0d18; }
 html.dark .bd-btn-download:hover { background: #fff; }

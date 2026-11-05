@@ -80,61 +80,106 @@
 
         /* ---- КАРТКА ПРОФІЛЮ ---- */
         .profile-card {
-            background: rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.92);
             backdrop-filter: blur(25px);
             border-radius: 28px;
             padding: 40px 45px;
             text-align: center;
-            border: 1px solid rgba(255, 255, 255, 0.85);
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
             min-width: 320px;
             max-width: 350px;
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
             box-sizing: border-box;
+            color: #0f172a;
         }
 
-        html.dark .profile-card {
-            background: rgba(20, 20, 32, 0.78);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-            color: #f1f5f9;
+        html.dark .profile-card,
+        html.dark .history-card,
+        html.dark .reading-card,
+        html.dark .playlists-shelf-card {
+            background: #141724 !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6) !important;
+            color: #f8fafc !important;
         }
 
-        html.dark .profile-name {
-            color: #f8fafc;
+        html.dark .profile-name,
+        html.dark .reading-card-title,
+        html.dark .history-card h2,
+        html.dark .stat-value,
+        html.dark .h-title,
+        html.dark .reading-item-title {
+            color: #ffffff !important;
         }
 
         html.dark .profile-badge {
-            background: rgba(212, 175, 55, 0.15);
-            color: #f1c40f;
-            border: 1px solid rgba(212, 175, 55, 0.3);
+            background: rgba(212, 175, 55, 0.2) !important;
+            color: #f1c40f !important;
+            border: 1px solid rgba(212, 175, 55, 0.4) !important;
         }
 
         html.dark .profile-rank-hint,
-        html.dark .profile-reg-date {
-            color: #94a3b8;
-        }
-
-        html.dark .stat-value {
-            color: #f8fafc;
-        }
-
-        html.dark .stat-label {
-            color: #94a3b8;
+        html.dark .profile-reg-date,
+        html.dark .reading-card-subtitle,
+        html.dark .stat-label,
+        html.dark .reading-item-author,
+        html.dark .reading-item-pages,
+        html.dark .h-author,
+        html.dark .h-date,
+        html.dark .history-table th {
+            color: #cbd5e1 !important;
         }
 
         html.dark .profile-divider {
-            border-color: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.14) !important;
         }
 
-        html.dark .playlists-shelf-card {
-            background: rgba(20, 20, 32, 0.78);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-            color: #f1f5f9;
+        @media (prefers-color-scheme: dark) {
+            html:not(.light) .profile-card,
+            html:not(.light) .history-card,
+            html:not(.light) .reading-card,
+            html:not(.light) .playlists-shelf-card {
+                background: #141724 !important;
+                border: 1px solid rgba(255, 255, 255, 0.15) !important;
+                box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6) !important;
+                color: #f8fafc !important;
+            }
+
+            html:not(.light) .profile-name,
+            html:not(.light) .reading-card-title,
+            html:not(.light) .history-card h2,
+            html:not(.light) .stat-value,
+            html:not(.light) .h-title,
+            html:not(.light) .reading-item-title {
+                color: #ffffff !important;
+            }
+
+            html:not(.light) .profile-badge {
+                background: rgba(212, 175, 55, 0.2) !important;
+                color: #f1c40f !important;
+                border: 1px solid rgba(212, 175, 55, 0.4) !important;
+            }
+
+            html:not(.light) .profile-rank-hint,
+            html:not(.light) .profile-reg-date,
+            html:not(.light) .reading-card-subtitle,
+            html:not(.light) .stat-label,
+            html:not(.light) .reading-item-author,
+            html:not(.light) .reading-item-pages,
+            html:not(.light) .h-author,
+            html:not(.light) .h-date,
+            html:not(.light) .history-table th {
+                color: #cbd5e1 !important;
+            }
+
+            html:not(.light) .profile-divider {
+                border-color: rgba(255, 255, 255, 0.14) !important;
+            }
         }
+
 
         .profile-avatar {
             width: 80px;
@@ -275,13 +320,6 @@
             box-sizing: border-box;
         }
 
-        html.dark .history-card,
-        html.dark .reading-card {
-            background: rgba(20, 20, 30, 0.6);
-            border-color: rgba(255, 255, 255, 0.08);
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
-        }
-
         .reading-card-header {
             display: flex;
             justify-content: space-between;
@@ -297,9 +335,6 @@
             line-height: 1.4;
         }
 
-        html.dark .reading-card-subtitle {
-            color: #aaa;
-        }
 
         .reading-count-badge {
             background: rgba(0, 0, 0, 0.06);
@@ -352,15 +387,35 @@
         }
 
         html.dark .reading-item {
-            background: rgba(255, 255, 255, 0.04);
-            border-color: rgba(255, 255, 255, 0.08);
+            background: #1c2237 !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+            color: #f8fafc !important;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            html:not(.light) .reading-item {
+                background: #1c2237 !important;
+                border: 1px solid rgba(255, 255, 255, 0.12) !important;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+                color: #f8fafc !important;
+            }
         }
 
         html.dark .reading-item:hover {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(212, 175, 55, 0.5);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+            background: #242c47 !important;
+            border-color: rgba(212, 175, 55, 0.6) !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
         }
+
+        @media (prefers-color-scheme: dark) {
+            html:not(.light) .reading-item:hover {
+                background: #242c47 !important;
+                border-color: rgba(212, 175, 55, 0.6) !important;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+            }
+        }
+
 
         .reading-item-cover {
             width: 44px;
@@ -375,6 +430,7 @@
             flex-shrink: 0;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
             position: relative;
+            user-select: none;
         }
 
         .reading-item-format-tag {
@@ -422,11 +478,23 @@
         }
 
         html.dark .reading-item-title {
-            color: #eee;
+            color: #ffffff !important;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            html:not(.light) .reading-item-title {
+                color: #ffffff !important;
+            }
         }
 
         html.dark .reading-item-title:hover {
-            color: #d4af37;
+            color: #d4af37 !important;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            html:not(.light) .reading-item-title:hover {
+                color: #d4af37 !important;
+            }
         }
 
         .reading-item-percent {
@@ -437,7 +505,13 @@
         }
 
         html.dark .reading-item-percent {
-            color: #d4af37;
+            color: #f1c40f !important;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            html:not(.light) .reading-item-percent {
+                color: #f1c40f !important;
+            }
         }
 
         .reading-item-author {
@@ -451,8 +525,15 @@
         }
 
         html.dark .reading-item-author {
-            color: #aaa;
+            color: #cbd5e1 !important;
         }
+
+        @media (prefers-color-scheme: dark) {
+            html:not(.light) .reading-item-author {
+                color: #cbd5e1 !important;
+            }
+        }
+
 
         .reading-item-progress-track {
             height: 6px;
@@ -515,7 +596,7 @@
         html.dark .reading-item-btn-remove {
             background: rgba(255, 255, 255, 0.08);
             border-color: rgba(255, 255, 255, 0.15);
-            color: #94a3b8;
+            color: #cbd5e1;
         }
 
         html.dark .reading-item-btn-remove:hover {
@@ -661,12 +742,6 @@
             width: 100%;
             max-width: 1100px;
             box-sizing: border-box;
-        }
-
-        html.dark .playlists-shelf-card {
-            background: rgba(20, 20, 30, 0.6);
-            border-color: rgba(255, 255, 255, 0.08);
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
         }
 
         @media (max-width: 850px) {
@@ -1042,12 +1117,16 @@
             }
 
             html.dark .history-table td:nth-child(2) {
-                color: #aaa;
+                color: #cbd5e1 !important;
             }
 
             .history-table td:nth-child(3) {
                 font-size: 0.78rem;
                 color: #999;
+            }
+
+            html.dark .history-table td:nth-child(3) {
+                color: #94a3b8 !important;
             }
 
             .theme-switcher-group,
@@ -1262,7 +1341,6 @@
                 <div class="reading-card-header">
                     <div>
                         <h2 class="reading-card-title" data-i18n="profile_reading_title" style="margin: 0 0 4px; font-size: 1.4rem;">📖 Зараз читаю</h2>
-                        <p class="reading-card-subtitle" data-i18n="profile_reading_hint">Книги, де ви прочитали принаймні 10 сторінок онлайн</p>
                     </div>
                     <span class="reading-count-badge" id="reading-count-badge">0</span>
                 </div>
@@ -1360,12 +1438,12 @@
         </div>
     </div>
 
-    <script src="page_counts.js"></script>
-    <script src="descriptions.js"></script>
-    <script src="books-cache.js?v=6"></script>
+    <script src="page_counts.js?v=7"></script>
+    <script src="descriptions.js?v=7"></script>
+    <script src="books-cache.js?v=8"></script>
     <script src="reading-progress.js?v=1"></script>
     <script src="playlists.js?v=6"></script>
-    <script src="book-modal.js?v=12"></script>
+    <script src="book-modal.js?v=15"></script>
     <script>
         // Ініціалізація плейлистів миттєво
         if (typeof plRenderProfileSection === 'function') {
@@ -1435,20 +1513,13 @@
                 btn.classList.toggle('active', btn.dataset.theme === curTheme);
                 btn.onclick = () => {
                     const t = btn.dataset.theme;
-                    localStorage.setItem('chess_theme', t);
-                    document.querySelectorAll('.theme-opt-btn:not(.lang-opt-btn):not(.date-opt-btn)').forEach(b => b.classList.toggle('active', b.dataset.theme === t));
-                    if (window.applyTheme) {
-                        window.applyTheme(t);
-                    } else {
-                        if (t === 'dark') {
-                            document.documentElement.classList.add('dark');
-                        } else if (t === 'light') {
-                            document.documentElement.classList.remove('dark');
-                        } else {
-                            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                            document.documentElement.classList.toggle('dark', prefersDark);
-                        }
+                    if (window.persistThemeChoice) window.persistThemeChoice(t);
+                    else {
+                        localStorage.setItem('chess_theme', t);
+                        localStorage.setItem('chess_theme_ts', String(Date.now()));
+                        if (window.applyTheme) window.applyTheme(t);
                     }
+                    document.querySelectorAll('.theme-opt-btn:not(.lang-opt-btn):not(.date-opt-btn)').forEach(b => b.classList.toggle('active', b.dataset.theme === t));
                     const user = auth.currentUser;
                     if (user && window.db) {
                         db.collection('user_preferences').doc(user.uid).set({
@@ -1706,9 +1777,13 @@
                 if (prefSnap.exists) {
                     const prefs = prefSnap.data();
                     if (prefs.theme) {
-                        localStorage.setItem('chess_theme', prefs.theme);
-                        if (window.applyTheme) window.applyTheme(prefs.theme);
-                        document.querySelectorAll('.theme-opt-btn:not(.lang-opt-btn):not(.date-opt-btn)').forEach(b => b.classList.toggle('active', b.dataset.theme === prefs.theme));
+                        if (window.applyThemeFromCloud) {
+                            window.applyThemeFromCloud(prefs.theme, prefs.updatedAt);
+                        } else if (window.applyTheme) {
+                            window.applyTheme(prefs.theme);
+                        }
+                        const shown = localStorage.getItem('chess_theme') || prefs.theme;
+                        document.querySelectorAll('.theme-opt-btn:not(.lang-opt-btn):not(.date-opt-btn)').forEach(b => b.classList.toggle('active', b.dataset.theme === shown));
                     }
                     if (prefs.language && window.i18n) {
                         window.i18n.setLanguage(prefs.language, false);
@@ -1727,6 +1802,9 @@
             document.getElementById('profile-name').textContent = name;
             document.getElementById('profile-avatar').textContent = name.charAt(0).toUpperCase();
             document.body.classList.add('user-logged-in');
+            if (window.setAuthHint) {
+                window.setAuthHint(user, window.isChessAdmin && window.isChessAdmin(user));
+            }
             const accBtnEl = document.getElementById('acc-btn');
             if (accBtnEl) {
                 accBtnEl.innerHTML = `
@@ -1812,13 +1890,15 @@
             }
             filename = filename.normalize('NFC');
 
-            const cachedBook = window.CHESS_BOOKS_CACHE && window.CHESS_BOOKS_CACHE.find(b => 
-                b && b.id && (
-                    b.id === filename || 
-                    b.id.toLowerCase() === filename.toLowerCase() ||
-                    (b.id.normalize && b.id.normalize('NFC').toLowerCase() === filename.toLowerCase())
-                )
-            );
+            const cachedBook = (typeof window.findCachedBook === 'function')
+                ? window.findCachedBook(filename, title)
+                : (window.CHESS_BOOKS_CACHE && window.CHESS_BOOKS_CACHE.find(b => 
+                    b && b.id && (
+                        b.id === filename || 
+                        b.id.toLowerCase() === filename.toLowerCase() ||
+                        (b.id.normalize && b.id.normalize('NFC').toLowerCase() === filename.toLowerCase())
+                    )
+                ));
 
             const canonicalId = cachedBook ? (cachedBook.id.normalize ? cachedBook.id.normalize('NFC') : cachedBook.id) : filename;
 
@@ -1841,6 +1921,8 @@
                 || (window.CHESS_DESCRIPTIONS && (window.CHESS_DESCRIPTIONS[canonicalId]?.pages || window.CHESS_DESCRIPTIONS[canonicalId.toLowerCase()]?.pages))
                 || null;
 
+            const hasCacheLoaded = Array.isArray(window.CHESS_BOOKS_CACHE) && window.CHESS_BOOKS_CACHE.length > 0;
+            const inArchive = cachedBook ? (cachedBook.inArchive !== false) : (!hasCacheLoaded && bookData.inArchive !== false);
             const bookObj = {
                 id: canonicalId,
                 title: (cachedBook && cachedBook.title) ? cachedBook.title : (title || canonicalId.replace(/\.[^/.]+$/, '')),
@@ -1849,7 +1931,8 @@
                 pages: pages,
                 format: format,
                 sizeDisplay: (cachedBook && cachedBook.sizeDisplay) ? cachedBook.sizeDisplay : (bookData.sizeDisplay || '—'),
-                url: rawUrl || `https://archive.org/download/1971_20260223/${encodeURIComponent(canonicalId)}`
+                inArchive: inArchive,
+                url: (cachedBook && cachedBook.url) || (inArchive ? (rawUrl || `https://archive.org/download/1971_20260223/${encodeURIComponent(canonicalId)}`) : '')
             };
 
             if (typeof openBookModal === 'function') {
@@ -1931,20 +2014,48 @@
 
                 readingWrap.innerHTML = readingBooks.map(item => {
                     const curP = item.currentPage || 1;
-                    let totP = parseInt(item.totalPages) || 0;
-                    if (!totP || totP === 100) {
-                        if (window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE)) {
-                            const found = window.CHESS_BOOKS_CACHE.find(b => b && (b.id === item.id || b.title === item.title));
-                            if (found && found.pages) totP = parseInt(found.pages) || 0;
+                    let totP = 0;
+                    if (window.CHESS_PAGE_COUNTS) {
+                        totP = window.CHESS_PAGE_COUNTS[item.id] || window.CHESS_PAGE_COUNTS[item.title] || 0;
+                    }
+                    let inArchive = true;
+                    let foundCache = null;
+                    if (window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE)) {
+                        if (typeof window.findCachedBook === 'function') {
+                            foundCache = window.findCachedBook(item.id, item.title);
+                        } else {
+                            const nfc = (s) => String(s || '').normalize('NFC').trim().toLowerCase();
+                            const itemIdN = nfc(item.id);
+                            const itemTitleN = nfc(item.title);
+                            foundCache = window.CHESS_BOOKS_CACHE.find(b => b && (
+                                (b.id && nfc(b.id) === itemIdN) ||
+                                (b.title && nfc(b.title) === itemTitleN)
+                            ));
+                        }
+                        if (foundCache) {
+                            if (!totP && foundCache.pages) totP = parseInt(foundCache.pages) || 0;
+                            if (foundCache.inArchive === false) inArchive = false;
+                        } else if (window.CHESS_BOOKS_CACHE.length > 0) {
+                            inArchive = false;
                         }
                     }
-                    if (!totP) totP = 100;
-                    const percent = Math.min(100, Math.max(0, parseInt(item.percentage) || Math.round((curP / totP) * 100)));
-                    const format = (item.format || 'pdf').toUpperCase();
-                    const fileUrl = item.url || (item.id ? `https://archive.org/download/1971_20260223/${encodeURIComponent(item.id)}` : '');
-                    const itemFormat = (item.format || (item.id ? item.id.split('.').pop() : 'pdf')).toLowerCase();
-                    const readerUrl = `reader.html?id=${encodeURIComponent(item.id)}&file=${encodeURIComponent(fileUrl)}&title=${encodeURIComponent(item.title || '')}&author=${encodeURIComponent(item.author || '')}&format=${encodeURIComponent(itemFormat)}&page=${curP}`;
+                    if (!totP) totP = parseInt(item.totalPages) || 0;
+                    if (!totP || totP === 100) totP = 452;
+                    const percent = Math.min(100, Math.max(0, Math.round((curP / totP) * 100)));
+                    const format = (item.format || (foundCache && foundCache.format) || 'pdf').toUpperCase();
+
+                    let fileUrl = (foundCache && foundCache.url) || (inArchive ? (item.url || '') : '');
+                    if (!fileUrl && inArchive && item.id) {
+                        try {
+                            fileUrl = `https://archive.org/download/1971_20260223/${encodeURIComponent(decodeURIComponent(item.id))}`;
+                        } catch (_) {
+                            fileUrl = `https://archive.org/download/1971_20260223/${encodeURIComponent(item.id)}`;
+                        }
+                    }
+                    const itemFormat = ((foundCache && foundCache.format) || item.format || (item.id ? item.id.split('.').pop() : 'pdf')).toLowerCase();
+                    const readerUrl = `reader.html?id=${encodeURIComponent(item.id)}&file=${encodeURIComponent(fileUrl)}&title=${encodeURIComponent(item.title || '')}&author=${encodeURIComponent(item.author || '')}&format=${encodeURIComponent(itemFormat)}&page=${curP}&inArchive=${inArchive ? '1' : '0'}&pages=${totP}`;
                     const isEn = window.i18n && window.i18n.getLanguage() === 'en';
+
 
                     return `
                         <div class="reading-item" data-id="${esc(item.id)}">

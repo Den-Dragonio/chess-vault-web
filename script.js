@@ -539,6 +539,7 @@ function updateHeaderAuthUI(user) {
     const t = (k) => window.i18n ? window.i18n.t(k) : k;
 
     const isAdmin = window.isChessAdmin && window.isChessAdmin(user);
+    if (window.setAuthHint) window.setAuthHint(user, isAdmin);
     if (adminLink) {
         adminLink.style.display = isAdmin ? '' : 'none';
     }
@@ -617,8 +618,12 @@ auth.onAuthStateChanged(async user => {
             if (prefSnap.exists) {
                 const prefs = prefSnap.data();
                 if (prefs.theme) {
-                    localStorage.setItem('chess_theme', prefs.theme);
-                    if (window.applyTheme) window.applyTheme(prefs.theme);
+                    if (window.applyThemeFromCloud) {
+                        window.applyThemeFromCloud(prefs.theme, prefs.updatedAt);
+                    } else {
+                        localStorage.setItem('chess_theme', prefs.theme);
+                        if (window.applyTheme) window.applyTheme(prefs.theme);
+                    }
                 }
                 if (prefs.language && window.i18n) {
                     window.i18n.setLanguage(prefs.language, false);

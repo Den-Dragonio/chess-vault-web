@@ -5,7 +5,12 @@ let currentUser = null;
 
 function sortBooksBySizeDesc(books) {
     if (!Array.isArray(books)) return books;
-    return books.sort((a, b) => (Number(b.sizeRaw) || 0) - (Number(a.sizeRaw) || 0));
+    return books.sort((a, b) => {
+        const avA = (a && a.inArchive !== false) ? 1 : 0;
+        const avB = (b && b.inArchive !== false) ? 1 : 0;
+        if (avA !== avB) return avB - avA;
+        return (Number(b.sizeRaw) || 0) - (Number(a.sizeRaw) || 0);
+    });
 }
 
 // =============================================
@@ -91,7 +96,7 @@ function getLocalCachedBooks() {
     }
     // 2. Локальне сховище браузера (localStorage)
     try {
-        const stored = localStorage.getItem('chess_vault_books_cache');
+        const stored = localStorage.getItem('chess_vault_books_cache_v3');
         if (stored) {
             const parsed = JSON.parse(stored);
             if (Array.isArray(parsed) && parsed.length > 0) {
@@ -153,13 +158,15 @@ async function fetchArchiveData() {
             })
         );
 
-        const ALLOWED = ['.pdf', '.djvu', '.epub', '.cbr', '.cbz', '.txt', '.doc', '.docx'];
+        const ALLOWED = ['.pdf', '.djvu', '.djv', '.epub', '.cbr', '.cbz', '.txt', '.doc', '.docx'];
+        const IGNORED_FILES = new Set(['test_file.txt']);
+        const normKey = (s) => String(s || '').normalize('NFC').trim().toLowerCase();
         const booksMap = new Map();
 
         // 1. Спочатку заповнюємо вже завантаженими з кешу, щоб нічого не втратити
         if (hasLoadedCache && Array.isArray(cached)) {
             cached.forEach(b => {
-                if (b && b.id) booksMap.set(b.id.toLowerCase(), b);
+                if (b && b.id) booksMap.set(normKey(b.id), b);
             });
         }
 
@@ -169,31 +176,40 @@ async function fetchArchiveData() {
             if (res.status === 'fulfilled' && res.value && res.value.files && res.value.files.length > 0) {
                 anyNetworkSuccess = true;
                 const volId = res.value.volId;
-                const validFiles = res.value.files.filter(f => ALLOWED.some(ext => f.name.toLowerCase().endsWith(ext)));
+                const validFiles = res.value.files.filter(f =>
+                    f.source !== 'derivative' &&
+                    !IGNORED_FILES.has((f.name || '').toLowerCase()) &&
+                    !String(f.name || '').startsWith(`${volId}_`) &&
+                    ALLOWED.some(ext => f.name.toLowerCase().endsWith(ext))
+                );
 
                 validFiles.forEach(f => {
-                    const fileName = f.name.replace(/\.[^/.]+$/, '');
+                    const nfcName = f.name.normalize('NFC');
+                    const fileName = nfcName.replace(/\.[^/.]+$/, '');
                     const match = fileName.match(/(.*?)\s*-\s*(.*)\s*\((\d{4})\)/);
-                    const bookId = f.name;
-                    const pages = (window.CHESS_PAGE_COUNTS && (window.CHESS_PAGE_COUNTS[bookId] || window.CHESS_PAGE_COUNTS[bookId.toLowerCase()]))
-                        || (window.CHESS_DESCRIPTIONS && (window.CHESS_DESCRIPTIONS[bookId]?.pages || window.CHESS_DESCRIPTIONS[bookId.toLowerCase()]?.pages))
+                    const mapKey = normKey(f.name);
+                    const existing = booksMap.get(mapKey) || {};
+                    const canonicalId = existing.id || nfcName;
+                    const pages = (window.CHESS_PAGE_COUNTS && (window.CHESS_PAGE_COUNTS[canonicalId] || window.CHESS_PAGE_COUNTS[canonicalId.toLowerCase()]))
+                        || (window.CHESS_DESCRIPTIONS && (window.CHESS_DESCRIPTIONS[canonicalId]?.pages || window.CHESS_DESCRIPTIONS[canonicalId.toLowerCase()]?.pages))
                         || null;
 
-                    const existing = booksMap.get(bookId.toLowerCase()) || {};
                     const isMulti = existing.formats;
                     if (!isMulti) {
+                        // Використовуємо точну (NFD або NFC) назву f.name зі сховища Archive.org для URL!
                         const safeUrl = `https://archive.org/download/${volId}/${encodeURIComponent(f.name)}`;
+                        const rawExt = f.name.split('.').pop().toLowerCase();
                         const bookObj = {
                             ...existing,
-                            author: match ? match[1].trim() : (existing.author || fileName.split('-')[0].trim()),
-                            title: match ? match[2].trim() : (existing.title || fileName),
-                            year: match ? match[3] : (existing.year || '---'),
+                            author: existing.author || (match ? match[1].trim() : fileName.split('-')[0].trim()),
+                            title: existing.title || (match ? match[2].trim() : fileName),
+                            year: (existing.year && existing.year !== '---') ? existing.year : (match ? match[3] : '---'),
                             pages: pages ? parseInt(pages, 10) : (existing.pages || null),
-                            format: f.name.split('.').pop().toLowerCase(),
+                            format: rawExt === 'djv' ? 'djvu' : rawExt,
                             sizeDisplay: (f.size / 1024 / 1024).toFixed(2) + ' MB',
                             sizeRaw: parseInt(f.size) || 0,
                             url: safeUrl,
-                            id: f.name,
+                            id: canonicalId,
                             archiveVolume: volId,
                             inArchive: true,
                             eloMin: existing.eloMin || 1400,
@@ -203,7 +219,7 @@ async function fetchArchiveData() {
                             eloDisplay: existing.eloDisplay || '1400–1800',
                             eloPercent: existing.eloPercent || 50
                         };
-                        booksMap.set(bookId.toLowerCase(), bookObj);
+                        booksMap.set(mapKey, bookObj);
                     }
                 });
             }
@@ -214,7 +230,9 @@ async function fetchArchiveData() {
         if (unifiedBooks.length > 0) {
             // Зберігаємо актуальний об'єднаний каталог
             try {
-                localStorage.setItem('chess_vault_books_cache', JSON.stringify(unifiedBooks));
+                localStorage.setItem('chess_vault_books_cache_v3', JSON.stringify(unifiedBooks));
+                localStorage.removeItem('chess_vault_books_cache_v2');
+                localStorage.removeItem('chess_vault_books_cache');
             } catch (e) {}
 
             const countChanged = unifiedBooks.length !== allBooks.length;
@@ -394,6 +412,9 @@ function sortBooks(key) {
     sortDirections[key] *= -1;
     const dir = sortDirections[key];
     const sorter = (a, b) => {
+        const avA = (a && a.inArchive !== false) ? 1 : 0;
+        const avB = (b && b.inArchive !== false) ? 1 : 0;
+        if (avA !== avB) return avB - avA;
         let valA = a[key];
         let valB = b[key];
         if (key === 'pages' || key === 'sizeRaw') {

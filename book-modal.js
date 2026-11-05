@@ -157,8 +157,148 @@ function ensureBookModalElements() {
     return overlay;
 }
 
+function slugifyBookKey(str, keepYear = true) {
+    if (!str) return '';
+    let t = String(str).normalize('NFC').toLowerCase();
+    t = t.replace(/\.[^/.]+$/, '').replace(/ё/g, 'е');
+    if (!keepYear) {
+        t = t.replace(/\b(18|19|20)\d{2}\b/g, '');
+    }
+    return t.replace(/[^a-zа-яіїєґ0-9]+/g, '');
+}
+window.slugifyBookKey = slugifyBookKey;
+
+const BOOK_LEGACY_ALIASES = {
+    '2005_kasparov_mgp_vol_1_rus.djvu': 'Каспаров--MGP-1,от Стейница до Алёхина,2005.djvu',
+    '2005_kasparov_mgp_vol_2_rus.djvu': 'Каспаров--MGP-2.от Эйве до Таля,2005.djvu',
+    '2005_kasparov_mgp_vol_3_rus.djvu': 'Каспаров--MGP-3,от Петросяна до Спасского,2005.djvu',
+    '2005_kasparov_mgp_vol_4_rus.djvu': 'Каспаров--MGP-4.Фишер и звёзды запада,2005.djvu',
+    '2006_kasparov_mgp_vol_5_rus.djvu': 'Каспаров--MGP-5. Карпов и Корчной,2006.djvu',
+    'kasparovcml.pdf': 'Каспаров - Шахматы как Модель Жизни, 2007.pdf',
+    'ботвинник - 3 матча анатолия карпова (1975).djvu': 'Ботвинник--Три матча Анатолия Карпова,1975.djvu',
+    'дворкович - андре лилиенталь (1989).djvu': 'Андре Лилиенталь,1989.djvu',
+    'капабланка хосе-рауль - учебник шахматной игры,  2001.djvu': 'Капабланка - учебник шахматной игры.pdf',
+    'последние шахматные лекции капабланки (1972).djvu': 'Капабланка - последние шахматные лекции.pdf',
+    'последние шахматные лекции капабланки, 1972.djvu': 'Капабланка - последние шахматные лекции.pdf',
+    'карпов - 50 миниатюр чемпионов мира (1986).djvu': 'Карпов--50 миниатюр чемпионов мира,1986i.djvu',
+    'карпов - девятая вертикаль (1978).djvu': 'Карпов Анатолий--Девятая вертикаль,1978.djvu',
+    'карпов - избранные партии 1969-1977 (1978).djvu': 'Карпов - Избранные партии 69-77,1978.djvu',
+    'карпов, подгаец - защита каро-канн.гамбитная и закрытая системы (2006).djvu': 'Карпов, Подгаец - Защита Каро-Канн. Закрытая и гамбитная системы - 2006.djvu',
+    'каспаров - великое противостояние.мои поединки с анатолием карповым.1975-1985.djvu': 'Каспаров - Великое противостояние.Мои поединки с Анатолием Карповым.1975-1985,2008.djvu',
+    'каспаров - великое противостояние.мои поединки с анатолием карповым.1975-1985.pdf': 'Каспаров - Великое противостояние.Мои поединки с Анатолием Карповым.1975-1985,2008.djvu',
+    'каспаров - великое противостояние.мои поединки с анатолием карповым.1986-1987.pdf': 'Каспаров - Великое противостояние.Мои поединки с Анатолием Карповым.1986-1987,2009.djvu',
+    'каспаров - испытание временем (1985) (без фото).djvu': 'Каспаров - Испытание временем,1985.djvu',
+    'каспаров, никитин - сицилианская защита.схевенинген (1984).djvu': 'Каспаров Г.К., Никитин А.С. - Сицилианская защита. Схевенинген, 1984.djvu',
+    'керес, ботвинник - матч-турнир на первенство мира 1948 года (1999).djvu': 'Керес,Ботвинник--Матч-турнир 48 года,1999.djvu',
+    'крамник, дамский - прорыв (2000).djvu': 'Крамник--Прорыв,2000.djvu',
+    'ласкер эм. - мой матч с капабланкой(1925).djvu': 'Ласкер Эм. - Мой матч с Капабланкой,1925,600dpi.djvu',
+    'эм.ласкер - мой матч с капабланкой (1925).djvu': 'Ласкер Эм. - Мой матч с Капабланкой,1925,600dpi.djvu',
+    'левенфиш, смыслов - теория ладейных окончаний (1986).djvu': 'Смыслов - Теория ладейных окончаний,1986.pdf',
+    'лилиенталь - жизнь-шахматам (1969).djvu': 'Лилиенталь Андре. Жизнь--шахматам,1969.djvu',
+    'сосонко - я знал капабланку,2001.djvu': 'Сосонко Г. - Я знал Капабланку (2001).djvu',
+    'таль - в огонь атаки.pdf': 'Таль, Дамский - В огонь атаки (1978).djvu',
+    'фишер - мои 60 памятных матчей.djvu': 'Фишер - Мои 60 памятных партий (2006).djvu',
+    'фишер р. д. - мои 60 памятных партий.pdf': 'Фишер - Мои 60 памятных партий (2006).djvu',
+    'фишер р. д. - бобби фишер учит играть в шахматы - 1991.pdf': 'Фишер - Бобби Фишер учит играть в шахматы (1990).djvu',
+    'фишер роберт джеймс - бобби фишер учит играть в шахматы - 1991.djvu': 'Фишер - Бобби Фишер учит играть в шахматы (1990).djvu',
+    'эйве - стратегия и тактика, 2002.djvu': 'Эйве - Стратегия и тактика. Курс шахматных лекций (2002).djvu',
+    'эйве,принс - баловень каиссы (1990).djvu': 'Эйве,Принс--Баловень Каиссы Х.Р. Капабланка (1888-1942),1990.djvu',
+    'endgame_troitzky_500': 'Троицкий - Сборник шахматных этюдов,1935.djvu',
+    'endgame_panchenko_theory': 'Панченко - Теория и практика шахматных окончаний - 2006.djvu',
+    'endgame_ece_vol1': 'Энциклопедия шахматных окончаний,1982.djvu',
+    'endgame_ece_vol2': 'Энциклопедия шахматных окончаний,1985.djvu',
+    'endgame_ece_vol4': 'Энциклопедия Шахматных Окончаний-4.Ферзевые, 1989.djvu',
+    'endgame_nunn_secrets_pawns': 'endgame_muller_secrets_pawns'
+};
+
+let _cachedBooksIndex = null;
+let _cachedBooksRef = null;
+
+function getBooksCacheIndex() {
+    const arr = window.CHESS_BOOKS_CACHE;
+    if (!Array.isArray(arr) || arr.length === 0) return null;
+    if (_cachedBooksIndex && _cachedBooksRef === arr) return _cachedBooksIndex;
+    const byId = new Map();
+    const byClean = new Map();
+    const byTitle = new Map();
+    const bySlug = new Map();
+    const bySlugNoYear = new Map();
+    const nfc = (s) => String(s || '').normalize('NFC').trim().toLowerCase();
+    for (const b of arr) {
+        if (!b || !b.id) continue;
+        const idN = nfc(b.id);
+        const cleanN = nfc(b.id.replace(/\.[^/.]+$/, ''));
+        if (!byId.has(idN)) byId.set(idN, b);
+        if (cleanN && !byClean.has(cleanN)) byClean.set(cleanN, b);
+        if (b.title) {
+            const tN = nfc(b.title);
+            if (tN && !byTitle.has(tN)) byTitle.set(tN, b);
+        }
+        const sk = slugifyBookKey(b.id, true);
+        if (sk && !bySlug.has(sk)) bySlug.set(sk, b);
+        const skNy = slugifyBookKey(b.id, false);
+        if (skNy && skNy.length >= 10 && !bySlugNoYear.has(skNy)) bySlugNoYear.set(skNy, b);
+    }
+    _cachedBooksRef = arr;
+    _cachedBooksIndex = { byId, byClean, byTitle, bySlug, bySlugNoYear };
+    return _cachedBooksIndex;
+}
+
+function findCachedBook(bookOrId, fallbackTitle) {
+    const idx = getBooksCacheIndex();
+    if (!idx) return null;
+    const rawId = typeof bookOrId === 'string' ? bookOrId : (bookOrId && bookOrId.id) || '';
+    const rawTitle = fallbackTitle || (typeof bookOrId === 'object' && bookOrId && bookOrId.title) || '';
+    const nfc = (s) => String(s || '').normalize('NFC').trim().toLowerCase();
+
+    const idNorm = nfc(rawId);
+    const aliased = idNorm && BOOK_LEGACY_ALIASES[idNorm] ? nfc(BOOK_LEGACY_ALIASES[idNorm]) : '';
+    if (aliased && idx.byId.has(aliased)) return idx.byId.get(aliased);
+    if (idNorm && idx.byId.has(idNorm)) return idx.byId.get(idNorm);
+
+    const idClean = nfc(rawId.replace(/\.[^/.]+$/, ''));
+    if (idClean && idx.byClean.has(idClean)) return idx.byClean.get(idClean);
+
+    const sk = slugifyBookKey(rawId, true);
+    if (sk && idx.bySlug.has(sk)) return idx.bySlug.get(sk);
+
+    const titleNorm = nfc(rawTitle);
+    if (titleNorm && titleNorm !== idNorm && idx.byTitle.has(titleNorm)) return idx.byTitle.get(titleNorm);
+
+    const skNy = slugifyBookKey(rawId, false);
+    if (skNy && skNy.length >= 12 && idx.bySlugNoYear.has(skNy)) return idx.bySlugNoYear.get(skNy);
+
+    return null;
+}
+window.findCachedBook = findCachedBook;
+
 function openBookModal(book) {
     if (!book) return;
+    const cached = findCachedBook(book);
+    if (cached) {
+        const hasCorruptTitle = !book.title || book.title === book.id;
+        const hasCorruptAuthor = !book.author || book.author === '—' || book.author === book.id;
+        book = {
+            ...book,
+            ...cached,
+            id: cached.id || book.id,
+            title: hasCorruptTitle ? cached.title : (cached.title || book.title),
+            author: hasCorruptAuthor ? cached.author : (cached.author || book.author),
+            year: (cached.year && cached.year !== '---') ? cached.year : (book.year || '---'),
+            url: cached.url || (cached.inArchive === false ? '' : (book.url || '')),
+            inArchive: cached.inArchive !== undefined ? cached.inArchive : book.inArchive,
+            format: cached.format || ((book.format && book.format !== '---') ? book.format : 'pdf'),
+            formats: cached.formats || book.formats,
+            pages: cached.pages || book.pages,
+            sizeDisplay: cached.sizeDisplay || book.sizeDisplay,
+            sizeRaw: cached.sizeRaw || book.sizeRaw
+        };
+    } else if (Array.isArray(window.CHESS_BOOKS_CACHE) && window.CHESS_BOOKS_CACHE.length > 0) {
+        const rawUrl = String(book.url || '');
+        if (!rawUrl || rawUrl.includes('archive.org/download/')) {
+            book = { ...book, inArchive: false, url: '' };
+        }
+    }
     const overlay = ensureBookModalElements();
     overlay.classList.add('active');
     document.body.classList.add('book-modal-open');
@@ -213,21 +353,13 @@ function formatDescriptionText(text) {
 
 function resolveBookFileName(book) {
     if (!book) return '';
+    const found = findCachedBook(book);
+    if (found && found.id) {
+        return (found.id.normalize ? found.id.normalize('NFC') : found.id);
+    }
     const rawId = (typeof book === 'string') ? book : (book.id || '');
     if (!rawId) return '';
-    const raw = (typeof rawId === 'string') ? rawId.normalize('NFC') : String(rawId);
-    if (window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE)) {
-        const lower = raw.toLowerCase();
-        const found = window.CHESS_BOOKS_CACHE.find(b => 
-            b && b.id && (
-                b.id === raw || 
-                b.id.toLowerCase() === lower || 
-                (b.id.normalize && b.id.normalize('NFC').toLowerCase() === lower)
-            )
-        );
-        if (found && found.id) return (found.id.normalize ? found.id.normalize('NFC') : found.id);
-    }
-    return raw;
+    return (typeof rawId === 'string') ? rawId.normalize('NFC') : String(rawId);
 }
 window.resolveBookFileName = resolveBookFileName;
 
@@ -367,6 +499,7 @@ function renderModalSkeleton(book) {
                     </button>
                     <button class="bd-btn-download" id="bd-download-btn"
                             data-url="${escHtml(book.url || '')}"
+                            data-available="${book.inArchive === false && !book.url ? 'false' : 'true'}"
                             data-title="${escHtml(book.title || '')}"
                             data-author="${escHtml(book.author || '')}"
                             data-id="${escHtml(book.id || '')}"
@@ -742,12 +875,13 @@ function renderModalFull(book, meta) {
             `;
         }).join('');
     } else {
-        const bookUrl = book.url || (book.id ? `https://archive.org/download/1971_20260223/${encodeURIComponent(book.id)}` : '');
+        const isAvailable = !(book.inArchive === false && !book.url);
+        const bookUrl = isAvailable ? (book.url || (book.id ? `https://archive.org/download/1971_20260223/${encodeURIComponent(book.id)}` : '')) : '';
         const dlBtnLabel = window.i18n ? window.i18n.t('modal_btn_download', { size: book.sizeDisplay || (isEn ? 'file' : 'файл') }) : `⬇ Скачати (${book.sizeDisplay || 'файл'})`;
         downloadButtonsHTML = `
             <button class="bd-btn-download" id="bd-download-btn"
                     data-url="${escHtml(bookUrl)}"
-                    data-available="true"
+                    data-available="${isAvailable ? 'true' : 'false'}"
                     data-title="${escHtml(book.title || '')}"
                     data-author="${escHtml(book.author || '')}"
                     data-id="${escHtml(book.id || '')}"
@@ -772,6 +906,7 @@ function renderModalFull(book, meta) {
                     ${year && year !== '---' ? `<span class="bd-meta-pill">📅 ${year}</span>` : ''}
                     <span class="bd-meta-pill">💾 ${book.sizeDisplay || '—'}</span>
                     <span class="bd-meta-pill">📄 ${format.toUpperCase()}</span>
+                    <span class="bd-meta-pill" id="bd-dl-count" style="display:none;">📥 —</span>
                     ${eloPill}
                     ${langPill}
                     ${pagesPill}
@@ -971,19 +1106,36 @@ async function onDownloadClick(btn) {
         return;
     }
 
-    if (btn.dataset.available === 'false') {
+    const hasAuthoritativeCache = Array.isArray(window.CHESS_BOOKS_CACHE) && window.CHESS_BOOKS_CACHE.length > 0;
+    const cachedEntry = findCachedBook(btn.dataset.id || btn.dataset.filename, btn.dataset.title);
+    const isUnverifiedArchiveUrl = hasAuthoritativeCache && !cachedEntry && (!btn.dataset.url || btn.dataset.url.includes('archive.org/download/'));
+    if (btn.dataset.available === 'false' || isUnverifiedArchiveUrl || (cachedEntry && cachedEntry.inArchive === false && !cachedEntry.url && !btn.dataset.url)) {
         const notAvailMsg = isEn
             ? 'This book is not in the online archive yet. You can open your local file in the reader.'
             : 'Ця книга ще не завантажена в онлайн-архів. Ви можете відкрити свій файл у читалці.';
         showToast(notAvailMsg, 'warn', isEn ? 'Reader 📖' : 'Читалка 📖', () => {
-            window.open(`reader.html?title=${encodeURIComponent(btn.dataset.title || '')}`, '_blank');
+            const p = new URLSearchParams({
+                id: (cachedEntry && cachedEntry.id) || btn.dataset.id || '',
+                title: btn.dataset.title || '',
+                author: btn.dataset.author || '',
+                format: btn.dataset.format || '',
+                inArchive: '0'
+            });
+            window.open(`reader.html?${p.toString()}`, '_blank');
         });
         return;
     }
 
-    let url = btn.dataset.url || '';
+    let url = '';
+    if (cachedEntry && Array.isArray(cachedEntry.formats) && btn.dataset.format) {
+        const fmtMatch = cachedEntry.formats.find(f => f && f.format && f.format.toLowerCase() === btn.dataset.format.toLowerCase());
+        if (fmtMatch && fmtMatch.url) url = fmtMatch.url;
+    }
     if (!url) {
-        const fallbackFilename = btn.dataset.id || btn.dataset.filename || '';
+        url = (cachedEntry && cachedEntry.url) || btn.dataset.url || '';
+    }
+    if (!url) {
+        const fallbackFilename = (cachedEntry && cachedEntry.id) || btn.dataset.id || btn.dataset.filename || '';
         if (fallbackFilename) {
             url = `https://archive.org/download/1971_20260223/${encodeURIComponent(fallbackFilename)}`;
         }
@@ -1154,16 +1306,25 @@ function onReadOnlineClick(book) {
         return;
     }
 
+    const hasAuthoritativeCache = Array.isArray(window.CHESS_BOOKS_CACHE) && window.CHESS_BOOKS_CACHE.length > 0;
+    const cached = findCachedBook(book);
     const uid = user.uid;
-    const bookId = book.id || book.title || '';
+    const bookId = (cached && cached.id) || book.id || book.title || '';
     const progress = (window.ReadingProgress && typeof window.ReadingProgress.getProgress === 'function')
         ? window.ReadingProgress.getProgress(uid, bookId)
         : null;
 
     const page = (progress && progress.currentPage) ? progress.currentPage : 1;
-    let fileUrl = book.url || '';
-    if (!fileUrl && bookId) {
-        fileUrl = `https://archive.org/download/1971_20260223/${encodeURIComponent(bookId)}`;
+    const isUnverifiedArchive = hasAuthoritativeCache && !cached && (!book.url || String(book.url).includes('archive.org/download/'));
+    const isOffline = isUnverifiedArchive || (book.inArchive === false && !book.url) || (cached && cached.inArchive === false && !cached.url && !book.url);
+    let fileUrl = isOffline ? '' : ((cached && cached.url) || book.url || '');
+    if (!isOffline && !fileUrl && bookId) {
+        try {
+            const raw = decodeURIComponent(bookId);
+            fileUrl = `https://archive.org/download/1971_20260223/${encodeURIComponent(raw)}`;
+        } catch (_) {
+            fileUrl = `https://archive.org/download/1971_20260223/${encodeURIComponent(bookId)}`;
+        }
     }
     if (fileUrl && (fileUrl.includes(' ') || /[\u0400-\u04FF]/.test(fileUrl))) {
         const lastSlash = fileUrl.lastIndexOf('/');
@@ -1177,23 +1338,28 @@ function onReadOnlineClick(book) {
             }
         }
     }
-    let format = (book.format || '').toLowerCase();
+    let format = ((cached && cached.format) || book.format || '').toLowerCase();
     if (!format || format === '---') {
         const ext = (bookId.split('.').pop() || 'pdf').toLowerCase();
         format = ext;
     }
+    if (format === 'djv') format = 'djvu';
     const coverUrl = book.coverUrl || '';
+
+    const resolvedPages = getBookPages(book) || book.pages || (cached && cached.pages) || '';
 
     const params = new URLSearchParams({
         file: fileUrl,
         id: bookId,
-        title: book.title || '',
-        author: book.author || '',
+        title: book.title || (cached && cached.title) || '',
+        author: book.author || (cached && cached.author) || '',
         format: format,
-        pages: book.pages || '',
+        pages: resolvedPages,
         cover: coverUrl,
-        page: page
+        page: page,
+        inArchive: isOffline ? '0' : '1'
     });
+
 
     window.open(`reader.html?${params.toString()}`, '_blank');
 }

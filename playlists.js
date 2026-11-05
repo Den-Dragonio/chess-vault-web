@@ -172,7 +172,20 @@ async function plSyncFromFirestore(uid) {
                         return { ...p, id: 'read-later', icon: '📖', name_uk: 'Читати потім', name_en: 'Read Later' };
                     }
                     if (p.id === 'downloads') {
-                        return { ...p, id: 'downloads', icon: '📥', name_uk: 'Завантажені', name_en: 'Downloaded', isDefault: true, isSystemOnly: true };
+                        const localDl = _plUserPlaylists.find(x => x.id === 'downloads');
+                        const localBooks = (localDl && localDl.books) || [];
+                        const cloudBooks = p.books || [];
+                        return {
+                            ...p,
+                            id: 'downloads',
+                            icon: '📥',
+                            name_uk: 'Завантажені',
+                            name_en: 'Downloaded',
+                            isDefault: true,
+                            isSystemOnly: true,
+                            books: cloudBooks.length >= localBooks.length ? cloudBooks : localBooks,
+                            downloadCount: Math.max(cloudBooks.length, localBooks.length, p.downloadCount || 0)
+                        };
                     }
                     return p;
                 });
@@ -292,37 +305,29 @@ function plSyncDownloadsFromList(booksList) {
         pl = { id: 'downloads', icon: '📥', name_uk: 'Завантажені', name_en: 'Downloaded', isDefault: true, isSystemOnly: true, books: [] };
         playlists.push(pl);
     }
-    if (!pl.books) pl.books = [];
 
-    const existingIds = new Set(pl.books.map(b => (b.id || b.title || '').trim().toLowerCase()));
-    let changed = false;
+    const mapped = booksList.map(item => ({
+        id: item.id || item.bookId || item.title,
+        title: item.title || item.id || '—',
+        author: item.author || '—',
+        format: (item.format || 'pdf').toLowerCase(),
+        sizeDisplay: item.sizeDisplay || '—',
+        url: item.url || '',
+        year: item.year || '---',
+        addedAt: item.lastDownloadedAt?.toMillis?.() || item.downloadedAt?.toMillis?.() || Date.now()
+    })).filter(b => b.id);
 
-    for (const item of booksList) {
-        const key = (item.id || item.bookId || item.title || '').trim().toLowerCase();
-        if (key && !existingIds.has(key)) {
-            existingIds.add(key);
-            pl.books.push({
-                id: item.id || item.bookId || item.title,
-                title: item.title || item.id || '—',
-                author: item.author || '—',
-                format: (item.format || 'pdf').toLowerCase(),
-                sizeDisplay: item.sizeDisplay || '—',
-                url: item.url || '',
-                year: item.year || '---',
-                addedAt: item.lastDownloadedAt?.toMillis?.() || item.downloadedAt?.toMillis?.() || Date.now()
-            });
-            changed = true;
-        }
-    }
+    const prevCount = (pl.books || []).length;
+    pl.books = mapped;
+    pl.downloadCount = mapped.length;
+    const changed = prevCount !== mapped.length || mapped.some((b, i) => (pl.books[i] && pl.books[i].id) !== b.id);
 
-    if (changed) {
-        const u = plGetUser();
-        const uid = u ? u.uid : 'guest';
-        plSaveToLocalStorage(uid, playlists);
-        if (u) plSyncToFirestore(u.uid).catch(() => {});
-        if (document.getElementById('playlists-section')) {
-            plRenderProfileHTML();
-        }
+    const u = plGetUser();
+    const uid = u ? u.uid : 'guest';
+    plSaveToLocalStorage(uid, playlists);
+    if (changed && u) plSyncToFirestore(u.uid).catch(() => {});
+    if (document.getElementById('playlists-section')) {
+        plRenderProfileHTML();
     }
 }
 window.plSyncDownloadsFromList = plSyncDownloadsFromList;
@@ -469,7 +474,9 @@ function plRenderProfileHTML() {
     // 2. Закріплені ("Улюблені", "Читати потім") та кастомні плейлисти
     for (const pl of playlists) {
         const displayName = isEn ? (pl.name_en || pl.name) : (pl.name_uk || pl.name);
-        const bookCount = (pl.books || []).length;
+        const bookCount = pl.id === 'downloads'
+            ? Math.max((pl.books || []).length, pl.downloadCount || 0)
+            : (pl.books || []).length;
         const booksWord = isEn
             ? (bookCount === 1 ? 'book' : 'books')
             : (bookCount === 1 ? 'книга' : (bookCount >= 2 && bookCount <= 4 ? 'книги' : 'книг'));
@@ -493,6 +500,40 @@ function plRenderProfileHTML() {
     `;
 
     container.innerHTML = html;
+
+    const shelfGrid = container.querySelector('.pl-shelf-grid');
+    if (shelfGrid && !shelfGrid.dataset.scrollBound) {
+        shelfGrid.dataset.scrollBound = '1';
+        shelfGrid.addEventListener('wheel', (e) => {
+            if (shelfGrid.scrollWidth <= shelfGrid.clientWidth + 2) return;
+            if (Math.abs(e.deltaY) >= Math.abs(e.deltaX)) {
+                e.preventDefault();
+                shelfGrid.scrollLeft += e.deltaY;
+            }
+        }, { passive: false });
+        let dragging = false;
+        let startX = 0;
+        let startLeft = 0;
+        shelfGrid.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            if (e.target.closest('.pl-shelf-card')) {
+                dragging = true;
+                startX = e.clientX;
+                startLeft = shelfGrid.scrollLeft;
+            }
+        });
+        shelfGrid.addEventListener('pointermove', (e) => {
+            if (!dragging) return;
+            const dx = e.clientX - startX;
+            if (Math.abs(dx) > 4) {
+                shelfGrid.scrollLeft = startLeft - dx;
+            }
+        });
+        const stopDrag = () => { dragging = false; };
+        shelfGrid.addEventListener('pointerup', stopDrag);
+        shelfGrid.addEventListener('pointercancel', stopDrag);
+        shelfGrid.addEventListener('pointerleave', stopDrag);
+    }
 
     // Listeners: Create
     const createCard = document.getElementById('pl-shelf-card-create');

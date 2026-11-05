@@ -1137,8 +1137,8 @@ input:focus {
 /* ====== via @media ====== */
 @media (prefers-color-scheme: dark) {
 
-    body,
-    html {
+    html:not(.light) body,
+    html:not(.light) {
         background: #0d0d14;
         color: #d8d8e4;
     }
@@ -1233,52 +1233,58 @@ input:focus {
     /* Профіль */
     .profile-card,
     .history-card {
-        background: rgba(18, 18, 30, 0.8);
-        border: 1px solid rgba(255, 255, 255, 0.07);
+        background: #141724;
+        border: 1px solid rgba(255, 255, 255, 0.14);
     }
 
     .profile-name {
-        color: #e8e8f0;
+        color: #ffffff;
     }
 
     .profile-badge {
-        background: rgba(255, 255, 255, 0.08);
-        color: #888;
+        background: rgba(212, 175, 55, 0.2);
+        color: #f1c40f;
+        border: 1px solid rgba(212, 175, 55, 0.4);
     }
 
     .profile-reg-date {
-        color: #666;
+        color: #cbd5e1;
     }
 
     .stat-value {
-        color: #e8e8f0;
+        color: #ffffff;
+    }
+
+    .stat-label {
+        color: #cbd5e1;
     }
 
     .history-table th {
-        color: #666;
-        border-bottom-color: rgba(255, 255, 255, 0.06);
+        color: #94a3b8;
+        border-bottom-color: rgba(255, 255, 255, 0.12);
     }
 
     .history-table td {
-        border-bottom-color: rgba(255, 255, 255, 0.04);
-        color: #ccc;
+        border-bottom-color: rgba(255, 255, 255, 0.08);
+        color: #f1f5f9;
     }
 
     .history-table tbody tr:hover td {
-        background: rgba(255, 255, 255, 0.04);
+        background: rgba(255, 255, 255, 0.06);
     }
 
     .h-author {
-        color: #888;
+        color: #cbd5e1;
     }
 
     .h-date {
-        color: #666;
+        color: #94a3b8;
     }
 
     .profile-divider {
-        border-top-color: rgba(255, 255, 255, 0.07);
+        border-top-color: rgba(255, 255, 255, 0.14);
     }
+
 
     .logout-profile-btn {
         background: #1e1e2e;
@@ -1370,7 +1376,7 @@ html.dark .news-item-download {
 
 html.dark .news-date,
 html.dark .top-count {
-    color: #666;
+    color: #cbd5e1;
 }
 
 html.dark .modal-overlay {
@@ -1394,11 +1400,11 @@ html.dark .modal-form input {
 }
 
 html.dark .modal-form input::placeholder {
-    color: #666;
+    color: #94a3b8;
 }
 
 html.dark .switch-text {
-    color: #888;
+    color: #cbd5e1;
 }
 
 html.dark .switch-text a {
@@ -1407,61 +1413,63 @@ html.dark .switch-text a {
 
 html.dark .profile-card,
 html.dark .history-card {
-    background: rgba(18, 18, 30, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(18, 18, 30, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 html.dark .profile-name {
-    color: #e8e8f0;
+    color: #f8fafc;
 }
 
 html.dark .profile-badge {
-    background: rgba(255, 255, 255, 0.08);
-    color: #888;
+    background: rgba(212, 175, 55, 0.2);
+    color: #f1c40f;
+    border: 1px solid rgba(212, 175, 55, 0.4);
 }
 
 html.dark .profile-reg-date {
-    color: #666;
+    color: #cbd5e1;
 }
 
 html.dark .stat-value {
-    color: #e8e8f0;
+    color: #ffffff;
 }
 
 html.dark .history-table th {
-    color: #666;
-    border-bottom-color: rgba(255, 255, 255, 0.06);
+    color: #94a3b8;
+    border-bottom-color: rgba(255, 255, 255, 0.12);
 }
 
 html.dark .history-table td {
-    border-bottom-color: rgba(255, 255, 255, 0.04);
-    color: #ccc;
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    color: #f1f5f9;
 }
 
 html.dark .history-table tbody tr:hover td {
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.06);
 }
 
 html.dark .h-author {
-    color: #888;
+    color: #cbd5e1;
 }
 
 html.dark .h-date {
-    color: #666;
+    color: #94a3b8;
 }
 
 html.dark .profile-divider {
-    border-top-color: rgba(255, 255, 255, 0.07);
+    border-top-color: rgba(255, 255, 255, 0.12);
 }
 
 html.dark .logout-profile-btn {
     background: #1e1e2e;
-    color: #d0d0e0;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #f8fafc;
+    border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 html.dark .logout-profile-btn:hover {
-    background: #2a2a3e;
+    background: #ef4444;
+    border-color: #ef4444;
 }
 
 html.dark .grid-cell {

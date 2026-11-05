@@ -16,18 +16,24 @@
 
     // 1. URL & BOOK PARAMETERS
     const urlParams = new URLSearchParams(window.location.search);
-    const rawId = (urlParams.get('id') || '').replace(/\+/g, ' ').trim();
-    const rawFile = (urlParams.get('file') || '').replace(/\+/g, ' ').trim();
-    const rawTitle = (urlParams.get('title') || '').replace(/\+/g, ' ').trim();
-    const rawAuthor = (urlParams.get('author') || '').replace(/\+/g, ' ').trim();
+    const rawId = (urlParams.get('id') || '').trim();
+    const rawFile = (urlParams.get('file') || '').trim();
+    const rawTitle = (urlParams.get('title') || '').trim();
+    const rawAuthor = (urlParams.get('author') || '').trim();
     const bookParam = {
-        id: rawId || 'book_' + Date.now(),
+        id: rawId || (rawTitle ? rawTitle : 'book'),
         file: rawFile,
         title: rawTitle || 'Шахова книга',
         author: rawAuthor || '—',
         format: (urlParams.get('format') || 'pdf').toLowerCase(),
         startPage: parseInt(urlParams.get('page')) || 1
     };
+    if (!rawId && rawTitle && window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE)) {
+        const normT = rawTitle.normalize('NFC').toLowerCase();
+        const found = window.CHESS_BOOKS_CACHE.find(b => b && b.title && b.title.normalize('NFC').toLowerCase() === normT);
+        if (found && found.id) bookParam.id = found.id;
+    }
+
 
     // DOM ELEMENTS
     const dom = {
@@ -842,6 +848,9 @@
                 state.currentUser = user;
                 if (user) {
                     if (dom.authGateModal) dom.authGateModal.style.display = 'none';
+                    // Миттєво завантажуємо збережені закладки та прогрес з LocalStorage для цього юзера!
+                    loadUserBookWorkspace(user.uid);
+                    // Потім синхронізуємо з хмарою Firestore
                     loadUserBookWorkspaceFromFirestore(user.uid);
                 } else {
                     if (dom.authGateModal) dom.authGateModal.style.display = 'flex';
@@ -946,38 +955,122 @@
         }
     }
 
-    async function downloadBookWithProgress(urls, onProgress) {
+    // ========================================================
+    // ARCHIVE.ORG URL HELPERS
+    // --------------------------------------------------------
+    // archive.org/download/... НЕ віддає CORS-заголовків, тому fetch() з браузера
+    // падає (TypeError: Failed to fetch). Через це DjVu/DOC/PDF-перевірка ніколи
+    // не працювали. Офіційний CORS-ендпоінт archive.org: /cors/{item}/{file}.
+    // ========================================================
+    const ARCHIVE_DOWNLOAD_RE = /^https?:\/\/(?:www\.)?archive\.org\/(?:download|cors)\/([^/?#]+)\/([^?#]+)/i;
+    const ARCHIVE_NODE_RE = /^https?:\/\/ia\d+\.us\.archive\.org\/\d+\/items\/([^/?#]+)\/([^?#]+)/i;
+
+    function parseArchiveUrl(url) {
+        if (!url || typeof url !== 'string') return null;
+        const m = url.match(ARCHIVE_DOWNLOAD_RE) || url.match(ARCHIVE_NODE_RE);
+        return m ? { item: m[1], path: m[2] } : null;
+    }
+
+    // URL для fetch() (з CORS-заголовками)
+    function toCorsUrl(url) {
+        const p = parseArchiveUrl(url);
+        return p ? `https://archive.org/cors/${p.item}/${p.path}` : url;
+    }
+
+    // URL для iframe / прямого посилання (браузерний переглядач, без CORS)
+    function toDirectUrl(url) {
+        const p = parseArchiveUrl(url);
+        return p ? `https://archive.org/download/${p.item}/${p.path}` : url;
+    }
+
+    function normalizeFormat(fmt) {
+        const f = String(fmt || '').toLowerCase().replace(/^\./, '').trim();
+        if (f === 'djv') return 'djvu';
+        return f;
+    }
+
+    function getDirectFileUrl() {
+        return state.resolvedDirectUrl || toDirectUrl(bookParam.file) || '';
+    }
+
+    // Визначає реальний формат файлу за сигнатурою (magic bytes)
+    async function sniffBlobFormat(blob, fallback) {
+        try {
+            const head = new Uint8Array(await blob.slice(0, 8).arrayBuffer());
+            const str = String.fromCharCode(...head);
+            if (str.startsWith('%PDF')) return 'pdf';
+            if (str.startsWith('AT&T')) return 'djvu';
+            if (head[0] === 0x50 && head[1] === 0x4B) return 'docx';
+            if (head[0] === 0xD0 && head[1] === 0xCF && head[2] === 0x11 && head[3] === 0xE0) return 'doc';
+        } catch (_) {}
+        return fallback;
+    }
+
+    // Перевіряє, що файл існує (через CORS-ендпоінт), не завантажуючи його повністю
+    async function probeUrl(url, timeoutMs = 15000) {
+        const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
+        try {
+            const res = await fetch(url, { mode: 'cors', signal: ctrl ? ctrl.signal : undefined });
+            const type = (res.headers.get('content-type') || '').toLowerCase();
+            const ok = res.ok && !type.startsWith('text/html');
+            if (ctrl) ctrl.abort(); // нам потрібні тільки заголовки
+            return ok;
+        } catch (_) {
+            return false;
+        } finally {
+            if (timer) clearTimeout(timer);
+        }
+    }
+
+    async function downloadBookWithProgress(urls, onProgress, format) {
         if (!Array.isArray(urls)) urls = [urls];
+        const fmt = normalizeFormat(format || bookParam.format);
         let lastError = null;
 
-        for (const url of urls) {
-            if (!url) continue;
+        for (const rawUrl of urls) {
+            if (!rawUrl) continue;
+            const url = toCorsUrl(rawUrl);
             try {
                 const response = await fetch(url, { mode: 'cors' });
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
+                const type = (response.headers.get('content-type') || '').toLowerCase();
+                if (type.startsWith('text/html')) {
+                    throw new Error('Отримано HTML-сторінку замість файлу книги');
+                }
 
                 const contentLength = response.headers.get('content-length');
                 const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
-                const reader = response.body.getReader();
                 const chunks = [];
                 let receivedBytes = 0;
 
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    chunks.push(value);
-                    receivedBytes += value.length;
-                    if (typeof onProgress === 'function') {
-                        onProgress(receivedBytes, totalBytes);
+                if (response.body && response.body.getReader) {
+                    const reader = response.body.getReader();
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        chunks.push(value);
+                        receivedBytes += value.length;
+                        if (typeof onProgress === 'function') {
+                            onProgress(receivedBytes, totalBytes);
+                        }
                     }
+                } else {
+                    const buf = await response.arrayBuffer();
+                    chunks.push(new Uint8Array(buf));
+                    receivedBytes = buf.byteLength;
+                    if (typeof onProgress === 'function') onProgress(receivedBytes, receivedBytes);
                 }
 
                 let mime = 'application/pdf';
-                if (bookParam.format === 'djvu') mime = 'image/vnd.djvu';
-                else if (bookParam.format === 'docx') mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+                if (fmt === 'djvu') mime = 'image/vnd.djvu';
+                else if (fmt === 'docx') mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+                else if (fmt === 'doc') mime = 'application/msword';
+                else if (fmt === 'txt') mime = 'text/plain';
 
+                state.resolvedDirectUrl = toDirectUrl(rawUrl);
                 return new Blob(chunks, { type: mime });
             } catch (err) {
                 console.warn(`Download attempt failed for ${url}:`, err);
@@ -987,80 +1080,148 @@
         throw lastError || new Error('Не вдалося завантажити книгу');
     }
 
+    function showDownloadProgress(received, total) {
+        if (total > 0) {
+            const pct = Math.min(100, Math.round((received / total) * 100));
+            if (dom.downloadProgressFill) dom.downloadProgressFill.style.width = `${pct}%`;
+            if (dom.downloadProgressPercent) dom.downloadProgressPercent.textContent = `${pct}%`;
+            const rMB = (received / (1024 * 1024)).toFixed(1);
+            const tMB = (total / (1024 * 1024)).toFixed(1);
+            if (dom.downloadProgressBytes) dom.downloadProgressBytes.textContent = `${rMB} / ${tMB} MB`;
+        } else {
+            const rMB = (received / (1024 * 1024)).toFixed(1);
+            if (dom.downloadProgressBytes) dom.downloadProgressBytes.textContent = `${rMB} MB завантажено`;
+            if (dom.downloadProgressFill) dom.downloadProgressFill.style.width = '70%';
+        }
+    }
+
     // ========================================================
-    // 3. DOCUMENT LOADERS (PDF, DjVu, DOCX + Local Drag & Drop)
+    // 3. DOCUMENT LOADERS (PDF, DjVu, DOC/DOCX, TXT + Local Drag & Drop)
     // ========================================================
     async function loadDocument() {
-        let format = bookParam.format;
+        const cleanId = (bookParam.id || '').replace(/\.[^/.]+$/, '').trim();
+        const fullId = (bookParam.id || '').trim();
 
-        // Auto-detect format from file extension if needed
-        if (!format || format === '---') {
-            const ext = (bookParam.file || bookParam.id).split('.').pop().toLowerCase();
-            if (ext) format = ext;
+        // Пошук у кеші бібліотеки (books-cache.js) — порівнюємо з урахуванням NFC/NFD, перейменувань та аліасів
+        const nfcLower = (s) => String(s || '').normalize('NFC').toLowerCase().trim();
+        const slugifyKey = (s, keepYear = true) => {
+            if (!s) return '';
+            let t = nfcLower(s).replace(/\.[^/.]+$/, '').replace(/ё/g, 'е');
+            if (!keepYear) t = t.replace(/\b(18|19|20)\d{2}\b/g, '');
+            return t.replace(/[^a-zа-яіїєґ0-9]+/g, '');
+        };
+        const LEGACY_ALIASES = {
+            '2005_kasparov_mgp_vol_1_rus.djvu': 'Каспаров--MGP-1,от Стейница до Алёхина,2005.djvu',
+            '2005_kasparov_mgp_vol_2_rus.djvu': 'Каспаров--MGP-2.от Эйве до Таля,2005.djvu',
+            '2005_kasparov_mgp_vol_3_rus.djvu': 'Каспаров--MGP-3,от Петросяна до Спасского,2005.djvu',
+            '2005_kasparov_mgp_vol_4_rus.djvu': 'Каспаров--MGP-4.Фишер и звёзды запада,2005.djvu',
+            '2006_kasparov_mgp_vol_5_rus.djvu': 'Каспаров--MGP-5. Карпов и Корчной,2006.djvu',
+            'kasparovcml.pdf': 'Каспаров - Шахматы как Модель Жизни, 2007.pdf',
+            'endgame_troitzky_500': 'Троицкий - Сборник шахматных этюдов,1935.djvu',
+            'endgame_panchenko_theory': 'Панченко - Теория и практика шахматных окончаний - 2006.djvu',
+            'endgame_ece_vol1': 'Энциклопедия шахматных окончаний,1982.djvu',
+            'endgame_ece_vol2': 'Энциклопедия шахматных окончаний,1985.djvu',
+            'endgame_ece_vol4': 'Энциклопедия Шахматных Окончаний-4.Ферзевые, 1989.djvu',
+            'endgame_nunn_secrets_pawns': 'endgame_muller_secrets_pawns'
+        };
+        let cachedBook = null;
+        if (window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE)) {
+            const rawIdN = nfcLower(fullId);
+            const idN = LEGACY_ALIASES[rawIdN] ? nfcLower(LEGACY_ALIASES[rawIdN]) : rawIdN;
+            const cleanN = nfcLower(cleanId);
+            const titleN = nfcLower(bookParam.title);
+            const slugFull = slugifyKey(idN, true);
+            const slugNy = slugifyKey(idN, false);
+            cachedBook = window.CHESS_BOOKS_CACHE.find(x => x && x.id && nfcLower(x.id) === idN)
+                || window.CHESS_BOOKS_CACHE.find(x => x && x.id && nfcLower(x.id.replace(/\.[^/.]+$/, '')) === cleanN)
+                || (slugFull ? window.CHESS_BOOKS_CACHE.find(x => x && x.id && slugifyKey(x.id, true) === slugFull) : null)
+                || (titleN && titleN !== rawIdN ? window.CHESS_BOOKS_CACHE.find(x => x && x.title && nfcLower(x.title) === titleN) : null)
+                || (slugNy.length >= 12 ? window.CHESS_BOOKS_CACHE.find(x => x && x.id && slugifyKey(x.id, false) === slugNy) : null)
+                || null;
         }
+
+        // Визначаємо формат: явний параметр → кеш → розширення файлу
+        let format = normalizeFormat(urlParams.get('format'));
+        if (!format || format === '---') {
+            format = normalizeFormat(cachedBook && cachedBook.format);
+        }
+        if (!format || format === '---') {
+            const src = (cachedBook && (cachedBook.id || cachedBook.url)) || bookParam.file || bookParam.id || '';
+            format = normalizeFormat(decodeURIComponent(src.split('?')[0]).split('.').pop());
+        }
+        if (!format || format.length > 5) format = 'pdf';
+        bookParam.format = format;
 
         if (dom.dropBar) dom.dropBar.style.display = 'flex';
 
         const uid = state.currentUser ? state.currentUser.uid : 'guest';
 
-        // 1. ПЕРЕВІРЯЄМО ОСОБИСТУ КОПІЮ В INDEXEDDB (миттєве офлайн-відкриття 0ms)
+        // 1. ПЕРЕВІРЯЄМО ОСОБИСТУ КОПІЮ В INDEXEDDB (миттєве офлайн-відкриття)
         dom.loading.style.display = 'flex';
         dom.loadingText.textContent = `Пошук персональної копії книги...`;
 
         try {
             const cachedBlob = await getCachedBookBlob(bookParam.id, uid);
             if (cachedBlob && cachedBlob.size > 1024) {
+                const cachedFormat = await sniffBlobFormat(cachedBlob, format);
                 dom.loading.style.display = 'none';
                 if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
                 showSyncToast('⚡ Відкрито збережену персональну копію (IndexedDB)');
-                displayDocumentBlob(cachedBlob, format);
+                displayDocumentBlob(cachedBlob, cachedFormat);
                 return;
             }
         } catch (e) {
             console.warn('Error reading cached blob:', e);
         }
 
-        // 2. ДЖЕРЕЛА ДЛЯ ЗАВАНТАЖЕННЯ (Прямі URL)
+        // 2. ДЖЕРЕЛА ДЛЯ ЗАВАНТАЖЕННЯ (прямі URL /download/; для fetch конвертуються в /cors/)
         const candidateUrls = [];
+        const pushUnique = (u) => { if (u && !candidateUrls.includes(u)) candidateUrls.push(u); };
         const addCandidate = (u) => {
             if (!u || typeof u !== 'string') return;
-            const clean = u.trim();
+            let clean = u.trim();
             if (clean.includes('1971_20260223_vol2')) {
-                const fixed = clean.replace('1971_20260223_vol2', '1971_20260223');
-                if (!candidateUrls.includes(fixed)) candidateUrls.push(fixed);
+                clean = clean.replace('1971_20260223_vol2', '1971_20260223');
             }
-            if (clean && !candidateUrls.includes(clean)) {
-                candidateUrls.push(clean);
+            if (clean.startsWith('blob:') || clean.startsWith('data:')) {
+                pushUnique(clean);
+                return;
             }
+            const parsed = parseArchiveUrl(clean);
+            if (parsed) {
+                // Точна назва як у кеші + варіанти NFC / NFD (macOS-завантаження на Archive.org)
+                let rawName = parsed.path;
+                try { rawName = decodeURIComponent(parsed.path); } catch (_) {}
+                const base = `https://archive.org/download/${parsed.item}/`;
+                pushUnique(base + encodeURIComponent(rawName));
+                pushUnique(base + encodeURIComponent(rawName.normalize('NFD')));
+                pushUnique(base + encodeURIComponent(rawName.normalize('NFC')));
+                return;
+            }
+            pushUnique(clean);
         };
 
-        const cleanId = (bookParam.id || '').replace(/\.[^/.]+$/, '').trim();
-        const fullId = (bookParam.id || '').trim();
+        // Якщо книга відома як не завантажена в онлайн-архів (тільки локальна копія)
+        const isKnownOffline = (cachedBook && !cachedBook.url && cachedBook.inArchive === false)
+            || (!cachedBook && urlParams.get('inArchive') === '0');
+        const hasRealCustomFile = Boolean(bookParam.file) && !(
+            isKnownOffline &&
+            parseArchiveUrl(bookParam.file) &&
+            parseArchiveUrl(bookParam.file).item === '1971_20260223'
+        );
 
-        // Пошук у кеші бібліотеки (books-cache.js)
-        if (window.CHESS_BOOKS_CACHE && Array.isArray(window.CHESS_BOOKS_CACHE)) {
-            const b = window.CHESS_BOOKS_CACHE.find(x => 
-                (x.id && x.id.toLowerCase() === fullId.toLowerCase()) ||
-                (x.id && x.id.replace(/\.[^/.]+$/, '').toLowerCase() === cleanId.toLowerCase()) ||
-                (x.title && x.title.toLowerCase() === (bookParam.title || '').toLowerCase())
-            );
-            if (b && b.url) {
-                addCandidate(b.url);
-            }
+        if (cachedBook && cachedBook.url) addCandidate(cachedBook.url);
+        if (hasRealCustomFile) addCandidate(bookParam.file);
+
+        if (isKnownOffline && !hasRealCustomFile) {
+            showDocError('Ця книга з локальної колекції (ще не завантажена в онлайн-архів). Будь ласка, оберіть свій файл з диска або перетягніть його сюди.');
+            return;
         }
 
-        if (bookParam.file) {
-            addCandidate(bookParam.file);
-        }
-
-        if (fullId) {
-            let encId;
-            try {
-                encId = encodeURIComponent(decodeURIComponent(fullId));
-            } catch (_) {
-                encId = encodeURIComponent(fullId);
-            }
-            addCandidate(`https://archive.org/download/1971_20260223/${encId}`);
+        if (fullId && (!cachedBook || cachedBook.inArchive !== false)) {
+            let raw = fullId;
+            try { raw = decodeURIComponent(fullId); } catch (_) {}
+            addCandidate(`https://archive.org/download/1971_20260223/${encodeURIComponent(raw)}`);
         }
 
         if (candidateUrls.length === 0) {
@@ -1068,34 +1229,50 @@
             return;
         }
 
-        const directUrl = candidateUrls[0];
-
-        // 3. МИТТЄВЕ ВІДКРИТТЯ ДЛЯ PDF (Native Iframe - 0s очікування)
+        // 3. PDF: знаходимо робочий URL через CORS-ендпоінт і відкриваємо у вбудованому переглядачі
         if (format === 'pdf') {
-            dom.loading.style.display = 'none';
-            if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
-            loadPdfDirect(directUrl);
-            // Асинхронне збереження персональної копії без затримки читання
-            downloadBookWithProgress([directUrl], () => {}).then(blob => {
-                if (blob && blob.size > 1024) {
-                    saveCachedBookBlob(bookParam.id, uid, blob, { format, title: bookParam.title });
+            dom.loading.style.display = 'flex';
+            dom.loadingText.textContent = `Підключення до джерела книги...`;
+
+            let workingUrl = null;
+            for (const cand of candidateUrls) {
+                if (cand.startsWith('blob:') || cand.startsWith('data:')) { workingUrl = cand; break; }
+                if (!parseArchiveUrl(cand)) { workingUrl = cand; break; } // сторонній URL — не можемо перевірити, пробуємо напряму
+                if (await probeUrl(toCorsUrl(cand))) { workingUrl = cand; break; }
+            }
+
+            if (workingUrl) {
+                state.resolvedDirectUrl = toDirectUrl(workingUrl);
+                dom.loading.style.display = 'none';
+                if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
+                loadPdfDirect(toDirectUrl(workingUrl));
+                // Асинхронне збереження персональної копії без перевантаження каналу для великих PDF
+                const pdfBytes = cachedBook && Number(cachedBook.sizeRaw) ? Number(cachedBook.sizeRaw) : 0;
+                if (!pdfBytes || pdfBytes <= 35 * 1024 * 1024) {
+                    setTimeout(() => {
+                        downloadBookWithProgress([workingUrl], () => {}, format).then(blob => {
+                            if (blob && blob.size > 1024) {
+                                state.pdfBlobUrl = URL.createObjectURL(blob);
+                                saveCachedBookBlob(bookParam.id, uid, blob, { format, title: bookParam.title });
+                            }
+                        }).catch(() => {});
+                    }, 1500);
                 }
-            }).catch(() => {});
+                return;
+            }
+
+            showDocError('Не вдалося знайти цю книгу в онлайн-архіві. Оберіть файл з вашого пристрою або перетягніть його сюди.');
             return;
         }
 
-        // 4. ДЛЯ DJVU ТА DOCX
-        if (format === 'djvu') {
-            loadDjvuDirect(directUrl);
+        // 4. CHM та інші непідтримувані браузером формати
+        if (!['djvu', 'docx', 'doc', 'txt'].includes(format)) {
+            state.resolvedDirectUrl = toDirectUrl(candidateUrls[0]);
+            showDocError(`Формат .${format} не підтримується онлайн-читалкою. Завантажте файл за посиланням нижче та відкрийте його у спеціальній програмі.`);
             return;
         }
 
-        if (format === 'docx' || format === 'doc') {
-            loadDocxDirect(directUrl);
-            return;
-        }
-
-        // 5. ВІДОБРАЖАЄМО ПРОГРЕС-БАР ЗАВАНТАЖЕННЯ ДЛЯ ІНШИХ ФАЙЛІВ
+        // 5. DjVu / DOC / DOCX / TXT: завантажуємо через CORS-ендпоінт з прогрес-баром і кешуємо
         dom.loading.style.display = 'flex';
         dom.loadingText.textContent = `Завантаження персональної копії...`;
         if (dom.downloadProgressWrap) {
@@ -1106,40 +1283,219 @@
         }
 
         try {
-            const blob = await downloadBookWithProgress(candidateUrls, (received, total) => {
-                if (total > 0) {
-                    const pct = Math.min(100, Math.round((received / total) * 100));
-                    if (dom.downloadProgressFill) dom.downloadProgressFill.style.width = `${pct}%`;
-                    if (dom.downloadProgressPercent) dom.downloadProgressPercent.textContent = `${pct}%`;
-                    const rMB = (received / (1024 * 1024)).toFixed(1);
-                    const tMB = (total / (1024 * 1024)).toFixed(1);
-                    if (dom.downloadProgressBytes) dom.downloadProgressBytes.textContent = `${rMB} / ${tMB} MB`;
-                } else {
-                    const rMB = (received / (1024 * 1024)).toFixed(1);
-                    if (dom.downloadProgressBytes) dom.downloadProgressBytes.textContent = `${rMB} MB завантажено`;
-                    if (dom.downloadProgressFill) dom.downloadProgressFill.style.width = '70%';
-                }
-            });
+            const blob = await downloadBookWithProgress(candidateUrls, showDownloadProgress, format);
+            const detectedFormat = await sniffBlobFormat(blob, format);
 
-            // Зберігаємо персональну копію в локальну БД браузера!
-            await saveCachedBookBlob(bookParam.id, uid, blob, { format, title: bookParam.title });
+            // Зберігаємо персональну копію в локальну БД браузера
+            saveCachedBookBlob(bookParam.id, uid, blob, { format: detectedFormat, title: bookParam.title }).then(() => {
+                showSyncToast('📖 Персональну копію книги збережено у вашу бібліотеку!');
+            }).catch(() => {});
 
             if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
-            dom.loading.style.display = 'none';
-            showSyncToast('📖 Персональну копію книги збережено у вашу бібліотеку!');
-
-            displayDocumentBlob(blob, format);
-            return;
+            displayDocumentBlob(blob, detectedFormat);
         } catch (downloadErr) {
-            console.warn('Download fallback:', downloadErr);
+            console.warn('Download failed:', downloadErr);
             if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
-            loadPdfDirect(directUrl);
+            showDocError('Не вдалося завантажити книгу з онлайн-архіву. Перевірте інтернет-з’єднання або оберіть файл з пристрою.');
         }
     }
 
-    // DISPLAY DOCUMENT FROM BLOB (Personal copy)
+    // Вбудований парсер бінарних MS Word 97-2003 (.doc, OLE2/CFB + FIB + PieceTable)
+    function parseBinaryDocToHtml(arrayBuffer) {
+        const u8 = new Uint8Array(arrayBuffer);
+        const dv = new DataView(arrayBuffer);
+        if (u8.length < 512 || dv.getUint32(0, true) !== 0xE011CFD0 || dv.getUint32(4, true) !== 0xE11AB1A1) {
+            throw new Error('Not an OLE2 CFB .doc file');
+        }
+
+        const secShift = dv.getUint16(0x1E, true);
+        const secSize = 1 << secShift;
+        const miniCutoff = dv.getUint32(0x38, true);
+        const firstDirSec = dv.getUint32(0x30, true);
+        const firstMiniFatSec = dv.getUint32(0x3C, true);
+        const firstDifatSec = dv.getUint32(0x44, true);
+        const numDifatSecs = dv.getUint32(0x48, true);
+
+        const difat = [];
+        for (let i = 0; i < 109; i++) {
+            difat.push(dv.getUint32(0x4C + i * 4, true));
+        }
+        let currDifat = firstDifatSec;
+        const entriesPerDifat = (secSize >> 2) - 1;
+        for (let d = 0; d < numDifatSecs && currDifat < 0xFFFFFFFC; d++) {
+            const off = (currDifat + 1) * secSize;
+            if (off + secSize > u8.length) break;
+            for (let j = 0; j < entriesPerDifat; j++) {
+                difat.push(dv.getUint32(off + j * 4, true));
+            }
+            currDifat = dv.getUint32(off + entriesPerDifat * 4, true);
+        }
+
+        const fat = [];
+        const intsPerSec = secSize >> 2;
+        for (const sec of difat) {
+            if (sec >= 0xFFFFFFFC) continue;
+            const off = (sec + 1) * secSize;
+            if (off + secSize > u8.length) continue;
+            for (let j = 0; j < intsPerSec; j++) {
+                fat.push(dv.getUint32(off + j * 4, true));
+            }
+        }
+
+        function readChain(startSec, maxBytes) {
+            const chunks = [];
+            let total = 0;
+            let s = startSec;
+            let guard = 0;
+            while (s < fat.length && s < 0xFFFFFFFC && guard++ < 250000) {
+                const off = (s + 1) * secSize;
+                if (off >= u8.length) break;
+                const slice = u8.subarray(off, Math.min(off + secSize, u8.length));
+                chunks.push(slice);
+                total += slice.length;
+                if (maxBytes && total >= maxBytes) break;
+                s = fat[s];
+            }
+            const out = new Uint8Array(maxBytes ? Math.min(total, maxBytes) : total);
+            let pos = 0;
+            for (const c of chunks) {
+                const take = Math.min(c.length, out.length - pos);
+                if (take <= 0) break;
+                out.set(c.subarray(0, take), pos);
+                pos += take;
+            }
+            return out;
+        }
+
+        const dirBytes = readChain(firstDirSec);
+        const dirDv = new DataView(dirBytes.buffer, dirBytes.byteOffset, dirBytes.byteLength);
+        const utf16 = new TextDecoder('utf-16le');
+        const cp1251 = new TextDecoder('windows-1251');
+        const entries = [];
+
+        for (let off = 0; off + 128 <= dirBytes.length; off += 128) {
+            const nameLen = dirDv.getUint16(off + 64, true);
+            if (nameLen < 2 || nameLen > 64) continue;
+            const name = utf16.decode(dirBytes.subarray(off, off + nameLen - 2));
+            const type = dirBytes[off + 66];
+            const start = dirDv.getUint32(off + 116, true);
+            const size = dirDv.getUint32(off + 120, true);
+            entries.push({ name, type, start, size });
+        }
+
+        const root = entries.find(e => e.type === 5);
+        const miniStream = (root && root.start < 0xFFFFFFFC && root.size > 0) ? readChain(root.start, root.size) : new Uint8Array(0);
+        const miniFat = [];
+        if (firstMiniFatSec < 0xFFFFFFFC) {
+            const mfBytes = readChain(firstMiniFatSec);
+            const mfDv = new DataView(mfBytes.buffer, mfBytes.byteOffset, mfBytes.byteLength);
+            for (let i = 0; i + 4 <= mfBytes.length; i += 4) {
+                miniFat.push(mfDv.getUint32(i, true));
+            }
+        }
+
+        function getStream(targetName) {
+            const entry = entries.find(e => e.name === targetName);
+            if (!entry) return null;
+            if (entry.size < miniCutoff && entry.type !== 5) {
+                const out = new Uint8Array(entry.size);
+                let s = entry.start;
+                let pos = 0;
+                let guard = 0;
+                while (s < miniFat.length && s < 0xFFFFFFFC && pos < entry.size && guard++ < 250000) {
+                    const mOff = s * 64;
+                    const take = Math.min(64, entry.size - pos, Math.max(0, miniStream.length - mOff));
+                    if (take <= 0) break;
+                    out.set(miniStream.subarray(mOff, mOff + take), pos);
+                    pos += take;
+                    s = miniFat[s];
+                }
+                return out;
+            }
+            return readChain(entry.start, entry.size);
+        }
+
+        const wdoc = getStream('WordDocument');
+        if (!wdoc || wdoc.length < 0x01AA) throw new Error('Missing WordDocument stream');
+        const wDv = new DataView(wdoc.buffer, wdoc.byteOffset, wdoc.byteLength);
+        const flags = wDv.getUint16(0x0A, true);
+        const ccpText = wDv.getUint32(0x004C, true);
+        const tblName = (flags & 0x0200) ? '1Table' : '0Table';
+        const fcClx = wDv.getUint32(0x01A2, true);
+        const lcbClx = wDv.getUint32(0x01A6, true);
+        const tbl = getStream(tblName);
+        if (!tbl || fcClx + lcbClx > tbl.length) throw new Error('Missing Table stream / CLX');
+
+        const clx = tbl.subarray(fcClx, fcClx + lcbClx);
+        const clxDv = new DataView(clx.buffer, clx.byteOffset, clx.byteLength);
+        let pos = 0;
+        while (pos < clx.length && clx[pos] === 1) {
+            const cbGrpprl = clxDv.getUint16(pos + 1, true);
+            pos += 3 + cbGrpprl;
+        }
+        if (pos >= clx.length || clx[pos] !== 2) throw new Error('Invalid CLX PlcPcd');
+        const lcbPlc = clxDv.getUint32(pos + 1, true);
+        const plcOff = pos + 5;
+        const pieceCount = Math.floor((lcbPlc - 4) / 12);
+        if (pieceCount <= 0) throw new Error('Empty PieceTable');
+
+        const parts = [];
+        for (let k = 0; k < pieceCount; k++) {
+            const cpStart = clxDv.getUint32(plcOff + k * 4, true);
+            const cpEnd = clxDv.getUint32(plcOff + (k + 1) * 4, true);
+            const cpLen = cpEnd - cpStart;
+            if (cpLen <= 0) continue;
+            const pcdOff = plcOff + (pieceCount + 1) * 4 + k * 8;
+            const fcRaw = clxDv.getUint32(pcdOff + 2, true);
+            const isCompressed = (fcRaw & 0x40000000) !== 0;
+            if (isCompressed) {
+                const byteOff = (fcRaw & 0x3FFFFFFF) >>> 1;
+                parts.push(cp1251.decode(wdoc.subarray(byteOff, Math.min(wdoc.length, byteOff + cpLen))));
+            } else {
+                const byteOff = fcRaw & 0x3FFFFFFF;
+                parts.push(utf16.decode(wdoc.subarray(byteOff, Math.min(wdoc.length, byteOff + cpLen * 2))));
+            }
+        }
+
+        let rawText = parts.join('');
+        if (ccpText > 0 && rawText.length > ccpText) {
+            rawText = rawText.slice(0, ccpText);
+        }
+
+        // Очищення службових кодів полів Word (\x13 код \x14 видимий текст \x15) та м'яких переносів (\x1f)
+        rawText = rawText
+            .replace(/\x13[^\x14\x15]*\x14([^\x15]*)\x15/g, '$1')
+            .replace(/\x13[^\x15]*\x15/g, '')
+            .replace(/\x1f/g, '')
+            .replace(/\x1e/g, '-')
+            .replace(/\x07/g, '\t')
+            .replace(/[\x00-\x06\x08\x0e-\x1c]/g, '');
+
+        const paragraphs = rawText.split(/\r|\x0c/);
+        const htmlBlocks = [];
+        for (const para of paragraphs) {
+            const trimmed = para.replace(/\x0b/g, '\n').trim();
+            if (!trimmed) continue;
+            const safe = escapeHtml(trimmed).replace(/\n/g, '<br>').replace(/\t+/g, ' &nbsp; ');
+            if (trimmed.length < 90 && /^[А-ЯІЇЄҐA-Z0-9№«"§IVXLC\s.,:—–\-()!?]+$/.test(trimmed) && /[А-ЯІЇЄҐA-Z]/.test(trimmed)) {
+                htmlBlocks.push(`<h3 style="margin: 1.2em 0 0.5em;">${safe}</h3>`);
+            } else {
+                htmlBlocks.push(`<p style="margin: 0 0 0.75em; line-height: 1.65;">${safe}</p>`);
+            }
+        }
+        if (htmlBlocks.length === 0) throw new Error('Empty extracted .doc content');
+        return htmlBlocks.join('\n');
+    }
+
+    // DISPLAY DOCUMENT FROM BLOB (Personal copy / downloaded file)
     function displayDocumentBlob(blob, format) {
+        format = normalizeFormat(format);
+        if (state.currentBlobUrl) {
+            try { URL.revokeObjectURL(state.currentBlobUrl); } catch (_) {}
+        }
         const blobUrl = URL.createObjectURL(blob);
+        state.currentBlobUrl = blobUrl;
+
         if (format === 'pdf') {
             dom.docFrame.style.display = 'block';
             if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
@@ -1150,37 +1506,87 @@
         } else if (format === 'djvu') {
             if (typeof DjVu !== 'undefined' && DjVu.Viewer && dom.djvuMount) {
                 dom.docFrame.style.display = 'none';
-                dom.contentWrap.style.display = 'none';
+                if (dom.contentWrap) dom.contentWrap.style.display = 'none';
                 dom.djvuWrap.style.display = 'block';
+                dom.loading.style.display = 'flex';
+                dom.loadingText.textContent = 'Відкриття DjVu документа...';
                 blob.arrayBuffer().then(buf => {
                     initDjVuViewer(buf);
-                }).catch(() => {
-                    dom.docFrame.src = blobUrl;
-                    dom.docFrame.style.display = 'block';
-                    dom.loading.style.display = 'none';
+                }).catch(err => {
+                    console.warn('DjVu blob read error:', err);
+                    showDocError('Не вдалося прочитати DjVu файл.');
                 });
             } else {
-                dom.docFrame.src = blobUrl;
-                dom.docFrame.style.display = 'block';
-                dom.loading.style.display = 'none';
+                showDocError('Бібліотека DjVu.js не завантажилась. Оновіть сторінку або перевірте інтернет-з’єднання.');
             }
-        } else if (format === 'docx') {
-            blob.arrayBuffer().then(async (buf) => {
-                if (typeof mammoth !== 'undefined') {
-                    const result = await mammoth.convertToHtml({ arrayBuffer: buf });
-                    dom.loading.style.display = 'none';
-                    dom.docFrame.style.display = 'none';
-                    if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
-                    dom.contentWrap.style.display = 'block';
-                    dom.contentWrap.innerHTML = `<div class="reader-docx-container">${result.value}</div>`;
-                    const totalChars = (result.value.replace(/<[^>]*>/g, '') || '').length;
-                    state.totalPages = Math.max(1, Math.round(totalChars / 2200));
-                    dom.labelTotalPages.textContent = state.totalPages;
-                    dom.inputCurrentPage.max = state.totalPages;
-                    updatePageUI();
+        } else if (format === 'doc') {
+            blob.arrayBuffer().then(buf => {
+                const html = parseBinaryDocToHtml(buf);
+                renderHtmlDocument(html);
+            }).catch(err => {
+                console.warn('Binary .doc parse fallback:', err);
+                const direct = getDirectFileUrl();
+                if (direct && parseArchiveUrl(direct)) {
+                    loadOfficeViewer(direct);
+                } else {
+                    showDocError('Не вдалося прочитати цей .doc файл у браузері.');
                 }
             });
+        } else if (format === 'docx') {
+            blob.arrayBuffer().then(async (buf) => {
+                if (typeof mammoth === 'undefined') throw new Error('Mammoth.js не знайдено');
+                const result = await mammoth.convertToHtml({ arrayBuffer: buf });
+                renderHtmlDocument(result.value);
+            }).catch(err => {
+                console.warn('DOCX render error:', err);
+                const direct = getDirectFileUrl();
+                if (direct && parseArchiveUrl(direct)) {
+                    loadOfficeViewer(direct);
+                } else {
+                    showDocError('Не вдалося відкрити Word-документ у браузері. Збережіть його у форматі PDF або DOCX.');
+                }
+            });
+        } else if (format === 'txt') {
+            blob.arrayBuffer().then(buf => {
+                const bytes = new Uint8Array(buf);
+                let text;
+                try {
+                    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+                } catch (_) {
+                    text = new TextDecoder('windows-1251').decode(bytes);
+                }
+                renderHtmlDocument(`<pre style="white-space: pre-wrap; font-family: inherit;">${escapeHtml(text)}</pre>`);
+            });
+        } else {
+            showDocError(`Формат .${format} не підтримується онлайн-читалкою.`);
         }
+    }
+
+    function renderHtmlDocument(html) {
+        dom.loading.style.display = 'none';
+        dom.docFrame.style.display = 'none';
+        if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
+        dom.contentWrap.style.display = 'block';
+        dom.contentWrap.innerHTML = `<div class="reader-docx-container">${html}</div>`;
+        const totalChars = (html.replace(/<[^>]*>/g, '') || '').length;
+        state.totalPages = Math.max(1, Math.round(totalChars / 2200));
+        if (dom.labelTotalPages) dom.labelTotalPages.textContent = state.totalPages;
+        if (dom.inputCurrentPage) dom.inputCurrentPage.max = state.totalPages;
+        updatePageUI();
+        saveUserBookWorkspace();
+    }
+
+    // Старі .doc файли: Microsoft Office Online Viewer (працює з публічними URL)
+    function loadOfficeViewer(directUrl) {
+        dom.loading.style.display = 'none';
+        if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
+        if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
+        if (dom.contentWrap) dom.contentWrap.style.display = 'none';
+        dom.docFrame.style.display = 'block';
+        dom.docFrame.onload = null;
+        dom.docFrame.src = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(directUrl)}`;
+        state.isOfficeViewer = true;
+        updatePageUI();
     }
 
     // PDF LOADER: Uses native browser PDF viewer via Iframe (Zero CORS restrictions)
@@ -1200,6 +1606,7 @@
 
         dom.docFrame.onload = () => {
             dom.loading.style.display = 'none';
+            if (dom.errorOverlay && dom.errorOverlay.style.display === 'flex') return;
             showSyncToast('📄 PDF документ підвантажено успішно');
         };
 
@@ -1264,76 +1671,8 @@
             showSyncToast('📖 DjVu документ підвантажено');
         }).catch(err => {
             console.warn('DjVu loadDocument error:', err);
-            dom.loading.style.display = 'none';
+            showDocError('Не вдалося відкрити DjVu файл (можливо, файл пошкоджений). Спробуйте обрати файл з пристрою.');
         });
-    }
-
-    // DjVu LOADER: Uses DjVu.js Viewer with CORS arrayBuffer
-    function loadDjvuDirect(url) {
-        if (!url) {
-            showDocError('Посилання на файл DjVu відсутнє.');
-            return;
-        }
-
-        // Перевіряємо наявність DjVu.js Viewer
-        if (typeof DjVu !== 'undefined' && DjVu.Viewer && dom.djvuMount) {
-            dom.docFrame.style.display = 'none';
-            dom.contentWrap.style.display = 'none';
-            dom.djvuWrap.style.display = 'block';
-
-            fetch(url).then(res => {
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                return res.arrayBuffer();
-            }).then(buf => {
-                initDjVuViewer(buf);
-            }).catch(err => {
-                console.warn('DjVu direct fetch error:', err);
-                dom.loading.style.display = 'none';
-                dom.docFrame.src = url;
-                dom.docFrame.style.display = 'block';
-                if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
-                showSyncToast('📖 Документ відкрито через системний переглядач');
-            });
-            return;
-        }
-
-        // Якщо бібліотека недоступна в браузері:
-        dom.loading.style.display = 'none';
-        dom.docFrame.src = url;
-        dom.docFrame.style.display = 'block';
-    }
-
-    // DOCX LOADER: via mammoth.js
-    async function loadDocxDirect(url) {
-        try {
-            if (typeof mammoth === 'undefined') throw new Error('Mammoth.js не знайдено');
-            const resp = await fetch(url);
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            const arrayBuffer = await resp.arrayBuffer();
-
-            const result = await mammoth.convertToHtml({ arrayBuffer });
-            dom.loading.style.display = 'none';
-            dom.docFrame.style.display = 'none';
-            if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
-            dom.contentWrap.style.display = 'block';
-
-            dom.contentWrap.innerHTML = `
-                <div class="reader-docx-container">
-                    ${result.value}
-                </div>
-            `;
-
-            const totalChars = (result.value.replace(/<[^>]*>/g, '') || '').length;
-            state.totalPages = Math.max(1, Math.round(totalChars / 2200));
-            dom.labelTotalPages.textContent = state.totalPages;
-            dom.inputCurrentPage.max = state.totalPages;
-
-            updatePageUI();
-            saveUserBookWorkspace();
-        } catch (err) {
-            console.warn('Docx direct load error, using frame fallback:', err);
-            loadPdfDirect(url);
-        }
     }
 
     // LOCAL FILE LOADER (Drag-and-Drop or File Picker)
@@ -1342,8 +1681,10 @@
         const fname = file.name.toLowerCase();
         const uid = state.currentUser ? state.currentUser.uid : 'guest';
         let ext = 'pdf';
-        if (fname.endsWith('.djvu')) ext = 'djvu';
-        else if (fname.endsWith('.docx') || fname.endsWith('.doc')) ext = 'docx';
+        if (fname.endsWith('.djvu') || fname.endsWith('.djv')) ext = 'djvu';
+        else if (fname.endsWith('.docx')) ext = 'docx';
+        else if (fname.endsWith('.doc')) ext = 'doc';
+        else if (fname.endsWith('.txt')) ext = 'txt';
 
         dom.loading.style.display = 'flex';
         dom.loadingText.textContent = `Читання та збереження локального файлу ${file.name}...`;
@@ -1359,7 +1700,8 @@
     // 4. PER-USER & PER-BOOK WORKSPACE PERSISTENCE
     // ========================================================
     function getWorkspaceKey(uid) {
-        return `chess_vault_workspace_${uid || 'guest'}_${bookParam.id}`;
+        const idKey = (bookParam.id || bookParam.title || 'book').trim().replace(/[\/\s]/g, '_');
+        return `chess_vault_workspace_${uid || 'guest'}_${idKey}`;
     }
 
     function saveUserBookWorkspace() {
@@ -1387,9 +1729,19 @@
             updatedAt: Date.now()
         };
 
-        // 1. Миттєве збереження в LocalStorage для поточного користувача
+        // 1. Збереження в LocalStorage під ключем поточного юзера, guest та заголовком книги
         try {
-            localStorage.setItem(getWorkspaceKey(uid), JSON.stringify(workspaceData));
+            const jsonStr = JSON.stringify(workspaceData);
+            localStorage.setItem(getWorkspaceKey(uid), jsonStr);
+            localStorage.setItem(`chess_vault_workspace_${uid}_${bookParam.id}`, jsonStr);
+            if (uid !== 'guest') {
+                localStorage.setItem(getWorkspaceKey('guest'), jsonStr);
+                localStorage.setItem(`chess_vault_workspace_guest_${bookParam.id}`, jsonStr);
+            }
+            if (bookParam.title) {
+                localStorage.setItem(`chess_vault_workspace_${uid}_title_${encodeURIComponent(bookParam.title)}`, jsonStr);
+                localStorage.setItem(`chess_vault_workspace_guest_title_${encodeURIComponent(bookParam.title)}`, jsonStr);
+            }
         } catch (_) {}
 
         // 2. Оновлення ReadingProgress (якщо >= 10 сторінок — рахується у «Зараз читаю» в профілі)
@@ -1409,8 +1761,9 @@
 
         // 3. Збереження в хмару Firestore окремо для цього користувача
         if (state.currentUser && window.db) {
+            const docId = (bookParam.id || 'book').replace(/[\/\.#$\[\]]/g, '_');
             window.db.collection('user_reading').doc(state.currentUser.uid)
-                .collection('books').doc(bookParam.id)
+                .collection('books').doc(docId)
                 .set(workspaceData, { merge: true })
                 .then(() => {
                     showSyncIndicator('✅ Збережено в хмарі');
@@ -1421,10 +1774,25 @@
         }
     }
 
-    function loadUserBookWorkspace() {
-        const uid = state.currentUser ? state.currentUser.uid : 'guest';
+    function loadUserBookWorkspace(customUid) {
+        const uid = customUid || (state.currentUser ? state.currentUser.uid : 'guest');
         try {
-            const raw = localStorage.getItem(getWorkspaceKey(uid));
+            let raw = localStorage.getItem(getWorkspaceKey(uid));
+            if (!raw) {
+                raw = localStorage.getItem(`chess_vault_workspace_${uid}_${bookParam.id}`);
+            }
+            if (!raw && uid !== 'guest') {
+                raw = localStorage.getItem(getWorkspaceKey('guest'));
+            }
+            if (!raw && uid !== 'guest') {
+                raw = localStorage.getItem(`chess_vault_workspace_guest_${bookParam.id}`);
+            }
+            if (!raw && bookParam.title) {
+                raw = localStorage.getItem(`chess_vault_workspace_${uid}_title_${encodeURIComponent(bookParam.title)}`);
+            }
+            if (!raw && bookParam.title) {
+                raw = localStorage.getItem(`chess_vault_workspace_guest_title_${encodeURIComponent(bookParam.title)}`);
+            }
             if (raw) {
                 const data = JSON.parse(raw);
                 applyWorkspaceData(data);
@@ -1432,16 +1800,20 @@
         } catch (_) {}
     }
 
+
     async function loadUserBookWorkspaceFromFirestore(uid) {
         if (!uid || !window.db) return;
         try {
+            const docId = (bookParam.id || 'book').replace(/[\/\.#$\[\]]/g, '_');
             const snap = await window.db.collection('user_reading').doc(uid)
-                .collection('books').doc(bookParam.id).get();
+                .collection('books').doc(docId).get();
             if (snap.exists) {
                 const data = snap.data();
                 applyWorkspaceData(data);
                 // Оновлюємо локальний кеш
-                localStorage.setItem(getWorkspaceKey(uid), JSON.stringify(data));
+                const jsonStr = JSON.stringify(data);
+                localStorage.setItem(getWorkspaceKey(uid), jsonStr);
+                localStorage.setItem(getWorkspaceKey('guest'), jsonStr);
             }
         } catch (err) {
             console.warn('Could not load user workspace from firestore:', err);
@@ -1461,9 +1833,17 @@
             if (dom.labelTotalPages) dom.labelTotalPages.textContent = state.totalPages;
         }
 
-        // Restore bookmarks & notes
-        if (Array.isArray(data.bookmarks)) state.bookmarks = data.bookmarks;
-        if (Array.isArray(data.notes)) state.notes = data.notes;
+        // Restore bookmarks & notes safely
+        if (Array.isArray(data.bookmarks)) {
+            if (data.bookmarks.length > 0 || state.bookmarks.length === 0) {
+                state.bookmarks = data.bookmarks;
+            }
+        }
+        if (Array.isArray(data.notes)) {
+            if (data.notes.length > 0 || state.notes.length === 0) {
+                state.notes = data.notes;
+            }
+        }
         if (Array.isArray(data.highlights)) state.highlights = data.highlights;
         renderBookmarksList();
         renderNotesList();
@@ -1529,15 +1909,27 @@
             }
         }
 
-        // 2. Iframe anchor (PDF mode)
-        if (dom.docFrame && dom.docFrame.style.display !== 'none' && dom.docFrame.src) {
-            const base = dom.docFrame.src.split('#')[0];
-            try {
-                dom.docFrame.contentWindow.location.replace(`${base}#page=${p}&toolbar=1&navpanes=0`);
-            } catch (_) {
-                dom.docFrame.src = `${base}#page=${p}&toolbar=1&navpanes=0`;
+        // 2. Iframe anchor (PDF mode) - query param change forces native viewer navigation
+        if (dom.docFrame && dom.docFrame.style.display !== 'none' && dom.docFrame.src && !state.isOfficeViewer) {
+            const raw = dom.docFrame.src.split('#')[0];
+            if (!raw.startsWith('blob:') && state.pdfBlobUrl) {
+                // Персональна копія вже завантажена у фоні — переходимо на неї (без повторного завантаження з архіву)
+                dom.docFrame.src = `${state.pdfBlobUrl}#page=${p}&toolbar=1&navpanes=0`;
+            } else if (raw.startsWith('blob:')) {
+                const cleanBlob = raw.split('?')[0];
+                dom.docFrame.src = `${cleanBlob}#page=${p}&toolbar=1&navpanes=0`;
+            } else {
+                try {
+                    const u = new URL(raw, window.location.href);
+                    u.searchParams.set('page_sync', p);
+                    dom.docFrame.src = `${u.toString()}#page=${p}&toolbar=1&navpanes=0`;
+                } catch (_) {
+                    const clean = raw.split('?')[0];
+                    dom.docFrame.src = `${clean}?page_sync=${p}#page=${p}&toolbar=1&navpanes=0`;
+                }
             }
         }
+
 
         saveUserBookWorkspace();
     }
@@ -1951,7 +2343,11 @@
             .replace(/[Дд](?=[a-hа-яЬx:1-8])/g, 'N')
             // 5. Font letter Ь/ь -> b
             .replace(/[Ьь](?=[1-8])/g, 'b')
-            // 6. Cyrillic files mapping
+            // 6. Soviet chess fonts / OCR: digit 2 before file/square is Bishop (B)
+            .replace(/2(?=[a-hа-яx:1-8])/g, 'B')
+            // 7. OCR file 'g' scanned as '9' (e.g. 96 -> g6, 94 -> g4)
+            .replace(/9(?=[1-8])/g, 'g')
+            // 8. Cyrillic files mapping
             .replace(/а(?=[1-8x:])/gi, 'a')
             .replace(/б(?=[1-8x:])/gi, 'b')
             .replace(/с(?=[1-8x:])/g, 'c')
@@ -1960,7 +2356,7 @@
             .replace(/ф(?=[1-8x:])/gi, 'f')
             .replace(/г(?=[1-8x:])/gi, 'g')
             .replace(/h(?=[1-8x:])/gi, 'h')
-            // 7. Captures symbol (: and x and Cyrillic х)
+            // 9. Captures symbol (: and x and Cyrillic х)
             .replace(/[:xх]/g, 'x');
 
         // Remove move numbers like '1.', '2.', '12...' and punctuation
@@ -1973,25 +2369,16 @@
         function getCandidates(g, token) {
             const list = [];
 
-            // 1. Direct move attempt
-            try {
-                const m = g.move(token, { sloppy: true });
-                if (m) {
-                    g.undo();
-                    list.push(m);
-                }
-            } catch (_) {}
-
-            // 2. Pawn capture e.g. 'cd', 'cxd', 'ed', 'fe'
+            // 1. Pawn capture e.g. 'cd', 'cxd', 'ed', 'fe', 'gf'
             const pawnCap = token.match(/^([a-h])x?([a-h])$/);
             if (pawnCap) {
                 const fromF = pawnCap[1];
                 const toF = pawnCap[2];
                 const found = g.moves({ verbose: true }).find(m => m.piece === 'p' && m.from[0] === fromF && m.to[0] === toF);
-                if (found && !list.some(x => x.san === found.san)) list.push(found);
+                if (found) list.push(found);
             }
 
-            // 3. Piece-less capture e.g. 'xd4', ':d4', 'xc6'
+            // 2. Piece-less capture e.g. 'xd4', ':d4', 'xc6', 'xf5'
             if (token.startsWith('x') || token.startsWith(':')) {
                 const target = token.replace(/[:x]/g, '');
                 const caps = g.moves({ verbose: true }).filter(m => m.to === target && m.captured);
@@ -1999,52 +2386,116 @@
                     const order = { n: 1, b: 2, r: 3, q: 4, p: 5, k: 6 };
                     return (order[a.piece] || 9) - (order[b.piece] || 9);
                 });
-                caps.forEach(c => {
-                    if (!list.some(x => x.san === c.san)) list.push(c);
-                });
+                caps.forEach(c => list.push(c));
             }
 
-            // 4. Try piece prefixes if token is a coordinate like 'f3', 'c6'
+            // 3. Coordinate square like 'f3', 'c3', 'f6', 'c6', 'a6', 'd6', 'e5', 'e6'
             if (/^[a-h][1-8]$/.test(token)) {
+                // Common knight development squares where piece letter was dropped by OCR
+                const isCommonKnightSquare = ['f3', 'c3', 'f6', 'c6'].includes(token);
+                if (isCommonKnightSquare) {
+                    try {
+                        const km = g.move('N' + token, { sloppy: true });
+                        if (km) { g.undo(); list.push(km); }
+                    } catch (_) {}
+                }
+
+                // Direct pawn move
+                try {
+                    const pm = g.move(token, { sloppy: true });
+                    if (pm) { g.undo(); list.push(pm); }
+                } catch (_) {}
+
+                // Other pieces (N, B, R, Q, K)
                 for (const p of ['N', 'B', 'R', 'Q', 'K']) {
                     try {
                         const m = g.move(p + token, { sloppy: true });
                         if (m) {
                             g.undo();
-                            if (!list.some(x => x.san === m.san)) {
-                                if (p === 'N') list.unshift(m);
-                                else list.push(m);
-                            }
+                            if (!list.some(x => x.san === m.san)) list.push(m);
                         }
                     } catch (_) {}
+                }
+            } else {
+                // Direct move attempt
+                try {
+                    const m = g.move(token, { sloppy: true });
+                    if (m) { g.undo(); list.push(m); }
+                } catch (_) {}
+            }
+
+            // 4. Missing file or OCR digit artifact (e.g. "5" when Nf5 was played)
+            if (/^[1-8]$/.test(token) && list.length === 0) {
+                for (const f of ['f', 'c', 'd', 'e', 'g', 'b', 'a', 'h']) {
+                    const sq = f + token;
+                    const mvs = g.moves({ verbose: true }).filter(m => m.to === sq);
+                    mvs.sort((a, b) => {
+                        const order = { n: 1, b: 2, r: 3, q: 4, p: 5, k: 6 };
+                        return (order[a.piece] || 9) - (order[b.piece] || 9);
+                    });
+                    mvs.forEach(m => {
+                        if (!list.some(x => x.san === m.san)) list.push(m);
+                    });
                 }
             }
 
             return list;
         }
 
-        let bestMoves = [];
+        // Fast linear parsing with 2-step lookahead and resilient token skipping
+        const g = new Chess();
+        const moves = [];
+        let idx = 0;
 
-        function search(idx, g, currentMoves) {
-            if (currentMoves.length > bestMoves.length) {
-                bestMoves = [...currentMoves];
-            }
-            if (idx >= tokens.length) return;
-
+        while (idx < tokens.length) {
             const token = tokens[idx];
             const candidates = getCandidates(g, token);
 
-            for (const cand of candidates) {
-                g.move(cand);
-                search(idx + 1, g, [...currentMoves, cand.san]);
-                g.undo();
-                if (bestMoves.length === tokens.length) return;
+            if (candidates.length === 0) {
+                // Skip non-move token (annotations, OCR noise, symbols)
+                idx++;
+                continue;
+            }
+
+            if (candidates.length === 1) {
+                g.move(candidates[0]);
+                moves.push(candidates[0].san);
+                idx++;
+            } else {
+                // Test candidates with lookahead up to 2 steps to pick the branch that continues
+                let bestCand = candidates[0];
+                let bestScore = -1;
+
+                for (const cand of candidates) {
+                    g.move(cand);
+                    let score = 1;
+                    if (idx + 1 < tokens.length) {
+                        const nextCands1 = getCandidates(g, tokens[idx + 1]);
+                        if (nextCands1.length > 0) {
+                            score += 2;
+                            g.move(nextCands1[0]);
+                            if (idx + 2 < tokens.length) {
+                                const nextCands2 = getCandidates(g, tokens[idx + 2]);
+                                if (nextCands2.length > 0) score += 3;
+                            }
+                            g.undo();
+                        }
+                    }
+                    g.undo();
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestCand = cand;
+                    }
+                }
+
+                g.move(bestCand);
+                moves.push(bestCand.san);
+                idx++;
             }
         }
 
-        const testGame = new Chess();
-        search(0, testGame, []);
-        return bestMoves;
+        return moves;
     }
 
     function loadMovesToBoard(movesArray) {
@@ -2151,7 +2602,8 @@
                 <button type="button" class="bookmark-del-btn" title="Видалити закладку">✕</button>
             `;
 
-            div.querySelector('.bookmark-left').addEventListener('click', () => goToPage(bm.page));
+            div.style.cursor = 'pointer';
+            div.addEventListener('click', () => goToPage(bm.page));
             div.querySelector('.bookmark-del-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
                 state.bookmarks.splice(idx, 1);
@@ -2740,7 +3192,7 @@
         if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
         if (dom.contentWrap) {
             dom.contentWrap.style.display = 'block';
-            const hasDirectFile = Boolean(bookParam.file);
+            const directUrl = state.resolvedDirectUrl || '';
             dom.contentWrap.innerHTML = `
                 <div style="text-align: center; padding: 60px 20px;">
                     <div style="font-size: 3rem; margin-bottom: 12px;">📂</div>
@@ -2752,9 +3204,9 @@
                         <button type="button" onclick="document.getElementById('input-local-file').click()" class="btn-add-note" style="padding: 12px 24px; font-size: 0.95rem; cursor: pointer; border: none; border-radius: 8px; font-weight: 600;">
                             📂 Обрати файл з пристрою
                         </button>
-                        ${hasDirectFile ? `
-                            <a href="${bookParam.file}" target="_blank" class="btn-add-note" style="text-decoration: none; padding: 12px 24px; font-size: 0.95rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);">
-                                🔗 Відкрити за прямим посиланням
+                        ${directUrl ? `
+                            <a href="${escapeHtml(directUrl)}" target="_blank" rel="noopener" class="btn-add-note" style="text-decoration: none; padding: 12px 24px; font-size: 0.95rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);">
+                                🔗 Завантажити оригінал
                             </a>
                         ` : ''}
                     </div>

@@ -270,6 +270,26 @@ function getFlagHtml(champ) {
     return `<span class="champ-flag-emoji">${champ.flag}</span>`;
 }
 
+function getResolvedChampBooks(bookList) {
+    if (!Array.isArray(bookList) || bookList.length === 0) return [];
+    if (typeof window.findCachedBook !== 'function' || !Array.isArray(window.CHESS_BOOKS_CACHE) || window.CHESS_BOOKS_CACHE.length === 0) {
+        return bookList;
+    }
+    const seen = new Set();
+    const out = [];
+    for (const fn of bookList) {
+        const found = window.findCachedBook(fn);
+        if (found && found.id && found.inArchive !== false) {
+            const key = found.id.normalize('NFC').toLowerCase();
+            if (!seen.has(key)) {
+                seen.add(key);
+                out.push(found.id);
+            }
+        }
+    }
+    return out;
+}
+
 // 1. РЕНДЕР СПИСКУ ЧЕМПІОНІВ (1 рядок на 1 людину)
 function renderChampionsList() {
     const listContainer = document.getElementById('champions-list');
@@ -283,8 +303,12 @@ function renderChampionsList() {
 
     listContainer.innerHTML = WORLD_CHAMPIONS_DATA.map(champ => {
         const cd = getChampData(champ, isEn);
-        const authorPillClass = champ.authorBooksCount > 0 ? 'has-books' : '';
-        const aboutPillClass = champ.aboutBooksCount > 0 ? 'has-books' : '';
+        const authList = getResolvedChampBooks(champ.authorBooks);
+        const aboutList = getResolvedChampBooks(champ.aboutBooks);
+        const authCount = authList.length;
+        const aboutCount = aboutList.length;
+        const authorPillClass = authCount > 0 ? 'has-books' : '';
+        const aboutPillClass = aboutCount > 0 ? 'has-books' : '';
         const flagHtml = getFlagHtml(champ);
         const countryHtml = cd.country ? `<span class="champ-country">${flagHtml} <span>${cd.country}</span></span><span class="champ-dot">•</span>` : '';
 
@@ -302,10 +326,10 @@ function renderChampionsList() {
                 </div>
                 <div class="champ-row-stats">
                     <span class="champ-pill ${authorPillClass}" title="${authPillTitle}">
-                        ✍️ ${champ.authorBooksCount} ${authPillText}
+                        ✍️ ${authCount} ${authPillText}
                     </span>
                     <span class="champ-pill ${aboutPillClass}" title="${aboutPillTitle}">
-                        📖 ${champ.aboutBooksCount} ${aboutPillText}
+                        📖 ${aboutCount} ${aboutPillText}
                     </span>
                 </div>
                 <span class="champ-row-arrow">›</span>
@@ -416,14 +440,19 @@ function openChampionModal(champ) {
 
     const factsHtml = cd.facts.map(f => `<li>${f}</li>`).join('');
 
+    const resolvedAuthorBooks = getResolvedChampBooks(champ.authorBooks);
+    const resolvedAboutBooks = getResolvedChampBooks(champ.aboutBooks);
+    const authBooksCount = resolvedAuthorBooks.length;
+    const aboutBooksCount = resolvedAboutBooks.length;
+
     // Генерація списку авторських книг
     let authorBooksHtml = isEn 
         ? '<p class="chm-empty-books">No separate authored books in vault yet.</p>'
         : '<p class="chm-empty-books">У сховищі поки немає окремих видань авторства.</p>';
-    if (champ.authorBooks && champ.authorBooks.length > 0) {
+    if (resolvedAuthorBooks.length > 0) {
         authorBooksHtml = `
             <div class="chm-books-scroll-list">
-                ${champ.authorBooks.map(b => formatChampBookItem(b, '📄')).join('')}
+                ${resolvedAuthorBooks.map(b => formatChampBookItem(b, '📄')).join('')}
             </div>
         `;
     }
@@ -432,10 +461,10 @@ function openChampionModal(champ) {
     let aboutBooksHtml = isEn
         ? '<p class="chm-empty-books">No separate books about this player in vault yet.</p>'
         : '<p class="chm-empty-books">У сховищі поки немає окремих книг про цього шахіста.</p>';
-    if (champ.aboutBooks && champ.aboutBooks.length > 0) {
+    if (resolvedAboutBooks.length > 0) {
         aboutBooksHtml = `
             <div class="chm-books-scroll-list">
-                ${champ.aboutBooks.map(b => formatChampBookItem(b, '📖')).join('')}
+                ${resolvedAboutBooks.map(b => formatChampBookItem(b, '📖')).join('')}
             </div>
         `;
     }
@@ -446,16 +475,16 @@ function openChampionModal(champ) {
     const aboutBooksLabel = isEn ? 'Books about him:' : 'Книг про нього:';
     const aboutChampTitle = isEn ? 'About Champion' : 'Про шахіста';
     const factsTitle = isEn ? 'Interesting Facts' : 'Цікаві факти';
-    const authorColTitle = isEn ? `Authored Books (${champ.authorBooksCount})` : `Книги авторства (${champ.authorBooksCount})`;
-    const aboutColTitle = isEn ? `Books About Him & Matches (${champ.aboutBooksCount})` : `Книги про нього та матчі (${champ.aboutBooksCount})`;
+    const authorColTitle = isEn ? `Authored Books (${authBooksCount})` : `Книги авторства (${authBooksCount})`;
+    const aboutColTitle = isEn ? `Books About Him & Matches (${aboutBooksCount})` : `Книги про нього та матчі (${aboutBooksCount})`;
     const booksFrameTitle = isEn ? 'Champion Library' : 'Бібліотека книг';
     const authTabLabel = isEn ? 'Authored' : 'Авторські';
     const aboutTabLabel = isEn ? 'About Him' : 'Про нього';
     const allTabLabel = isEn ? 'All Books' : 'Всі книги';
-    const totalBooksCount = (champ.authorBooksCount || 0) + (champ.aboutBooksCount || 0);
+    const totalBooksCount = authBooksCount + aboutBooksCount;
     const booksCountWord = isEn ? 'books' : 'книг';
 
-    const defaultTab = (champ.authorBooksCount === 0 && champ.aboutBooksCount > 0) ? 'about' : 'author';
+    const defaultTab = (authBooksCount === 0 && aboutBooksCount > 0) ? 'about' : 'author';
 
     const eloDigits = champ.peakElo || (champ.peakEloDisplay ? String(champ.peakEloDisplay).replace(/\D+/g, '') : '');
 
@@ -482,11 +511,11 @@ function openChampionModal(champ) {
                     </div>` : ''}
                     <div class="chm-count-pill">
                         <span>✍️ ${authorBooksLabel}</span>
-                        <strong>${champ.authorBooksCount}</strong>
+                        <strong>${authBooksCount}</strong>
                     </div>
                     <div class="chm-count-pill">
                         <span>📖 ${aboutBooksLabel}</span>
-                        <strong>${champ.aboutBooksCount}</strong>
+                        <strong>${aboutBooksCount}</strong>
                     </div>
                 </div>
             </div>
@@ -516,12 +545,12 @@ function openChampionModal(champ) {
                     <button type="button" class="chm-tab-btn ${defaultTab === 'author' ? 'active' : ''}" data-chm-tab="author">
                         <span class="chm-tab-icon">✍️</span>
                         <span class="chm-tab-text">${authTabLabel}</span>
-                        <span class="chm-tab-badge">${champ.authorBooksCount}</span>
+                        <span class="chm-tab-badge">${authBooksCount}</span>
                     </button>
                     <button type="button" class="chm-tab-btn ${defaultTab === 'about' ? 'active' : ''}" data-chm-tab="about">
                         <span class="chm-tab-icon">📖</span>
                         <span class="chm-tab-text">${aboutTabLabel}</span>
-                        <span class="chm-tab-badge">${champ.aboutBooksCount}</span>
+                        <span class="chm-tab-badge">${aboutBooksCount}</span>
                     </button>
                     <button type="button" class="chm-tab-btn ${defaultTab === 'all' ? 'active' : ''}" data-chm-tab="all">
                         <span class="chm-tab-icon">📚</span>
@@ -612,13 +641,15 @@ function openBookModalFromFilename(filename) {
 
     const format = normFilename.split('.').pop().toLowerCase() || 'pdf';
 
-    const cachedBook = window.CHESS_BOOKS_CACHE && window.CHESS_BOOKS_CACHE.find(b => 
-        b && b.id && (
-            b.id === normFilename || 
-            b.id.toLowerCase() === normFilename.toLowerCase() ||
-            (b.id.normalize && b.id.normalize('NFC').toLowerCase() === normFilename.toLowerCase())
-        )
-    );
+    const cachedBook = (typeof window.findCachedBook === 'function')
+        ? window.findCachedBook(normFilename)
+        : (window.CHESS_BOOKS_CACHE && window.CHESS_BOOKS_CACHE.find(b =>
+            b && b.id && (
+                b.id === normFilename ||
+                b.id.toLowerCase() === normFilename.toLowerCase() ||
+                (b.id.normalize && b.id.normalize('NFC').toLowerCase() === normFilename.toLowerCase())
+            )
+        ));
 
     const canonicalId = cachedBook ? (cachedBook.id.normalize ? cachedBook.id.normalize('NFC') : cachedBook.id) : normFilename;
 
@@ -630,6 +661,8 @@ function openBookModalFromFilename(filename) {
     const sizeDisplay = cachedBook ? cachedBook.sizeDisplay : '—';
     const sizeRaw = cachedBook ? cachedBook.sizeRaw : 0;
 
+    const hasCacheLoaded = Array.isArray(window.CHESS_BOOKS_CACHE) && window.CHESS_BOOKS_CACHE.length > 0;
+    const inArchive = cachedBook ? cachedBook.inArchive !== false : !hasCacheLoaded;
     const bookObj = {
         id: canonicalId,
         title: (cachedBook && cachedBook.title) ? cachedBook.title : (title || cleanName),
@@ -639,7 +672,8 @@ function openBookModalFromFilename(filename) {
         format: (cachedBook && cachedBook.format) ? cachedBook.format : format,
         sizeDisplay: sizeDisplay,
         sizeRaw: sizeRaw,
-        url: (cachedBook && cachedBook.url) ? cachedBook.url : `https://archive.org/download/1971_20260223/${encodeURIComponent(canonicalId)}`
+        inArchive: inArchive,
+        url: cachedBook ? (cachedBook.url || '') : (inArchive ? `https://archive.org/download/1971_20260223/${encodeURIComponent(canonicalId)}` : '')
     };
 
     if (typeof openBookModal === 'function') {
