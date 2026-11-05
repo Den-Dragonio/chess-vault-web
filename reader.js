@@ -50,6 +50,7 @@
         labelPercentage: document.getElementById('label-percentage'),
         btnReaderSettings: document.getElementById('btn-reader-settings'),
         btnQuickNote: document.getElementById('btn-quick-note'),
+        btnTopbarLocal: document.getElementById('btn-topbar-local'),
         settingsModal: document.getElementById('reader-settings-modal'),
         btnCloseSettings: document.getElementById('btn-close-settings'),
         btnDoneSettings: document.getElementById('btn-done-settings'),
@@ -141,6 +142,12 @@
         zoom: 1.0,
         pdfDoc: null,
         djvuViewer: null,
+        djvuViewerUnsub: null,
+        djvuFallbackDoc: null,
+        djvuFallbackCanvas: null,
+        djvuFallbackOcrBody: null,
+        djvuRenderToken: 0,
+        resolvedCorsUrl: '',
         isHighlightActive: false,
         settings: {
             dockSide: localStorage.getItem('chess_vault_reader_dock_side') || 'right',
@@ -955,6 +962,26 @@
         }
     }
 
+    async function deleteCachedBookBlob(bookId, uid) {
+        try {
+            const db = await openBooksDB();
+            const userKey = `book_${uid || 'guest'}_${bookId}`;
+            const guestKey = `book_guest_${bookId}`;
+            const rawKey = `book_${bookId}`;
+            return new Promise((resolve) => {
+                const tx = db.transaction(IDB_STORE, 'readwrite');
+                const store = tx.objectStore(IDB_STORE);
+                try { store.delete(userKey); } catch (_) {}
+                try { store.delete(guestKey); } catch (_) {}
+                try { store.delete(rawKey); } catch (_) {}
+                tx.oncomplete = () => resolve(true);
+                tx.onerror = () => resolve(false);
+            });
+        } catch (_) {
+            return false;
+        }
+    }
+
     // ========================================================
     // ARCHIVE.ORG URL HELPERS
     // --------------------------------------------------------
@@ -993,17 +1020,119 @@
         return state.resolvedDirectUrl || toDirectUrl(bookParam.file) || '';
     }
 
+    function getDjVuBaseUrl() {
+        const src = state.resolvedCorsUrl || (bookParam.file ? toCorsUrl(bookParam.file) : '');
+        if (!src || src.startsWith('blob:') || src.startsWith('data:')) return null;
+        const idx = src.lastIndexOf('/');
+        return idx > 8 ? src.slice(0, idx + 1) : null;
+    }
+
+    function sniffArrayBufferFormat(buf, fallback) {
+        try {
+            const u8 = new Uint8Array(buf, 0, Math.min(64, buf.byteLength));
+            if (u8.length < 4) return fallback;
+            const ascii = String.fromCharCode(...u8);
+            if (ascii.startsWith('%PDF')) return 'pdf';
+            if (ascii.startsWith('AT&T') || ascii.includes('AT&TFORM')) return 'djvu';
+            if (ascii.startsWith('FORM') && u8.length >= 12) {
+                const sub = String.fromCharCode(u8[8], u8[9], u8[10], u8[11]);
+                if (sub === 'DJVM' || sub === 'DJVU') return 'djvu';
+            }
+            if (u8[0] === 0x50 && u8[1] === 0x4B) return 'docx';
+            if (u8[0] === 0xD0 && u8[1] === 0xCF && u8[2] === 0x11 && u8[3] === 0xE0) return 'doc';
+            const trimmed = ascii.trimStart().toLowerCase();
+            if (trimmed.startsWith('<!doctype html') || trimmed.startsWith('<html') || trimmed.startsWith('<head')) {
+                return 'html_error';
+            }
+        } catch (_) {}
+        return fallback;
+    }
+
     // Визначає реальний формат файлу за сигнатурою (magic bytes)
     async function sniffBlobFormat(blob, fallback) {
         try {
-            const head = new Uint8Array(await blob.slice(0, 8).arrayBuffer());
-            const str = String.fromCharCode(...head);
-            if (str.startsWith('%PDF')) return 'pdf';
-            if (str.startsWith('AT&T')) return 'djvu';
-            if (head[0] === 0x50 && head[1] === 0x4B) return 'docx';
-            if (head[0] === 0xD0 && head[1] === 0xCF && head[2] === 0x11 && head[3] === 0xE0) return 'doc';
-        } catch (_) {}
-        return fallback;
+            const sliceBuf = await blob.slice(0, 64).arrayBuffer();
+            return sniffArrayBufferFormat(sliceBuf, fallback);
+        } catch (_) {
+            return fallback;
+        }
+    }
+
+    async function isValidCachedBlobForFormat(blob, expectedFormat) {
+        if (!blob || blob.size < 64) return false;
+        try {
+            const sliceBuf = await blob.slice(0, 64).arrayBuffer();
+            const detected = sniffArrayBufferFormat(sliceBuf, '');
+            if (detected === 'html_error') return false;
+            const fmt = normalizeFormat(expectedFormat);
+            if (fmt === 'djvu') return detected === 'djvu';
+            if (fmt === 'pdf') return detected === 'pdf';
+            if (fmt === 'docx') return detected === 'docx';
+            if (fmt === 'doc') return detected === 'doc' || detected === 'docx';
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    // Приводить буфер DjVu до канонічного заголовка AT&TFORM...
+    function normalizeDjVuBuffer(arrayBuffer) {
+        if (!arrayBuffer || arrayBuffer.byteLength < 16) {
+            throw new Error('Файл порожній або занадто малий для DjVu');
+        }
+        const u8 = new Uint8Array(arrayBuffer);
+        const head = String.fromCharCode(...u8.subarray(0, Math.min(64, u8.length)));
+        if (head.startsWith('AT&TFORM')) {
+            return arrayBuffer;
+        }
+        // Деякі DjVu-файли починаються одразу з IFF85 "FORM....DJVM" / "FORM....DJVU" без 4-байтного префікса "AT&T"
+        if (head.startsWith('FORM')) {
+            const sub = String.fromCharCode(u8[8], u8[9], u8[10], u8[11]);
+            if (sub === 'DJVM' || sub === 'DJVU') {
+                const merged = new Uint8Array(u8.byteLength + 4);
+                merged[0] = 0x41; // A
+                merged[1] = 0x54; // T
+                merged[2] = 0x26; // &
+                merged[3] = 0x54; // T
+                merged.set(u8, 4);
+                return merged.buffer;
+            }
+        }
+        // Якщо є кілька службових байтів перед AT&TFORM
+        const idx = head.indexOf('AT&TFORM');
+        if (idx > 0) {
+            return arrayBuffer.slice(idx);
+        }
+        throw new Error('Файл не має коректної сигнатури DjVu (AT&TFORM)');
+    }
+
+    function loadScriptDynamic(src) {
+        return new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = src;
+            s.async = true;
+            s.onload = () => resolve(true);
+            s.onerror = () => reject(new Error(`Failed to load ${src}`));
+            document.head.appendChild(s);
+        });
+    }
+
+    async function ensureDjVuLibraryLoaded() {
+        if (typeof DjVu !== 'undefined' && (DjVu.Viewer || DjVu.Document)) return true;
+        const fallbacks = [
+            ['vendor/djvu.js?v=2', 'vendor/djvu_viewer.js?v=2'],
+            ['https://djvu.js.org/assets/dist/djvu.js', 'https://djvu.js.org/assets/dist/djvu_viewer.js']
+        ];
+        for (const [coreSrc, viewerSrc] of fallbacks) {
+            try {
+                if (typeof DjVu === 'undefined') await loadScriptDynamic(coreSrc);
+                if (typeof DjVu !== 'undefined' && !DjVu.Viewer) {
+                    await loadScriptDynamic(viewerSrc).catch(() => {});
+                }
+                if (typeof DjVu !== 'undefined' && (DjVu.Viewer || DjVu.Document)) return true;
+            } catch (_) {}
+        }
+        return typeof DjVu !== 'undefined' && Boolean(DjVu.Viewer || DjVu.Document);
     }
 
     // Перевіряє, що файл існує (через CORS-ендпоінт), не завантажуючи його повністю
@@ -1070,6 +1199,7 @@
                 else if (fmt === 'doc') mime = 'application/msword';
                 else if (fmt === 'txt') mime = 'text/plain';
 
+                state.resolvedCorsUrl = url;
                 state.resolvedDirectUrl = toDirectUrl(rawUrl);
                 return new Blob(chunks, { type: mime });
             } catch (err) {
@@ -1154,9 +1284,15 @@
 
         if (dom.dropBar) dom.dropBar.style.display = 'flex';
 
+        // Прямий режим відкриття локального файлу (reader.html?local=1)
+        if (urlParams.get('local') === '1' && !rawId && !rawFile) {
+            showDocError('Оберіть файл книги (.djvu, .pdf, .doc, .docx, .txt) з вашого комп’ютера або просто перетягніть його у це вікно.');
+            return;
+        }
+
         const uid = state.currentUser ? state.currentUser.uid : 'guest';
 
-        // 1. ПЕРЕВІРЯЄМО ОСОБИСТУ КОПІЮ В INDEXEDDB (миттєве офлайн-відкриття)
+        // 1. ПЕРЕВІРЯЄМО ОСОБИСТУ КОПІЮ В INDEXEDDB (миттєве офлайн-відкриття з перевіркою цілісності)
         dom.loading.style.display = 'flex';
         dom.loadingText.textContent = `Пошук персональної копії книги...`;
 
@@ -1164,11 +1300,21 @@
             const cachedBlob = await getCachedBookBlob(bookParam.id, uid);
             if (cachedBlob && cachedBlob.size > 1024) {
                 const cachedFormat = await sniffBlobFormat(cachedBlob, format);
-                dom.loading.style.display = 'none';
-                if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
-                showSyncToast('⚡ Відкрито збережену персональну копію (IndexedDB)');
-                displayDocumentBlob(cachedBlob, cachedFormat);
-                return;
+                const validCache = await isValidCachedBlobForFormat(cachedBlob, cachedFormat === 'html_error' ? format : cachedFormat);
+                if (validCache && cachedFormat !== 'html_error') {
+                    if (cachedBook && cachedBook.url) {
+                        state.resolvedCorsUrl = toCorsUrl(cachedBook.url);
+                        state.resolvedDirectUrl = toDirectUrl(cachedBook.url);
+                    }
+                    dom.loading.style.display = 'none';
+                    if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
+                    showSyncToast('⚡ Відкрито збережену персональну копію (IndexedDB)');
+                    displayDocumentBlob(cachedBlob, cachedFormat);
+                    return;
+                } else {
+                    console.warn('Evicting invalid/corrupted IndexedDB cached blob for:', bookParam.id);
+                    await deleteCachedBookBlob(bookParam.id, uid);
+                }
             }
         } catch (e) {
             console.warn('Error reading cached blob:', e);
@@ -1504,21 +1650,21 @@
             dom.loading.style.display = 'none';
             updatePageUI();
         } else if (format === 'djvu') {
-            if (typeof DjVu !== 'undefined' && DjVu.Viewer && dom.djvuMount) {
-                dom.docFrame.style.display = 'none';
-                if (dom.contentWrap) dom.contentWrap.style.display = 'none';
-                dom.djvuWrap.style.display = 'block';
-                dom.loading.style.display = 'flex';
-                dom.loadingText.textContent = 'Відкриття DjVu документа...';
-                blob.arrayBuffer().then(buf => {
-                    initDjVuViewer(buf);
-                }).catch(err => {
-                    console.warn('DjVu blob read error:', err);
-                    showDocError('Не вдалося прочитати DjVu файл.');
-                });
-            } else {
-                showDocError('Бібліотека DjVu.js не завантажилась. Оновіть сторінку або перевірте інтернет-з’єднання.');
-            }
+            dom.docFrame.style.display = 'none';
+            if (dom.contentWrap) dom.contentWrap.style.display = 'none';
+            if (dom.djvuWrap) dom.djvuWrap.style.display = 'block';
+            dom.loading.style.display = 'flex';
+            dom.loadingText.textContent = 'Відкриття DjVu документа...';
+            ensureDjVuLibraryLoaded().then(loaded => {
+                if (!loaded) {
+                    showDocError('Бібліотека DjVu.js не завантажилась. Оновіть сторінку (Cmd+Shift+R / Ctrl+F5) або перевірте інтернет-з’єднання.');
+                    return;
+                }
+                return blob.arrayBuffer().then(buf => openDjVuBuffer(buf, bookParam.title || bookParam.id || 'book.djvu'));
+            }).catch(err => {
+                console.warn('DjVu blob read error:', err);
+                showDocError('Не вдалося прочитати DjVu файл. Перевірте цілісність файлу або оберіть іншу копію з пристрою.');
+            });
         } else if (format === 'doc') {
             blob.arrayBuffer().then(buf => {
                 const html = parseBinaryDocToHtml(buf);
@@ -1627,73 +1773,298 @@
         updatePageUI();
     }
 
-    // Shared DjVu Viewer initializer with robust page synchronization
-    function initDjVuViewer(buf) {
+    function cleanupDjVuState() {
+        if (typeof state.djvuViewerUnsub === 'function') {
+            try { state.djvuViewerUnsub(); } catch (_) {}
+            state.djvuViewerUnsub = null;
+        }
+        if (state.djvuViewer) {
+            try { state.djvuViewer.destroy(); } catch (_) {}
+            state.djvuViewer = null;
+        }
+        if (state.djvuFallbackDoc) {
+            try { state.djvuFallbackDoc.resetLastRequestedPage && state.djvuFallbackDoc.resetLastRequestedPage(); } catch (_) {}
+            state.djvuFallbackDoc = null;
+        }
+        state.djvuFallbackCanvas = null;
+        state.djvuFallbackOcrBody = null;
+    }
+
+    async function openDjVuBuffer(rawBuf, fileName = 'book.djvu') {
         if (!dom.djvuMount) return;
+        let normalizedBuf;
+        try {
+            normalizedBuf = normalizeDjVuBuffer(rawBuf);
+        } catch (err) {
+            console.warn('Invalid DjVu header:', err);
+            showDocError('Обраний файл не є коректним DjVu-документом або завантажився з помилкою. Спробуйте обрати інший файл з пристрою.');
+            return;
+        }
+
+        cleanupDjVuState();
+        dom.docFrame.style.display = 'none';
+        if (dom.contentWrap) dom.contentWrap.style.display = 'none';
+        if (dom.djvuWrap) dom.djvuWrap.style.display = 'block';
+        dom.djvuMount.style.transform = '';
         dom.djvuMount.innerHTML = '';
-        const viewer = new DjVu.Viewer();
-        state.djvuViewer = viewer;
-        viewer.render(dom.djvuMount);
 
-        // Listen for user turning pages in DjVu.js Viewer
-        const pageEvent = (DjVu.Viewer && DjVu.Viewer.Events && DjVu.Viewer.Events.PAGE_NUMBER_CHANGED) || 'PAGE_NUMBER_CHANGED';
-        viewer.on(pageEvent, (newPage) => {
-            if (newPage && newPage !== state.currentPage) {
-                state.currentPage = newPage;
-                updatePageUI();
-                saveUserBookWorkspace();
-            }
-        });
+        const baseUrl = getDjVuBaseUrl();
+        const djvuOptions = baseUrl ? { baseUrl } : undefined;
 
-        viewer.loadDocument(buf).then(() => {
-            dom.loading.style.display = 'none';
+        // 1. Основний переглядач DjVu.Viewer (Web Worker + повний інтерфейс)
+        if (typeof DjVu !== 'undefined' && DjVu.Viewer && typeof Worker !== 'undefined') {
             try {
-                if (DjVu.Viewer && DjVu.Viewer.get && DjVu.Viewer.get.pagesCount) {
-                    const total = DjVu.Viewer.get.pagesCount(viewer.store.getState());
+                await initDjVuViewer(normalizedBuf.slice(0), fileName, djvuOptions);
+                return;
+            } catch (viewerErr) {
+                console.warn('DjVu.Viewer failed, switching to built-in Canvas DjVu renderer:', viewerErr);
+                cleanupDjVuState();
+                dom.djvuMount.innerHTML = '';
+            }
+        }
+
+        // 2. Вбудований безвідмовний Canvas-рендерер DjVu.Document (без Web Worker / Blob URL)
+        if (typeof DjVu !== 'undefined' && DjVu.Document) {
+            try {
+                await initDjVuCanvasFallback(normalizedBuf, djvuOptions);
+                return;
+            } catch (fallbackErr) {
+                console.error('DjVu Canvas fallback failed:', fallbackErr);
+            }
+        }
+
+        showDocError('Не вдалося відкрити DjVu файл (можливо, файл пошкоджений). Спробуйте завантажити оригінал або обрати інший файл з пристрою.');
+    }
+
+    // Primary DjVu.Viewer initializer with store error monitoring, timeout & accurate page sync
+    function initDjVuViewer(buf, fileName = 'book.djvu', djvuOptions = undefined) {
+        return new Promise((resolve, reject) => {
+            if (!dom.djvuMount) {
+                reject(new Error('djvuMount missing'));
+                return;
+            }
+            const viewer = new DjVu.Viewer();
+            state.djvuViewer = viewer;
+            viewer.render(dom.djvuMount);
+
+            // PAGE_NUMBER_CHANGED у DjVu.Viewer не передає аргументів — зчитуємо viewer.getPageNumber()
+            const pageEvent = (DjVu.Viewer && DjVu.Viewer.Events && DjVu.Viewer.Events.PAGE_NUMBER_CHANGED) || 'PAGE_NUMBER_CHANGED';
+            viewer.on(pageEvent, (argPage) => {
+                let newPage = typeof argPage === 'number' && argPage > 0 ? argPage : 0;
+                if (!newPage && typeof viewer.getPageNumber === 'function') {
+                    try { newPage = viewer.getPageNumber(); } catch (_) {}
+                }
+                if (newPage && newPage !== state.currentPage) {
+                    state.currentPage = newPage;
+                    updatePageUI();
+                    saveUserBookWorkspace();
+                }
+            });
+
+            let settled = false;
+            const timer = setTimeout(() => {
+                if (!settled) {
+                    settled = true;
+                    reject(new Error('DjVu.Viewer loadDocument timeout'));
+                }
+            }, 14000);
+
+            // Відстежуємо помилки у Redux-сторі DjVu.Viewer (інакше loadDocument зависає назавжди!)
+            if (viewer.store && typeof viewer.store.subscribe === 'function') {
+                state.djvuViewerUnsub = viewer.store.subscribe(() => {
+                    try {
+                        const st = viewer.store.getState();
+                        const err = (DjVu.Viewer.get && DjVu.Viewer.get.error) ? DjVu.Viewer.get.error(st) : (st && st.error);
+                        if (err && !settled) {
+                            settled = true;
+                            clearTimeout(timer);
+                            reject(err);
+                        }
+                    } catch (_) {}
+                });
+            }
+
+            const config = djvuOptions ? { djvuOptions } : {};
+            viewer.loadDocument(buf, fileName, config).then(() => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                dom.loading.style.display = 'none';
+
+                try {
+                    const st = viewer.store ? viewer.store.getState() : null;
+                    const getSel = DjVu.Viewer && DjVu.Viewer.get;
+                    const total = st && getSel
+                        ? ((getSel.pagesQuantity && getSel.pagesQuantity(st)) || (getSel.pagesCount && getSel.pagesCount(st)) || 0)
+                        : 0;
                     if (total && total > 0) {
                         state.totalPages = total;
                         if (dom.labelTotalPages) dom.labelTotalPages.textContent = total;
                         if (dom.inputCurrentPage) dom.inputCurrentPage.max = total;
                     }
+                } catch (err) {
+                    console.warn('Error reading DjVu pagesQuantity:', err);
                 }
-            } catch (err) {
-                console.warn('Error reading DjVu pages count:', err);
-            }
 
-            // Jump to user's saved reading position
-            if (state.currentPage && state.currentPage > 1) {
-                try {
-                    viewer.configure({ pageNumber: state.currentPage });
-                } catch (_) {}
-            }
-            updatePageUI();
-            saveUserBookWorkspace();
-            showSyncToast('📖 DjVu документ підвантажено');
-        }).catch(err => {
-            console.warn('DjVu loadDocument error:', err);
-            showDocError('Не вдалося відкрити DjVu файл (можливо, файл пошкоджений). Спробуйте обрати файл з пристрою.');
+                const cfg = {};
+                if (state.currentPage && state.currentPage > 1) {
+                    cfg.pageNumber = Math.min(state.currentPage, state.totalPages || state.currentPage);
+                }
+                if (state.zoom && Math.abs(state.zoom - 1.0) > 0.02) {
+                    cfg.pageScale = state.zoom;
+                }
+                if (Object.keys(cfg).length > 0) {
+                    try { viewer.configure(cfg); } catch (_) {}
+                }
+
+                updatePageUI();
+                saveUserBookWorkspace();
+                showSyncToast('📖 DjVu документ підвантажено');
+                resolve(true);
+            }).catch(err => {
+                if (!settled) {
+                    settled = true;
+                    clearTimeout(timer);
+                    reject(err);
+                }
+            });
         });
     }
 
+    // Built-in main-thread Canvas DjVu renderer (works even if Web Workers / DjVu.Viewer fail)
+    async function initDjVuCanvasFallback(buf, djvuOptions = undefined) {
+        const doc = new DjVu.Document(buf, djvuOptions || {});
+        const total = doc.getPagesQuantity() || 1;
+        state.djvuFallbackDoc = doc;
+        state.totalPages = total;
+        if (dom.labelTotalPages) dom.labelTotalPages.textContent = total;
+        if (dom.inputCurrentPage) dom.inputCurrentPage.max = total;
+        if (state.currentPage > total) state.currentPage = 1;
+
+        const stage = document.createElement('div');
+        stage.className = 'djvu-fallback-stage';
+
+        const canvas = document.createElement('canvas');
+        canvas.className = 'djvu-fallback-canvas';
+        stage.appendChild(canvas);
+
+        const ocrDetails = document.createElement('details');
+        ocrDetails.className = 'djvu-fallback-ocr';
+        ocrDetails.style.display = 'none';
+        const summary = document.createElement('summary');
+        summary.textContent = '🔤 Текстовий шар сторінки (для виділення шахової нотації)';
+        const pre = document.createElement('pre');
+        ocrDetails.appendChild(summary);
+        ocrDetails.appendChild(pre);
+        stage.appendChild(ocrDetails);
+
+        dom.djvuMount.innerHTML = '';
+        dom.djvuMount.appendChild(stage);
+        state.djvuFallbackCanvas = canvas;
+        state.djvuFallbackOcrBody = { details: ocrDetails, pre, stage };
+
+        await renderDjVuFallbackPage(state.currentPage || 1);
+        dom.loading.style.display = 'none';
+        applyZoomToDocument();
+        updatePageUI();
+        saveUserBookWorkspace();
+        showSyncToast('📖 DjVu документ підвантажено');
+    }
+
+    async function renderDjVuFallbackPage(pageNum) {
+        if (!state.djvuFallbackDoc || !state.djvuFallbackCanvas) return;
+        const token = ++state.djvuRenderToken;
+        const p = Math.min(Math.max(1, pageNum), state.totalPages || 1);
+        const page = await state.djvuFallbackDoc.getPage(p);
+        if (token !== state.djvuRenderToken) return;
+
+        const imageData = page.getImageData();
+        if (token !== state.djvuRenderToken) return;
+
+        const canvas = state.djvuFallbackCanvas;
+        canvas.width = imageData.width;
+        canvas.height = imageData.height;
+        const ctx = canvas.getContext('2d');
+        ctx.putImageData(imageData, 0, 0);
+
+        if (state.djvuFallbackOcrBody) {
+            let txt = '';
+            try { txt = (page.getText && page.getText()) ? String(page.getText()).trim() : ''; } catch (_) {}
+            if (txt) {
+                state.djvuFallbackOcrBody.pre.textContent = txt;
+                state.djvuFallbackOcrBody.details.style.display = 'block';
+            } else {
+                state.djvuFallbackOcrBody.pre.textContent = '';
+                state.djvuFallbackOcrBody.details.style.display = 'none';
+            }
+            if (state.djvuFallbackOcrBody.stage) {
+                state.djvuFallbackOcrBody.stage.scrollTop = 0;
+            }
+        }
+    }
+
     // LOCAL FILE LOADER (Drag-and-Drop or File Picker)
-    function handleLocalFileSelected(file) {
+    async function handleLocalFileSelected(file) {
         if (!file) return;
-        const fname = file.name.toLowerCase();
+        const fname = file.name || 'local_book';
+        const lower = fname.toLowerCase();
         const uid = state.currentUser ? state.currentUser.uid : 'guest';
-        let ext = 'pdf';
-        if (fname.endsWith('.djvu') || fname.endsWith('.djv')) ext = 'djvu';
-        else if (fname.endsWith('.docx')) ext = 'docx';
-        else if (fname.endsWith('.doc')) ext = 'doc';
-        else if (fname.endsWith('.txt')) ext = 'txt';
+        let ext = '';
+        if (lower.endsWith('.djvu') || lower.endsWith('.djv')) ext = 'djvu';
+        else if (lower.endsWith('.pdf')) ext = 'pdf';
+        else if (lower.endsWith('.docx')) ext = 'docx';
+        else if (lower.endsWith('.doc')) ext = 'doc';
+        else if (lower.endsWith('.txt')) ext = 'txt';
 
         dom.loading.style.display = 'flex';
-        dom.loadingText.textContent = `Читання та збереження локального файлу ${file.name}...`;
+        if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
+        dom.loadingText.textContent = `Читання локального файлу ${fname}...`;
 
-        // Зберігаємо файл у IndexedDB як особисту копію користувача!
-        saveCachedBookBlob(bookParam.id, uid, file, { format: ext, title: file.name });
+        try {
+            const arrayBuf = await file.arrayBuffer();
+            const detected = sniffArrayBufferFormat(arrayBuf, ext || normalizeFormat(bookParam.format) || 'pdf');
+            const finalFormat = (detected && detected !== 'html_error') ? detected : (ext || 'pdf');
 
-        displayDocumentBlob(file, ext);
-        showSyncToast(`📂 Файл "${file.name}" збережено як вашу особисту копію!`);
+            let mime = 'application/octet-stream';
+            if (finalFormat === 'pdf') mime = 'application/pdf';
+            else if (finalFormat === 'djvu') mime = 'image/vnd.djvu';
+            else if (finalFormat === 'docx') mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            else if (finalFormat === 'doc') mime = 'application/msword';
+            else if (finalFormat === 'txt') mime = 'text/plain';
+
+            // Оновлюємо заголовок та ID, якщо відкривали в режимі "Свій файл" без конкретної книги з каталогу
+            if (!rawId && (!rawTitle || urlParams.get('local') === '1')) {
+                const cleanLocalTitle = fname.replace(/\.[^/.]+$/, '');
+                bookParam.id = fname;
+                bookParam.title = cleanLocalTitle || fname;
+                bookParam.format = finalFormat;
+                state.currentPage = 1;
+                if (dom.topbarTitle) dom.topbarTitle.textContent = bookParam.title;
+                document.title = `${bookParam.title} — Онлайн Читалка | Chess Vault`;
+                loadUserBookWorkspace(uid);
+            } else {
+                bookParam.format = finalFormat;
+            }
+
+            // Створюємо чистий Blob у пам'яті (запобігає помилці NotReadableError у Safari/macOS при збереженні File в IndexedDB)
+            const memBlob = new Blob([arrayBuf], { type: mime });
+            saveCachedBookBlob(bookParam.id, uid, memBlob, { format: finalFormat, title: bookParam.title || fname }).catch(() => {});
+
+            if (finalFormat === 'djvu') {
+                const loaded = await ensureDjVuLibraryLoaded();
+                if (!loaded) {
+                    showDocError('Бібліотека DjVu.js не завантажилась. Оновіть сторінку та спробуйте знову.');
+                    return;
+                }
+                await openDjVuBuffer(arrayBuf, fname);
+            } else {
+                displayDocumentBlob(memBlob, finalFormat);
+            }
+            showSyncToast(`📂 Файл "${fname}" відкрито та збережено у вашу бібліотеку!`);
+        } catch (err) {
+            console.error('Local file open error:', err);
+            showDocError(`Не вдалося прочитати локальний файл "${fname}". Перевірте, що файл не пошкоджений.`);
+        }
     }
 
     // ========================================================
@@ -1900,13 +2271,15 @@
         state.currentPage = p;
         updatePageUI();
 
-        // 1. DjVu.js Viewer page navigation
+        // 1. DjVu.js Viewer / Canvas Fallback page navigation
         if (state.djvuViewer && state.djvuViewer.configure) {
             try {
                 state.djvuViewer.configure({ pageNumber: p });
             } catch (err) {
                 console.warn('DjVu configure page error:', err);
             }
+        } else if (state.djvuFallbackDoc) {
+            renderDjVuFallbackPage(p).catch(err => console.warn('DjVu fallback page error:', err));
         }
 
         // 2. Iframe anchor (PDF mode) - query param change forces native viewer navigation
@@ -2526,11 +2899,13 @@
     }
 
     function updateMovesLogUI() {
+        if (!dom.boardMovesLog) return;
         dom.boardMovesLog.innerHTML = '';
         if (chessState.moveHistory.length === 0) {
-            dom.boardMovesLog.innerHTML = '<span style="color: var(--reader-text-muted); font-size: 0.75rem;">Виділіть ходи в книзі або перетягніть фігуру.</span>';
+            dom.boardMovesLog.style.display = 'none';
             return;
         }
+        dom.boardMovesLog.style.display = '';
 
         chessState.moveHistory.forEach((san, idx) => {
             const span = document.createElement('span');
@@ -3048,28 +3423,39 @@
         });
 
         // Local file picker
-        if (dom.btnPickLocal && dom.inputLocalFile) {
-            dom.btnPickLocal.addEventListener('click', () => dom.inputLocalFile.click());
+        if (dom.inputLocalFile) {
+            const triggerFilePick = () => dom.inputLocalFile.click();
+            if (dom.btnPickLocal) dom.btnPickLocal.addEventListener('click', triggerFilePick);
+            if (dom.btnTopbarLocal) dom.btnTopbarLocal.addEventListener('click', triggerFilePick);
             dom.inputLocalFile.addEventListener('change', (e) => {
                 const file = e.target.files && e.target.files[0];
                 if (file) handleLocalFileSelected(file);
+                e.target.value = '';
             });
         }
 
-        // Drag & drop file support
-        dom.viewport.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dom.viewport.style.outline = '2px dashed var(--reader-accent)';
-        });
-        dom.viewport.addEventListener('dragleave', () => {
-            dom.viewport.style.outline = 'none';
-        });
-        dom.viewport.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dom.viewport.style.outline = 'none';
-            const file = e.dataTransfer.files && e.dataTransfer.files[0];
-            if (file) handleLocalFileSelected(file);
-        });
+        // Drag & drop file support (works across entire reader window)
+        const onDragOver = (e) => {
+            if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) {
+                e.preventDefault();
+                if (dom.viewport) dom.viewport.style.outline = '2px dashed var(--reader-accent)';
+            }
+        };
+        const onDragLeave = (e) => {
+            if (!e.relatedTarget && dom.viewport) {
+                dom.viewport.style.outline = 'none';
+            }
+        };
+        const onDrop = (e) => {
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                e.preventDefault();
+                if (dom.viewport) dom.viewport.style.outline = 'none';
+                handleLocalFileSelected(e.dataTransfer.files[0]);
+            }
+        };
+        window.addEventListener('dragover', onDragOver);
+        window.addEventListener('dragleave', onDragLeave);
+        window.addEventListener('drop', onDrop);
     }
 
     // ========================================================
@@ -3139,7 +3525,15 @@
                 dom.docFrame.style.height = `${100 / z}%`;
             }
         }
-        if (dom.djvuMount) {
+        if (state.djvuViewer && state.djvuViewer.configure) {
+            if (dom.djvuMount) dom.djvuMount.style.transform = '';
+            try {
+                state.djvuViewer.configure({ pageScale: z });
+            } catch (_) {}
+        } else if (state.djvuFallbackCanvas) {
+            state.djvuFallbackCanvas.style.width = z === 1.0 ? '' : `${Math.round(z * 100)}%`;
+            state.djvuFallbackCanvas.style.maxWidth = z > 1.0 ? 'none' : '100%';
+        } else if (dom.djvuMount) {
             dom.djvuMount.style.transformOrigin = 'top center';
             dom.djvuMount.style.transform = z === 1.0 ? '' : `scale(${z})`;
         }

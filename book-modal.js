@@ -1207,8 +1207,12 @@ async function onDownloadClick(btn) {
             }, { merge: true }).catch(() => {});
 
             const repeatMsg = isEn ? '📥 Book downloaded again' : '📥 Книгу завантажено знову (повторне завантаження)';
-            if (typeof showLibToast === 'function') showLibToast(repeatMsg);
-            else if (typeof showToast === 'function') showToast(repeatMsg);
+            const openReaderAction = format === 'djvu'
+                ? () => onReadOnlineClick({ id: filename, title, author, format, url })
+                : null;
+            const actionLabel = format === 'djvu' ? (isEn ? 'Read Online 📖' : 'Читати онлайн 📖') : null;
+            if (typeof showLibToast === 'function') showLibToast(repeatMsg, 'ok', actionLabel, openReaderAction);
+            else if (typeof showToast === 'function') showToast(repeatMsg, 'ok', actionLabel, openReaderAction);
             return;
         }
 
@@ -1277,8 +1281,12 @@ async function onDownloadClick(btn) {
         }
 
         const startMsg = window.i18n ? window.i18n.t('modal_download_success', { title: title || filename }) : `📥 Завантаження розпочато!`;
-        if (typeof showLibToast === 'function') showLibToast(startMsg);
-        else if (typeof showToast === 'function') showToast(startMsg);
+        const openReaderAction = format === 'djvu'
+            ? () => onReadOnlineClick({ id: filename, title, author, format, url })
+            : null;
+        const actionLabel = format === 'djvu' ? (isEn ? 'Read Online 📖' : 'Читати онлайн 📖') : null;
+        if (typeof showLibToast === 'function') showLibToast(startMsg, 'ok', actionLabel, openReaderAction);
+        else if (typeof showToast === 'function') showToast(startMsg, 'ok', actionLabel, openReaderAction);
 
     } catch (e) {
         console.error('Firestore download tracking error:', e);
