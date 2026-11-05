@@ -61,7 +61,6 @@
         settingEvalOff: document.getElementById('setting-eval-off'),
         settingArrowBest: document.getElementById('setting-arrow-best'),
         settingArrowThreat: document.getElementById('setting-arrow-threat'),
-        settingEngineLines: document.getElementById('setting-engine-lines'),
         settingBtnFullscreen: document.getElementById('setting-btn-fullscreen'),
         authGateModal: document.getElementById('reader-auth-gate-modal'),
         boardArrowsSvg: document.getElementById('board-arrows-svg'),
@@ -120,11 +119,6 @@
         labelZoomLevel: document.getElementById('label-zoom-level'),
         btnZoomIn: document.getElementById('btn-zoom-in'),
         settingZoomControl: document.getElementById('setting-zoom-control'),
-        // Stockfish Engine Eval
-        engineEvalBox: document.getElementById('engine-eval-box'),
-        engineEvalScorePill: document.getElementById('engine-eval-score-pill'),
-        engineEvalDepth: document.getElementById('engine-eval-depth'),
-        engineEvalPv: document.getElementById('engine-eval-pv'),
         inputChessMoves: document.getElementById('input-chess-moves'),
         btnPasteMoves: document.getElementById('btn-paste-moves'),
         btnLoadMoves: document.getElementById('btn-load-moves'),
@@ -153,8 +147,7 @@
             dockSide: localStorage.getItem('chess_vault_reader_dock_side') || 'right',
             evalMode: localStorage.getItem('chess_vault_reader_eval_mode') || 'full', // 'full' | 'numbers' | 'off'
             arrowBest: localStorage.getItem('chess_vault_reader_arrow_best') !== 'false',
-            arrowThreat: localStorage.getItem('chess_vault_reader_arrow_threat') !== 'false',
-            engineLines: localStorage.getItem('chess_vault_reader_engine_lines') !== 'false'
+            arrowThreat: localStorage.getItem('chess_vault_reader_arrow_threat') !== 'false'
         },
         isDockCollapsed: localStorage.getItem('chess_vault_reader_dock_collapsed') === 'true',
         activeTab: 'board',
@@ -310,9 +303,6 @@
         stockfishState.depth = 0;
         stockfishState.pvSan = '';
 
-        if (dom.engineEvalDepth) dom.engineEvalDepth.textContent = 'обчислення...';
-        if (dom.engineEvalPv) dom.engineEvalPv.textContent = 'Аналіз позиції двигуном Stockfish...';
-
         if (stockfishWorker) {
             stockfishWorker.postMessage('stop');
             stockfishWorker.postMessage('position fen ' + currentFen);
@@ -414,42 +404,8 @@
     }
 
     function renderStockfishUI() {
-        if (dom.engineEvalScorePill) {
-            dom.engineEvalScorePill.textContent = stockfishState.textScore;
-            const s = stockfishState.textScore;
-            if (s.startsWith('+')) {
-                dom.engineEvalScorePill.style.background = 'rgba(34, 197, 94, 0.2)';
-                dom.engineEvalScorePill.style.borderColor = 'rgba(34, 197, 94, 0.4)';
-                dom.engineEvalScorePill.style.color = '#22c55e';
-            } else if (s.startsWith('-')) {
-                dom.engineEvalScorePill.style.background = 'rgba(239, 68, 68, 0.2)';
-                dom.engineEvalScorePill.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-                dom.engineEvalScorePill.style.color = '#ef4444';
-            } else {
-                dom.engineEvalScorePill.style.background = 'rgba(255, 255, 255, 0.1)';
-                dom.engineEvalScorePill.style.borderColor = 'var(--reader-border)';
-                dom.engineEvalScorePill.style.color = 'var(--reader-text)';
-            }
-        }
-
-        if (dom.engineEvalDepth) {
-            dom.engineEvalDepth.textContent = `d=${stockfishState.depth || 12}`;
-        }
-
-        if (dom.engineEvalPv) {
-            dom.engineEvalPv.textContent = stockfishState.pvSan || 'Stockfish аналізує позицію...';
-        }
-
-        applyEngineLinesVisibility();
         updateEvalBarUI();
         updateBoardArrows();
-    }
-
-    function applyEngineLinesVisibility() {
-        const show = state.settings.engineLines !== false;
-        if (dom.engineEvalBox) {
-            dom.engineEvalBox.style.display = show ? 'flex' : 'none';
-        }
     }
 
     function evaluateCurrentBoardPosition() {
@@ -1135,6 +1091,28 @@
         return typeof DjVu !== 'undefined' && Boolean(DjVu.Viewer || DjVu.Document);
     }
 
+    function getPdfWorkerUrl() {
+        if (window.location && (window.location.protocol === 'http:' || window.location.protocol === 'https:')) {
+            return 'vendor/pdf.worker.min.js?v=1';
+        }
+        return 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    async function ensurePdfJsLibraryLoaded() {
+        if (typeof pdfjsLib !== 'undefined' && typeof pdfjsLib.getDocument === 'function') return true;
+        const sources = [
+            'vendor/pdf.min.js?v=1',
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
+        ];
+        for (const src of sources) {
+            try {
+                if (typeof pdfjsLib === 'undefined') await loadScriptDynamic(src);
+                if (typeof pdfjsLib !== 'undefined' && typeof pdfjsLib.getDocument === 'function') return true;
+            } catch (_) {}
+        }
+        return typeof pdfjsLib !== 'undefined' && typeof pdfjsLib.getDocument === 'function';
+    }
+
     // Перевіряє, що файл існує (через CORS-ендпоінт), не завантажуючи його повністю
     async function probeUrl(url, timeoutMs = 15000) {
         const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -1392,7 +1370,8 @@
                 state.resolvedDirectUrl = toDirectUrl(workingUrl);
                 const pdfBytes = cachedBook && Number(cachedBook.sizeRaw) ? Number(cachedBook.sizeRaw) : 0;
 
-                if (typeof pdfjsLib !== 'undefined') {
+                const pdfReady = await ensurePdfJsLibraryLoaded();
+                if (pdfReady) {
                     // Для звичайних PDF (до 65 МБ) завантажуємо з прогрес-баром, кешуємо в IndexedDB та рендеримо через PDF.js
                     if (!pdfBytes || pdfBytes <= 65 * 1024 * 1024) {
                         dom.loadingText.textContent = `Завантаження персональної копії...`;
@@ -1687,7 +1666,10 @@
         pageInput.min = '1';
         pageInput.max = String(state.totalPages || 1);
         pageInput.value = String(state.currentPage || 1);
-        pageInput.addEventListener('change', () => goToPage(pageInput.value));
+        pageInput.addEventListener('change', () => {
+            goToPage(pageInput.value);
+            pageInput.blur();
+        });
         pageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
@@ -1764,18 +1746,20 @@
         state.currentBlobUrl = blobUrl;
 
         if (format === 'pdf') {
-            if (typeof pdfjsLib !== 'undefined') {
-                dom.loading.style.display = 'flex';
-                dom.loadingText.textContent = 'Відкриття PDF документа...';
-                blob.arrayBuffer().then(buf => {
-                    return initPdfJsViewer({ data: new Uint8Array(buf) }, blobUrl);
-                }).catch(err => {
-                    console.warn('PDF.js render fallback to native iframe:', err);
+            dom.loading.style.display = 'flex';
+            dom.loadingText.textContent = 'Відкриття PDF документа...';
+            ensurePdfJsLibraryLoaded().then(loaded => {
+                if (!loaded) {
                     loadPdfDirect(blobUrl);
+                    return;
+                }
+                return blob.arrayBuffer().then(buf => {
+                    return initPdfJsViewer({ data: new Uint8Array(buf) }, blobUrl);
                 });
-            } else {
+            }).catch(err => {
+                console.warn('PDF.js render fallback to native iframe:', err);
                 loadPdfDirect(blobUrl);
-            }
+            });
         } else if (format === 'djvu') {
             cleanupPdfState();
             setViewportInnerScrollLock(true);
@@ -1889,6 +1873,7 @@
 
     // PDF.js CONTINUOUS VIEWER: Full bidirectional scroll ↔ header counter sync + selectable text layer
     async function initPdfJsViewer(pdfSource, fallbackUrl = '') {
+        await ensurePdfJsLibraryLoaded();
         if (typeof pdfjsLib === 'undefined') {
             if (fallbackUrl) {
                 loadPdfDirect(fallbackUrl);
@@ -1897,8 +1882,8 @@
             throw new Error('PDF.js not available');
         }
 
-        if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        if (pdfjsLib.GlobalWorkerOptions) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = getPdfWorkerUrl();
         }
 
         cleanupViewerState();
@@ -1910,7 +1895,16 @@
             dom.contentWrap.innerHTML = '';
         }
 
-        const loadingTask = pdfjsLib.getDocument(pdfSource);
+        const docParams = (pdfSource && typeof pdfSource === 'object' && !(pdfSource instanceof Uint8Array) && !(pdfSource instanceof ArrayBuffer))
+            ? {
+                cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+                cMapPacked: true,
+                standardFontDataUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/standard_fonts/',
+                ...pdfSource
+            }
+            : pdfSource;
+
+        const loadingTask = pdfjsLib.getDocument(docParams);
         state.pdfLoadingTask = loadingTask;
         loadingTask.onProgress = (prog) => {
             if (prog && prog.loaded > 0) {
@@ -2007,7 +2001,11 @@
         }
 
         updatePageUI(true);
-        saveUserBookWorkspace();
+        try {
+            saveUserBookWorkspace();
+        } catch (wsErr) {
+            console.warn('Initial PDF workspace save skipped:', wsErr);
+        }
         showSyncToast('📄 PDF документ підвантажено');
     }
 
@@ -2554,28 +2552,36 @@
 
     function saveUserBookWorkspace() {
         const uid = state.currentUser ? state.currentUser.uid : 'guest';
-        const percent = Math.min(100, Math.max(1, Math.round((state.currentPage / state.totalPages) * 100)));
+        const safeTotal = Math.max(1, Number(state.totalPages) || 1);
+        const safeCurrent = Math.min(Math.max(1, Number(state.currentPage) || 1), safeTotal);
+        const percent = Math.min(100, Math.max(1, Math.round((safeCurrent / safeTotal) * 100)));
+        const resolvedDockSide = (state.settings && state.settings.dockSide) ? state.settings.dockSide : 'right';
 
-        const workspaceData = {
-            bookId: bookParam.id,
-            title: bookParam.title,
-            author: bookParam.author,
-            url: bookParam.file,
-            format: bookParam.format,
-            currentPage: state.currentPage,
-            totalPages: state.totalPages,
+        const rawWorkspaceData = {
+            bookId: bookParam.id || 'book',
+            title: bookParam.title || '',
+            author: bookParam.author || '—',
+            url: bookParam.file || '',
+            format: bookParam.format || 'pdf',
+            currentPage: safeCurrent,
+            totalPages: safeTotal,
             percentage: percent,
             boardFEN: chessState.game ? chessState.game.fen() : null,
-            boardMoves: chessState.moveHistory || [],
-            boardMoveIndex: chessState.currentMoveIndex,
-            boardFlipped: chessState.boardFlipped,
-            boardTurn: chessState.editorTurn,
-            bookmarks: state.bookmarks || [],
-            notes: state.notes || [],
-            highlights: state.highlights || [],
-            dockSide: state.dockSide,
+            boardMoves: Array.isArray(chessState.moveHistory) ? chessState.moveHistory : [],
+            boardMoveIndex: typeof chessState.currentMoveIndex === 'number' ? chessState.currentMoveIndex : -1,
+            boardFlipped: Boolean(chessState.boardFlipped),
+            boardTurn: chessState.editorTurn || 'w',
+            bookmarks: Array.isArray(state.bookmarks) ? state.bookmarks : [],
+            notes: Array.isArray(state.notes) ? state.notes : [],
+            highlights: Array.isArray(state.highlights) ? state.highlights : [],
+            dockSide: resolvedDockSide,
             updatedAt: Date.now()
         };
+
+        const workspaceData = {};
+        for (const [k, v] of Object.entries(rawWorkspaceData)) {
+            if (v !== undefined) workspaceData[k] = v;
+        }
 
         // 1. Збереження в LocalStorage під ключем поточного юзера, guest та заголовком книги
         try {
@@ -2593,30 +2599,38 @@
         } catch (_) {}
 
         // 2. Оновлення ReadingProgress (якщо >= 10 сторінок — рахується у «Зараз читаю» в профілі)
-        if (window.ReadingProgress) {
-            window.ReadingProgress.saveProgress(uid, {
-                id: bookParam.id,
-                title: bookParam.title,
-                author: bookParam.author,
-                url: bookParam.file,
-                format: bookParam.format,
-                currentPage: state.currentPage,
-                totalPages: state.totalPages,
-                notesCount: state.notes.length,
-                bookmarksCount: state.bookmarks.length
-            });
+        try {
+            if (window.ReadingProgress) {
+                window.ReadingProgress.saveProgress(uid, {
+                    id: bookParam.id || 'book',
+                    title: bookParam.title || '',
+                    author: bookParam.author || '—',
+                    url: bookParam.file || '',
+                    format: bookParam.format || 'pdf',
+                    currentPage: safeCurrent,
+                    totalPages: safeTotal,
+                    notesCount: Array.isArray(state.notes) ? state.notes.length : 0,
+                    bookmarksCount: Array.isArray(state.bookmarks) ? state.bookmarks.length : 0
+                });
+            }
+        } catch (rpErr) {
+            console.warn('ReadingProgress save warning:', rpErr);
         }
 
         // 3. Збереження в хмару Firestore окремо для цього користувача
         if (state.currentUser && window.db) {
-            const docId = (bookParam.id || 'book').replace(/[\/\.#$\[\]]/g, '_');
-            window.db.collection('user_reading').doc(state.currentUser.uid)
-                .collection('books').doc(docId)
-                .set(workspaceData, { merge: true })
-                .then(() => {
-                    showSyncIndicator('✅ Збережено в хмарі');
-                })
-                .catch(err => console.warn('Workspace sync error:', err));
+            try {
+                const docId = (bookParam.id || 'book').replace(/[\/\.#$\[\]]/g, '_');
+                window.db.collection('user_reading').doc(state.currentUser.uid)
+                    .collection('books').doc(docId)
+                    .set(workspaceData, { merge: true })
+                    .then(() => {
+                        showSyncIndicator('✅ Збережено в хмарі');
+                    })
+                    .catch(err => console.warn('Workspace sync error:', err));
+            } catch (err) {
+                console.warn('Workspace sync error:', err);
+            }
         } else {
             showSyncIndicator('💾 Збережено локально');
         }
@@ -2672,11 +2686,11 @@
         if (!data) return;
 
         // Restore reading page
-        if (data.currentPage && !urlParams.get('page')) {
+        if (data.currentPage && !urlParams.get('page') && !state.pdfDoc && !state.djvuViewer && !state.djvuFallbackDoc) {
             state.currentPage = data.currentPage;
             if (dom.inputCurrentPage) dom.inputCurrentPage.value = state.currentPage;
         }
-        if (data.totalPages) {
+        if (data.totalPages && !state.pdfDoc && !state.djvuViewer && !state.djvuFallbackDoc) {
             state.totalPages = data.totalPages;
             if (dom.labelTotalPages) dom.labelTotalPages.textContent = state.totalPages;
         }
@@ -2764,12 +2778,18 @@
     function syncPageFromViewerScroll(newPage) {
         const total = Math.max(1, state.totalPages || 1);
         const p = Math.min(Math.max(1, parseInt(newPage, 10) || 1), total);
+        // Якщо користувач ввів сторінку в поле і одразу почав скролити — знімаємо фокус,
+        // щоб обидва лічильники (у хедері та внизу рідера) завжди оновлювалися синхронно.
+        const activeEl = document.activeElement;
+        if (activeEl && (activeEl === dom.inputCurrentPage || (state.viewerBottomBar && activeEl === state.viewerBottomBar.pageInput))) {
+            try { activeEl.blur(); } catch (_) {}
+        }
         if (p === state.currentPage) {
-            updatePageUI(false);
+            updatePageUI(true);
             return;
         }
         state.currentPage = p;
-        updatePageUI(false);
+        updatePageUI(true);
         scheduleSaveWorkspace(500);
     }
 
@@ -2798,6 +2818,7 @@
                 const mid = (lo + hi) >>> 1;
                 const r = pages[mid].getBoundingClientRect();
                 if (r.bottom < readingLineY) {
+                    foundIdx = Math.min(pages.length - 1, mid + 1);
                     lo = mid + 1;
                 } else if (r.top > readingLineY) {
                     foundIdx = mid;
@@ -3693,7 +3714,6 @@
             dom.settingEvalNumbers.classList.toggle('active', state.settings.evalMode === 'numbers');
             dom.settingEvalOff.classList.toggle('active', state.settings.evalMode === 'off');
         }
-        if (dom.settingEngineLines) dom.settingEngineLines.checked = state.settings.engineLines !== false;
         if (dom.settingArrowBest) dom.settingArrowBest.checked = state.settings.arrowBest;
         if (dom.settingArrowThreat) dom.settingArrowThreat.checked = state.settings.arrowThreat;
 
@@ -3796,7 +3816,10 @@
     function bindEvents() {
         dom.btnPrevPage.addEventListener('click', () => goToPage(state.currentPage - 1));
         dom.btnNextPage.addEventListener('click', () => goToPage(state.currentPage + 1));
-        dom.inputCurrentPage.addEventListener('change', () => goToPage(dom.inputCurrentPage.value));
+        dom.inputCurrentPage.addEventListener('change', () => {
+            goToPage(dom.inputCurrentPage.value);
+            dom.inputCurrentPage.blur();
+        });
         dom.inputCurrentPage.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
@@ -3857,13 +3880,6 @@
         }
         if (dom.settingEvalOff) {
             dom.settingEvalOff.addEventListener('click', () => applyEvalMode('off'));
-        }
-        if (dom.settingEngineLines) {
-            dom.settingEngineLines.addEventListener('change', (e) => {
-                state.settings.engineLines = e.target.checked;
-                localStorage.setItem('chess_vault_reader_engine_lines', String(state.settings.engineLines));
-                applyEngineLinesVisibility();
-            });
         }
         if (dom.settingArrowBest) {
             dom.settingArrowBest.addEventListener('change', (e) => {
