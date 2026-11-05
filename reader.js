@@ -1375,7 +1375,7 @@
             return;
         }
 
-        // 3. PDF: знаходимо робочий URL через CORS-ендпоінт і відкриваємо у вбудованому переглядачі
+        // 3. PDF: знаходимо робочий URL через CORS-ендпоінт і відкриваємо через PDF.js зі синхронізацією сторінок при скролі
         if (format === 'pdf') {
             dom.loading.style.display = 'flex';
             dom.loadingText.textContent = `Підключення до джерела книги...`;
@@ -1388,22 +1388,55 @@
             }
 
             if (workingUrl) {
+                state.resolvedCorsUrl = toCorsUrl(workingUrl);
                 state.resolvedDirectUrl = toDirectUrl(workingUrl);
+                const pdfBytes = cachedBook && Number(cachedBook.sizeRaw) ? Number(cachedBook.sizeRaw) : 0;
+
+                if (typeof pdfjsLib !== 'undefined') {
+                    // Для звичайних PDF (до 65 МБ) завантажуємо з прогрес-баром, кешуємо в IndexedDB та рендеримо через PDF.js
+                    if (!pdfBytes || pdfBytes <= 65 * 1024 * 1024) {
+                        dom.loadingText.textContent = `Завантаження персональної копії...`;
+                        if (dom.downloadProgressWrap) {
+                            dom.downloadProgressWrap.style.display = 'block';
+                            if (dom.downloadProgressFill) dom.downloadProgressFill.style.width = '0%';
+                            if (dom.downloadProgressPercent) dom.downloadProgressPercent.textContent = '0%';
+                            if (dom.downloadProgressBytes) dom.downloadProgressBytes.textContent = 'З’єднання з сервером...';
+                        }
+                        try {
+                            const blob = await downloadBookWithProgress([workingUrl], showDownloadProgress, 'pdf');
+                            const detectedFormat = await sniffBlobFormat(blob, 'pdf');
+                            if (detectedFormat !== 'html_error') {
+                                saveCachedBookBlob(bookParam.id, uid, blob, { format: detectedFormat, title: bookParam.title }).then(() => {
+                                    showSyncToast('📖 Персональну копію книги збережено у вашу бібліотеку!');
+                                }).catch(() => {});
+                                if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
+                                displayDocumentBlob(blob, detectedFormat);
+                                return;
+                            }
+                        } catch (pdfDlErr) {
+                            console.warn('PDF personal copy download failed, trying direct stream:', pdfDlErr);
+                        }
+                    }
+
+                    // Для великих сканованих PDF (> 65 МБ) або при збої кешування — потокове відкриття у PDF.js
+                    try {
+                        dom.loading.style.display = 'flex';
+                        dom.loadingText.textContent = `Потокове завантаження PDF книги...`;
+                        await initPdfJsViewer({
+                            url: toCorsUrl(workingUrl),
+                            disableRange: true,
+                            disableStream: false,
+                            disableAutoFetch: false
+                        }, toDirectUrl(workingUrl));
+                        return;
+                    } catch (streamErr) {
+                        console.warn('PDF.js stream fallback to native iframe:', streamErr);
+                    }
+                }
+
                 dom.loading.style.display = 'none';
                 if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
                 loadPdfDirect(toDirectUrl(workingUrl));
-                // Асинхронне збереження персональної копії без перевантаження каналу для великих PDF
-                const pdfBytes = cachedBook && Number(cachedBook.sizeRaw) ? Number(cachedBook.sizeRaw) : 0;
-                if (!pdfBytes || pdfBytes <= 35 * 1024 * 1024) {
-                    setTimeout(() => {
-                        downloadBookWithProgress([workingUrl], () => {}, format).then(blob => {
-                            if (blob && blob.size > 1024) {
-                                state.pdfBlobUrl = URL.createObjectURL(blob);
-                                saveCachedBookBlob(bookParam.id, uid, blob, { format, title: bookParam.title });
-                            }
-                        }).catch(() => {});
-                    }, 1500);
-                }
                 return;
             }
 
@@ -1633,6 +1666,94 @@
         return htmlBlocks.join('\n');
     }
 
+    function setViewportInnerScrollLock(locked) {
+        if (!dom.viewport) return;
+        dom.viewport.classList.toggle('locked-inner-scroll', Boolean(locked));
+    }
+
+    function createViewerBottomBar() {
+        const bar = document.createElement('div');
+        bar.className = 'pdf-viewer-bottom-bar';
+
+        const prevBtn = document.createElement('button');
+        prevBtn.type = 'button';
+        prevBtn.title = 'Попередня сторінка';
+        prevBtn.textContent = '◀';
+        prevBtn.addEventListener('click', () => goToPage(state.currentPage - 1));
+
+        const pageInput = document.createElement('input');
+        pageInput.type = 'number';
+        pageInput.className = 'pdf-viewer-bottom-input';
+        pageInput.min = '1';
+        pageInput.max = String(state.totalPages || 1);
+        pageInput.value = String(state.currentPage || 1);
+        pageInput.addEventListener('change', () => goToPage(pageInput.value));
+        pageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                goToPage(pageInput.value);
+                pageInput.blur();
+            }
+        });
+
+        const sep = document.createElement('span');
+        sep.textContent = '/';
+        sep.style.opacity = '0.7';
+
+        const totalSpan = document.createElement('span');
+        totalSpan.textContent = String(state.totalPages || 1);
+
+        const nextBtn = document.createElement('button');
+        nextBtn.type = 'button';
+        nextBtn.title = 'Наступна сторінка';
+        nextBtn.textContent = '▶';
+        nextBtn.addEventListener('click', () => goToPage(state.currentPage + 1));
+
+        bar.appendChild(prevBtn);
+        bar.appendChild(pageInput);
+        bar.appendChild(sep);
+        bar.appendChild(totalSpan);
+        bar.appendChild(nextBtn);
+
+        state.viewerBottomBar = { bar, prevBtn, nextBtn, pageInput, totalSpan };
+        return bar;
+    }
+
+    function cleanupPdfState() {
+        if (state.pdfZoomTimer) {
+            clearTimeout(state.pdfZoomTimer);
+            state.pdfZoomTimer = null;
+        }
+        if (state.pdfRenderObserver) {
+            try { state.pdfRenderObserver.disconnect(); } catch (_) {}
+            state.pdfRenderObserver = null;
+        }
+        if (state.pdfRenderTasks) {
+            for (const task of state.pdfRenderTasks.values()) {
+                try { task.cancel && task.cancel(); } catch (_) {}
+            }
+            state.pdfRenderTasks.clear();
+            state.pdfRenderTasks = null;
+        }
+        if (state.pdfLoadingTask) {
+            try { state.pdfLoadingTask.destroy && state.pdfLoadingTask.destroy(); } catch (_) {}
+            state.pdfLoadingTask = null;
+        }
+        if (state.pdfDoc) {
+            try { state.pdfDoc.destroy && state.pdfDoc.destroy(); } catch (_) {}
+            state.pdfDoc = null;
+        }
+        state.pdfPageContainers = null;
+        state.viewerBottomBar = null;
+        state.htmlDocActive = false;
+    }
+
+    function cleanupViewerState() {
+        cleanupDjVuState();
+        cleanupPdfState();
+        state.isOfficeViewer = false;
+    }
+
     // DISPLAY DOCUMENT FROM BLOB (Personal copy / downloaded file)
     function displayDocumentBlob(blob, format) {
         format = normalizeFormat(format);
@@ -1643,13 +1764,21 @@
         state.currentBlobUrl = blobUrl;
 
         if (format === 'pdf') {
-            dom.docFrame.style.display = 'block';
-            if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
-            if (dom.contentWrap) dom.contentWrap.style.display = 'none';
-            dom.docFrame.src = `${blobUrl}#page=${state.currentPage}&toolbar=1&navpanes=0`;
-            dom.loading.style.display = 'none';
-            updatePageUI();
+            if (typeof pdfjsLib !== 'undefined') {
+                dom.loading.style.display = 'flex';
+                dom.loadingText.textContent = 'Відкриття PDF документа...';
+                blob.arrayBuffer().then(buf => {
+                    return initPdfJsViewer({ data: new Uint8Array(buf) }, blobUrl);
+                }).catch(err => {
+                    console.warn('PDF.js render fallback to native iframe:', err);
+                    loadPdfDirect(blobUrl);
+                });
+            } else {
+                loadPdfDirect(blobUrl);
+            }
         } else if (format === 'djvu') {
+            cleanupPdfState();
+            setViewportInnerScrollLock(true);
             dom.docFrame.style.display = 'none';
             if (dom.contentWrap) dom.contentWrap.style.display = 'none';
             if (dom.djvuWrap) dom.djvuWrap.style.display = 'block';
@@ -1709,21 +1838,44 @@
     }
 
     function renderHtmlDocument(html) {
+        cleanupViewerState();
+        setViewportInnerScrollLock(false);
         dom.loading.style.display = 'none';
         dom.docFrame.style.display = 'none';
         if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
         dom.contentWrap.style.display = 'block';
         dom.contentWrap.innerHTML = `<div class="reader-docx-container">${html}</div>`;
+
         const totalChars = (html.replace(/<[^>]*>/g, '') || '').length;
         state.totalPages = Math.max(1, Math.round(totalChars / 2200));
-        if (dom.labelTotalPages) dom.labelTotalPages.textContent = state.totalPages;
-        if (dom.inputCurrentPage) dom.inputCurrentPage.max = state.totalPages;
-        updatePageUI();
-        saveUserBookWorkspace();
+        state.htmlDocActive = true;
+        dom.contentWrap.appendChild(createViewerBottomBar());
+
+        requestAnimationFrame(() => {
+            if (!state.htmlDocActive || !dom.viewport || !dom.contentWrap) return;
+            const pageHeightStep = Math.max(520, Math.round((dom.viewport.clientHeight || 720) * 0.88));
+            const measuredPages = Math.max(1, Math.ceil((dom.contentWrap.scrollHeight || pageHeightStep) / pageHeightStep));
+            state.totalPages = Math.max(1, measuredPages);
+            if (state.currentPage > state.totalPages) state.currentPage = state.totalPages;
+            if (dom.labelTotalPages) dom.labelTotalPages.textContent = state.totalPages;
+            if (dom.inputCurrentPage) dom.inputCurrentPage.max = state.totalPages;
+
+            state.programmaticScrollUntil = Date.now() + 350;
+            if (state.currentPage > 1 && state.totalPages > 1) {
+                const maxScroll = Math.max(0, dom.viewport.scrollHeight - dom.viewport.clientHeight);
+                dom.viewport.scrollTop = Math.round(((state.currentPage - 1) / (state.totalPages - 1)) * maxScroll);
+            } else {
+                dom.viewport.scrollTop = 0;
+            }
+            updatePageUI(true);
+            saveUserBookWorkspace();
+        });
     }
 
     // Старі .doc файли: Microsoft Office Online Viewer (працює з публічними URL)
     function loadOfficeViewer(directUrl) {
+        cleanupViewerState();
+        setViewportInnerScrollLock(true);
         dom.loading.style.display = 'none';
         if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
         if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
@@ -1732,16 +1884,287 @@
         dom.docFrame.onload = null;
         dom.docFrame.src = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(directUrl)}`;
         state.isOfficeViewer = true;
-        updatePageUI();
+        updatePageUI(true);
     }
 
-    // PDF LOADER: Uses native browser PDF viewer via Iframe (Zero CORS restrictions)
+    // PDF.js CONTINUOUS VIEWER: Full bidirectional scroll ↔ header counter sync + selectable text layer
+    async function initPdfJsViewer(pdfSource, fallbackUrl = '') {
+        if (typeof pdfjsLib === 'undefined') {
+            if (fallbackUrl) {
+                loadPdfDirect(fallbackUrl);
+                return;
+            }
+            throw new Error('PDF.js not available');
+        }
+
+        if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+
+        cleanupViewerState();
+        setViewportInnerScrollLock(false);
+        if (dom.docFrame) dom.docFrame.style.display = 'none';
+        if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
+        if (dom.contentWrap) {
+            dom.contentWrap.style.display = 'block';
+            dom.contentWrap.innerHTML = '';
+        }
+
+        const loadingTask = pdfjsLib.getDocument(pdfSource);
+        state.pdfLoadingTask = loadingTask;
+        loadingTask.onProgress = (prog) => {
+            if (prog && prog.loaded > 0) {
+                if (dom.downloadProgressWrap && dom.loading && dom.loading.style.display !== 'none') {
+                    dom.downloadProgressWrap.style.display = 'block';
+                    showDownloadProgress(prog.loaded, prog.total || 0);
+                }
+            }
+        };
+
+        const pdfDoc = await loadingTask.promise;
+        if (state.pdfLoadingTask !== loadingTask) {
+            try { pdfDoc.destroy(); } catch (_) {}
+            return;
+        }
+
+        state.pdfDoc = pdfDoc;
+        state.pdfRenderTasks = new Map();
+        const total = pdfDoc.numPages || 1;
+        state.totalPages = total;
+        if (dom.labelTotalPages) dom.labelTotalPages.textContent = total;
+        if (dom.inputCurrentPage) dom.inputCurrentPage.max = total;
+        state.currentPage = Math.min(Math.max(1, state.currentPage || 1), total);
+
+        const firstPage = await pdfDoc.getPage(1);
+        const baseVp = firstPage.getViewport({ scale: 1.0 });
+        state.pdfBaseWidth = baseVp.width || 595;
+        state.pdfBaseHeight = baseVp.height || 842;
+        const availWidth = Math.max(460, Math.min(840, (dom.viewport ? dom.viewport.clientWidth : 860) - 56));
+        state.pdfFitScale = availWidth / state.pdfBaseWidth;
+
+        const z = state.zoom || 1.0;
+        const defaultCssW = Math.round(state.pdfBaseWidth * state.pdfFitScale * z);
+        const defaultCssH = Math.round(state.pdfBaseHeight * state.pdfFitScale * z);
+
+        const stage = document.createElement('div');
+        stage.className = 'pdf-pages-stage';
+
+        const containers = [];
+        const frag = document.createDocumentFragment();
+        for (let i = 1; i <= total; i++) {
+            const pageDiv = document.createElement('div');
+            pageDiv.className = 'reader-page-container';
+            pageDiv.dataset.page = String(i);
+            pageDiv.dataset.baseW = String(state.pdfBaseWidth);
+            pageDiv.dataset.baseH = String(state.pdfBaseHeight);
+            pageDiv.style.width = `${defaultCssW}px`;
+            pageDiv.style.height = `${defaultCssH}px`;
+
+            const badge = document.createElement('span');
+            badge.className = 'pdf-page-placeholder-badge';
+            badge.textContent = `${i} / ${total}`;
+            pageDiv.appendChild(badge);
+
+            containers.push(pageDiv);
+            frag.appendChild(pageDiv);
+        }
+        stage.appendChild(frag);
+        dom.contentWrap.appendChild(stage);
+        dom.contentWrap.appendChild(createViewerBottomBar());
+        state.pdfPageContainers = containers;
+
+        const observer = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                if (!entry.isIntersecting) continue;
+                const el = entry.target;
+                const pNum = parseInt(el.dataset.page, 10);
+                if (pNum > 0) {
+                    renderPdfPageIntoContainer(pdfDoc, pNum, el);
+                }
+            }
+        }, {
+            root: dom.viewport || null,
+            rootMargin: '1200px 0px 1200px 0px',
+            threshold: 0.01
+        });
+        state.pdfRenderObserver = observer;
+        for (const el of containers) {
+            observer.observe(el);
+        }
+
+        dom.loading.style.display = 'none';
+        if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
+
+        state.programmaticScrollUntil = Date.now() + 420;
+        if (state.currentPage > 1) {
+            scrollToPdfPage(state.currentPage);
+        } else if (dom.viewport) {
+            dom.viewport.scrollTop = 0;
+        }
+        // Негайно рендеримо стартову сторінку
+        if (containers[state.currentPage - 1]) {
+            renderPdfPageIntoContainer(pdfDoc, state.currentPage, containers[state.currentPage - 1]);
+        }
+
+        updatePageUI(true);
+        saveUserBookWorkspace();
+        showSyncToast('📄 PDF документ підвантажено');
+    }
+
+    async function renderPdfPageIntoContainer(pdfDoc, pageNum, container, forceScaleRefresh = false) {
+        if (!state.pdfDoc || state.pdfDoc !== pdfDoc || !container) return;
+        const z = state.zoom || 1.0;
+        const scaleKey = (state.pdfFitScale * z).toFixed(3);
+        if (!forceScaleRefresh && (container.dataset.renderedScale === scaleKey || container.dataset.renderingScale === scaleKey)) {
+            return;
+        }
+        container.dataset.renderingScale = scaleKey;
+
+        const prevTask = state.pdfRenderTasks && state.pdfRenderTasks.get(pageNum);
+        if (prevTask) {
+            try { prevTask.cancel(); } catch (_) {}
+            state.pdfRenderTasks.delete(pageNum);
+        }
+
+        try {
+            const page = await pdfDoc.getPage(pageNum);
+            if (state.pdfDoc !== pdfDoc) return;
+
+            const rawVp = page.getViewport({ scale: 1.0 });
+            container.dataset.baseW = String(rawVp.width);
+            container.dataset.baseH = String(rawVp.height);
+
+            const cssScale = state.pdfFitScale * (state.zoom || 1.0);
+            const currentKey = cssScale.toFixed(3);
+            const cssVp = page.getViewport({ scale: cssScale });
+            const cssW = Math.round(cssVp.width);
+            const cssH = Math.round(cssVp.height);
+            container.style.width = `${cssW}px`;
+            container.style.height = `${cssH}px`;
+
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const renderVp = page.getViewport({ scale: cssScale * dpr });
+
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.floor(renderVp.width);
+            canvas.height = Math.floor(renderVp.height);
+            canvas.style.width = `${cssW}px`;
+            canvas.style.height = `${cssH}px`;
+
+            const ctx = canvas.getContext('2d', { alpha: false });
+            const renderTask = page.render({ canvasContext: ctx, viewport: renderVp });
+            if (state.pdfRenderTasks) state.pdfRenderTasks.set(pageNum, renderTask);
+            await renderTask.promise;
+            if (state.pdfRenderTasks) state.pdfRenderTasks.delete(pageNum);
+            if (state.pdfDoc !== pdfDoc) return;
+
+            const textLayerDiv = document.createElement('div');
+            textLayerDiv.className = 'textLayer';
+            textLayerDiv.style.setProperty('--scale-factor', String(cssScale));
+
+            const badge = container.querySelector('.pdf-page-placeholder-badge');
+            container.innerHTML = '';
+            container.appendChild(canvas);
+            container.appendChild(textLayerDiv);
+            if (badge) container.appendChild(badge);
+            container.dataset.renderedScale = currentKey;
+            delete container.dataset.renderingScale;
+
+            if (typeof pdfjsLib.renderTextLayer === 'function') {
+                try {
+                    const tlTask = pdfjsLib.renderTextLayer({
+                        textContentSource: page.streamTextContent(),
+                        container: textLayerDiv,
+                        viewport: cssVp
+                    });
+                    if (tlTask && tlTask.promise) {
+                        tlTask.promise.catch(() => {});
+                    }
+                } catch (_) {}
+            }
+
+            evictDistantPdfCanvases(pageNum);
+        } catch (err) {
+            delete container.dataset.renderingScale;
+            if (err && err.name === 'RenderingCancelledException') return;
+            console.warn(`PDF page ${pageNum} render warning:`, err);
+        }
+    }
+
+    function evictDistantPdfCanvases(centerPage) {
+        if (!state.pdfPageContainers) return;
+        const anchor = state.currentPage || centerPage || 1;
+        for (let i = 0; i < state.pdfPageContainers.length; i++) {
+            const p = i + 1;
+            if (Math.abs(p - anchor) <= 12) continue;
+            const el = state.pdfPageContainers[i];
+            if (el && el.dataset.renderedScale) {
+                const badge = el.querySelector('.pdf-page-placeholder-badge');
+                el.innerHTML = '';
+                if (badge) el.appendChild(badge);
+                delete el.dataset.renderedScale;
+                delete el.dataset.renderingScale;
+            }
+        }
+    }
+
+    function scrollToPdfPage(pageNum) {
+        if (!dom.viewport || !state.pdfPageContainers || !state.pdfPageContainers.length) return;
+        const idx = Math.min(Math.max(0, pageNum - 1), state.pdfPageContainers.length - 1);
+        const target = state.pdfPageContainers[idx];
+        if (!target) return;
+        const vpRect = dom.viewport.getBoundingClientRect();
+        const tRect = target.getBoundingClientRect();
+        const nextTop = dom.viewport.scrollTop + (tRect.top - vpRect.top) - 12;
+        dom.viewport.scrollTop = Math.max(0, Math.round(nextTop));
+        if (state.pdfDoc) {
+            renderPdfPageIntoContainer(state.pdfDoc, idx + 1, target);
+        }
+    }
+
+    function refreshPdfZoomLayout() {
+        if (!state.pdfDoc || !state.pdfPageContainers || !state.pdfPageContainers.length) return;
+        const anchorPage = state.currentPage || 1;
+        const z = state.zoom || 1.0;
+        const cssScale = state.pdfFitScale * z;
+        for (const el of state.pdfPageContainers) {
+            const bw = parseFloat(el.dataset.baseW) || state.pdfBaseWidth;
+            const bh = parseFloat(el.dataset.baseH) || state.pdfBaseHeight;
+            const w = Math.round(bw * cssScale);
+            const h = Math.round(bh * cssScale);
+            el.style.width = `${w}px`;
+            el.style.height = `${h}px`;
+            const c = el.querySelector('canvas');
+            if (c) {
+                c.style.width = `${w}px`;
+                c.style.height = `${h}px`;
+            }
+        }
+        state.programmaticScrollUntil = Date.now() + 300;
+        scrollToPdfPage(anchorPage);
+
+        if (state.pdfZoomTimer) clearTimeout(state.pdfZoomTimer);
+        const activePdf = state.pdfDoc;
+        state.pdfZoomTimer = setTimeout(() => {
+            if (state.pdfDoc !== activePdf || !state.pdfPageContainers) return;
+            const cur = state.currentPage || 1;
+            const start = Math.max(1, cur - 2);
+            const end = Math.min(state.pdfPageContainers.length, cur + 2);
+            for (let p = start; p <= end; p++) {
+                renderPdfPageIntoContainer(activePdf, p, state.pdfPageContainers[p - 1], true);
+            }
+        }, 180);
+    }
+
+    // PDF FALLBACK LOADER: Uses native browser PDF viewer via Iframe when PDF.js cannot read file
     function loadPdfDirect(url) {
         if (!url) {
             showDocError('Посилання на файл PDF відсутнє.');
             return;
         }
 
+        cleanupViewerState();
+        setViewportInnerScrollLock(true);
         dom.docFrame.style.display = 'block';
         if (dom.djvuWrap) dom.djvuWrap.style.display = 'none';
         if (dom.contentWrap) dom.contentWrap.style.display = 'none';
@@ -1770,7 +2193,7 @@
             dom.inputCurrentPage.max = state.totalPages;
         }
 
-        updatePageUI();
+        updatePageUI(true);
     }
 
     function cleanupDjVuState() {
@@ -1801,7 +2224,8 @@
             return;
         }
 
-        cleanupDjVuState();
+        cleanupViewerState();
+        setViewportInnerScrollLock(true);
         dom.docFrame.style.display = 'none';
         if (dom.contentWrap) dom.contentWrap.style.display = 'none';
         if (dom.djvuWrap) dom.djvuWrap.style.display = 'block';
@@ -1811,7 +2235,7 @@
         const baseUrl = getDjVuBaseUrl();
         const djvuOptions = baseUrl ? { baseUrl } : undefined;
 
-        // 1. Основний переглядач DjVu.Viewer (Web Worker + повний інтерфейс)
+        // 1. Основний переглядач DjVu.Viewer (Web Worker + повний безперервний скрол зі синхронізацією сторінок)
         if (typeof DjVu !== 'undefined' && DjVu.Viewer && typeof Worker !== 'undefined') {
             try {
                 await initDjVuViewer(normalizedBuf.slice(0), fileName, djvuOptions);
@@ -1836,7 +2260,7 @@
         showDocError('Не вдалося відкрити DjVu файл (можливо, файл пошкоджений). Спробуйте завантажити оригінал або обрати інший файл з пристрою.');
     }
 
-    // Primary DjVu.Viewer initializer with store error monitoring, timeout & accurate page sync
+    // Primary DjVu.Viewer initializer with continuous scroll mode & 1:1 Redux store page sync
     function initDjVuViewer(buf, fileName = 'book.djvu', djvuOptions = undefined) {
         return new Promise((resolve, reject) => {
             if (!dom.djvuMount) {
@@ -1850,18 +2274,18 @@
             // PAGE_NUMBER_CHANGED у DjVu.Viewer не передає аргументів — зчитуємо viewer.getPageNumber()
             const pageEvent = (DjVu.Viewer && DjVu.Viewer.Events && DjVu.Viewer.Events.PAGE_NUMBER_CHANGED) || 'PAGE_NUMBER_CHANGED';
             viewer.on(pageEvent, (argPage) => {
+                if (Date.now() < state.programmaticScrollUntil) return;
                 let newPage = typeof argPage === 'number' && argPage > 0 ? argPage : 0;
                 if (!newPage && typeof viewer.getPageNumber === 'function') {
                     try { newPage = viewer.getPageNumber(); } catch (_) {}
                 }
-                if (newPage && newPage !== state.currentPage) {
-                    state.currentPage = newPage;
-                    updatePageUI();
-                    saveUserBookWorkspace();
+                if (newPage > 0) {
+                    syncPageFromViewerScroll(newPage);
                 }
             });
 
             let settled = false;
+            let readyForScrollSync = false;
             const timer = setTimeout(() => {
                 if (!settled) {
                     settled = true;
@@ -1869,22 +2293,53 @@
                 }
             }, 14000);
 
-            // Відстежуємо помилки у Redux-сторі DjVu.Viewer (інакше loadDocument зависає назавжди!)
+            // Пряме відстеження помилок, кількості сторінок та поточної сторінки з Redux-стору DjVu.Viewer
             if (viewer.store && typeof viewer.store.subscribe === 'function') {
                 state.djvuViewerUnsub = viewer.store.subscribe(() => {
                     try {
                         const st = viewer.store.getState();
-                        const err = (DjVu.Viewer.get && DjVu.Viewer.get.error) ? DjVu.Viewer.get.error(st) : (st && st.error);
+                        const getSel = DjVu.Viewer && DjVu.Viewer.get;
+                        const err = (getSel && getSel.error) ? getSel.error(st) : (st && st.error);
                         if (err && !settled) {
                             settled = true;
                             clearTimeout(timer);
                             reject(err);
+                            return;
+                        }
+                        if (!settled || !getSel) return;
+
+                        const total = (getSel.pagesQuantity && getSel.pagesQuantity(st))
+                            || (getSel.pagesCount && getSel.pagesCount(st))
+                            || 0;
+                        if (total > 0 && total !== state.totalPages) {
+                            state.totalPages = total;
+                            if (dom.labelTotalPages) dom.labelTotalPages.textContent = total;
+                            if (dom.inputCurrentPage) dom.inputCurrentPage.max = total;
+                            updatePageUI(false);
+                        }
+
+                        if (readyForScrollSync && Date.now() >= state.programmaticScrollUntil) {
+                            const cur = getSel.currentPageNumber ? getSel.currentPageNumber(st) : 0;
+                            if (cur > 0 && cur !== state.currentPage) {
+                                syncPageFromViewerScroll(cur);
+                            }
                         }
                     } catch (_) {}
                 });
             }
 
-            const config = djvuOptions ? { djvuOptions } : {};
+            const initialPage = Math.max(1, parseInt(state.currentPage, 10) || 1);
+            const config = {
+                viewMode: 'continuous',
+                uiOptions: { changePageOnScroll: true }
+            };
+            if (djvuOptions) config.djvuOptions = djvuOptions;
+            if (initialPage > 1) config.pageNumber = initialPage;
+            if (state.zoom && Math.abs(state.zoom - 1.0) > 0.02) {
+                config.pageScale = state.zoom;
+            }
+
+            state.programmaticScrollUntil = Date.now() + 450;
             viewer.loadDocument(buf, fileName, config).then(() => {
                 if (settled) return;
                 settled = true;
@@ -1901,23 +2356,26 @@
                         state.totalPages = total;
                         if (dom.labelTotalPages) dom.labelTotalPages.textContent = total;
                         if (dom.inputCurrentPage) dom.inputCurrentPage.max = total;
+                        if (state.currentPage > total) state.currentPage = 1;
                     }
                 } catch (err) {
                     console.warn('Error reading DjVu pagesQuantity:', err);
                 }
 
-                const cfg = {};
-                if (state.currentPage && state.currentPage > 1) {
-                    cfg.pageNumber = Math.min(state.currentPage, state.totalPages || state.currentPage);
-                }
-                if (state.zoom && Math.abs(state.zoom - 1.0) > 0.02) {
-                    cfg.pageScale = state.zoom;
-                }
-                if (Object.keys(cfg).length > 0) {
-                    try { viewer.configure(cfg); } catch (_) {}
-                }
+                // Активація live-синхронізації після ініціалізації початкової сторінки в сазі DjVu.Viewer
+                setTimeout(() => {
+                    readyForScrollSync = true;
+                    try {
+                        if (typeof viewer.getPageNumber === 'function') {
+                            const p = viewer.getPageNumber();
+                            if (p > 0 && p !== state.currentPage) {
+                                syncPageFromViewerScroll(p);
+                            }
+                        }
+                    } catch (_) {}
+                }, 200);
 
-                updatePageUI();
+                updatePageUI(true);
                 saveUserBookWorkspace();
                 showSyncToast('📖 DjVu документ підвантажено');
                 resolve(true);
@@ -1957,6 +2415,25 @@
         ocrDetails.appendChild(summary);
         ocrDetails.appendChild(pre);
         stage.appendChild(ocrDetails);
+        stage.appendChild(createViewerBottomBar());
+
+        let lastWheelFlip = 0;
+        stage.addEventListener('wheel', (e) => {
+            if (e.ctrlKey || Math.abs(e.deltaY) < 12) return;
+            const now = Date.now();
+            if (now - lastWheelFlip < 240) return;
+            const atBottom = stage.scrollTop + stage.clientHeight >= stage.scrollHeight - 2;
+            const atTop = stage.scrollTop <= 1;
+            if (e.deltaY > 0 && atBottom && state.currentPage < state.totalPages) {
+                e.preventDefault();
+                lastWheelFlip = now;
+                goToPage(state.currentPage + 1);
+            } else if (e.deltaY < 0 && atTop && state.currentPage > 1) {
+                e.preventDefault();
+                lastWheelFlip = now;
+                goToPage(state.currentPage - 1);
+            }
+        }, { passive: false });
 
         dom.djvuMount.innerHTML = '';
         dom.djvuMount.appendChild(stage);
@@ -1966,7 +2443,7 @@
         await renderDjVuFallbackPage(state.currentPage || 1);
         dom.loading.style.display = 'none';
         applyZoomToDocument();
-        updatePageUI();
+        updatePageUI(true);
         saveUserBookWorkspace();
         showSyncToast('📖 DjVu документ підвантажено');
     }
@@ -2264,15 +2741,102 @@
     }
 
     // ========================================================
-    // 5. PAGE NAVIGATION & UI
+    // 5. PAGE NAVIGATION & BIDIRECTIONAL SCROLL SYNC
     // ========================================================
-    function goToPage(page) {
-        const p = Math.min(Math.max(1, parseInt(page) || 1), state.totalPages);
-        state.currentPage = p;
-        updatePageUI();
+    function scheduleSaveWorkspace(delayMs = 500) {
+        if (state.workspaceSaveTimer) {
+            clearTimeout(state.workspaceSaveTimer);
+        }
+        state.workspaceSaveTimer = setTimeout(() => {
+            state.workspaceSaveTimer = null;
+            saveUserBookWorkspace();
+        }, delayMs);
+    }
 
-        // 1. DjVu.js Viewer / Canvas Fallback page navigation
-        if (state.djvuViewer && state.djvuViewer.configure) {
+    function flushScheduledWorkspaceSave() {
+        if (state.workspaceSaveTimer) {
+            clearTimeout(state.workspaceSaveTimer);
+            state.workspaceSaveTimer = null;
+            saveUserBookWorkspace();
+        }
+    }
+
+    function syncPageFromViewerScroll(newPage) {
+        const total = Math.max(1, state.totalPages || 1);
+        const p = Math.min(Math.max(1, parseInt(newPage, 10) || 1), total);
+        if (p === state.currentPage) {
+            updatePageUI(false);
+            return;
+        }
+        state.currentPage = p;
+        updatePageUI(false);
+        scheduleSaveWorkspace(500);
+    }
+
+    function detectVisiblePageInViewport() {
+        if (!dom.viewport || Date.now() < state.programmaticScrollUntil) return;
+
+        // 1. PDF.js continuous pages inside #reader-viewport
+        if (state.pdfDoc && state.pdfPageContainers && state.pdfPageContainers.length > 0) {
+            const pages = state.pdfPageContainers;
+            const vp = dom.viewport;
+            if (vp.scrollTop <= 4) {
+                syncPageFromViewerScroll(1);
+                return;
+            }
+            if (vp.scrollTop + vp.clientHeight >= vp.scrollHeight - 6) {
+                syncPageFromViewerScroll(pages.length);
+                return;
+            }
+            const vpRect = vp.getBoundingClientRect();
+            const readingLineY = vpRect.top + Math.min(220, vpRect.height * 0.36);
+
+            let lo = 0;
+            let hi = pages.length - 1;
+            let foundIdx = 0;
+            while (lo <= hi) {
+                const mid = (lo + hi) >>> 1;
+                const r = pages[mid].getBoundingClientRect();
+                if (r.bottom < readingLineY) {
+                    lo = mid + 1;
+                } else if (r.top > readingLineY) {
+                    foundIdx = mid;
+                    hi = mid - 1;
+                } else {
+                    foundIdx = mid;
+                    break;
+                }
+            }
+            syncPageFromViewerScroll(foundIdx + 1);
+            return;
+        }
+
+        // 2. HTML documents (.doc / .docx / .txt) inside #reader-viewport
+        if (state.htmlDocActive && state.totalPages > 1) {
+            const maxScroll = Math.max(0, dom.viewport.scrollHeight - dom.viewport.clientHeight);
+            if (maxScroll <= 8) {
+                syncPageFromViewerScroll(1);
+                return;
+            }
+            const ratio = Math.min(1, Math.max(0, dom.viewport.scrollTop / maxScroll));
+            const p = 1 + Math.round(ratio * (state.totalPages - 1));
+            syncPageFromViewerScroll(p);
+        }
+    }
+
+    function goToPage(page) {
+        const total = Math.max(1, state.totalPages || 1);
+        const p = Math.min(Math.max(1, parseInt(page, 10) || 1), total);
+        state.programmaticScrollUntil = Date.now() + 380;
+        state.currentPage = p;
+        updatePageUI(true);
+
+        // 1. PDF.js continuous scroll viewer
+        if (state.pdfDoc && state.pdfPageContainers && state.pdfPageContainers.length > 0) {
+            scrollToPdfPage(p);
+        }
+        // 2. DjVu.js Viewer / Canvas Fallback page navigation
+        else if (state.djvuViewer && state.djvuViewer.configure) {
             try {
                 state.djvuViewer.configure({ pageNumber: p });
             } catch (err) {
@@ -2281,12 +2845,17 @@
         } else if (state.djvuFallbackDoc) {
             renderDjVuFallbackPage(p).catch(err => console.warn('DjVu fallback page error:', err));
         }
-
-        // 2. Iframe anchor (PDF mode) - query param change forces native viewer navigation
-        if (dom.docFrame && dom.docFrame.style.display !== 'none' && dom.docFrame.src && !state.isOfficeViewer) {
+        // 3. HTML documents (.doc / .docx / .txt)
+        else if (state.htmlDocActive && dom.viewport) {
+            const maxScroll = Math.max(0, dom.viewport.scrollHeight - dom.viewport.clientHeight);
+            dom.viewport.scrollTop = total > 1
+                ? Math.round(((p - 1) / (total - 1)) * maxScroll)
+                : 0;
+        }
+        // 4. Native Iframe fallback (PDF fallback mode)
+        else if (dom.docFrame && dom.docFrame.style.display !== 'none' && dom.docFrame.src && !state.isOfficeViewer) {
             const raw = dom.docFrame.src.split('#')[0];
             if (!raw.startsWith('blob:') && state.pdfBlobUrl) {
-                // Персональна копія вже завантажена у фоні — переходимо на неї (без повторного завантаження з архіву)
                 dom.docFrame.src = `${state.pdfBlobUrl}#page=${p}&toolbar=1&navpanes=0`;
             } else if (raw.startsWith('blob:')) {
                 const cleanBlob = raw.split('?')[0];
@@ -2303,17 +2872,34 @@
             }
         }
 
-
-        saveUserBookWorkspace();
+        scheduleSaveWorkspace(150);
     }
 
-    function updatePageUI() {
-        if (dom.inputCurrentPage) dom.inputCurrentPage.value = state.currentPage;
-        if (dom.btnPrevPage) dom.btnPrevPage.disabled = state.currentPage <= 1;
-        if (dom.btnNextPage) dom.btnNextPage.disabled = state.currentPage >= state.totalPages;
+    function updatePageUI(forceInputOverwrite = false) {
+        const total = Math.max(1, state.totalPages || 1);
+        const cur = Math.min(Math.max(1, state.currentPage || 1), total);
 
-        const percent = Math.min(100, Math.max(1, Math.round((state.currentPage / state.totalPages) * 100)));
+        if (dom.inputCurrentPage && (forceInputOverwrite || document.activeElement !== dom.inputCurrentPage)) {
+            dom.inputCurrentPage.value = cur;
+        }
+        if (dom.inputCurrentPage) dom.inputCurrentPage.max = total;
+        if (dom.labelTotalPages) dom.labelTotalPages.textContent = total;
+        if (dom.btnPrevPage) dom.btnPrevPage.disabled = cur <= 1;
+        if (dom.btnNextPage) dom.btnNextPage.disabled = cur >= total;
+
+        const percent = Math.min(100, Math.max(1, Math.round((cur / total) * 100)));
         if (dom.labelPercentage) dom.labelPercentage.textContent = `${percent}%`;
+
+        if (state.viewerBottomBar) {
+            const b = state.viewerBottomBar;
+            if (b.pageInput && (forceInputOverwrite || document.activeElement !== b.pageInput)) {
+                b.pageInput.value = String(cur);
+            }
+            if (b.pageInput) b.pageInput.max = String(total);
+            if (b.totalSpan) b.totalSpan.textContent = String(total);
+            if (b.prevBtn) b.prevBtn.disabled = cur <= 1;
+            if (b.nextBtn) b.nextBtn.disabled = cur >= total;
+        }
     }
 
     // ========================================================
@@ -3211,6 +3797,30 @@
         dom.btnPrevPage.addEventListener('click', () => goToPage(state.currentPage - 1));
         dom.btnNextPage.addEventListener('click', () => goToPage(state.currentPage + 1));
         dom.inputCurrentPage.addEventListener('change', () => goToPage(dom.inputCurrentPage.value));
+        dom.inputCurrentPage.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                goToPage(dom.inputCurrentPage.value);
+                dom.inputCurrentPage.blur();
+            }
+        });
+
+        if (dom.viewport) {
+            let scrollRafPending = false;
+            dom.viewport.addEventListener('scroll', () => {
+                if (scrollRafPending) return;
+                scrollRafPending = true;
+                requestAnimationFrame(() => {
+                    scrollRafPending = false;
+                    detectVisiblePageInViewport();
+                });
+            }, { passive: true });
+        }
+
+        window.addEventListener('pagehide', flushScheduledWorkspaceSave);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') flushScheduledWorkspaceSave();
+        });
 
         document.addEventListener('keydown', (e) => {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -3513,12 +4123,16 @@
 
     function applyZoomToDocument() {
         const z = state.zoom || 1.0;
+        if (state.pdfDoc && state.pdfPageContainers) {
+            refreshPdfZoomLayout();
+            return;
+        }
         if (dom.docFrame) {
             dom.docFrame.style.transformOrigin = 'top center';
             if (z === 1.0) {
                 dom.docFrame.style.transform = '';
                 dom.docFrame.style.width = '100%';
-                dom.docFrame.style.height = '100%';
+                dom.docFrame.style.height = '';
             } else {
                 dom.docFrame.style.transform = `scale(${z})`;
                 dom.docFrame.style.width = `${100 / z}%`;
@@ -3580,6 +4194,8 @@
     }
 
     function showDocError(msg) {
+        cleanupViewerState();
+        setViewportInnerScrollLock(false);
         dom.loading.style.display = 'none';
         if (dom.downloadProgressWrap) dom.downloadProgressWrap.style.display = 'none';
         if (dom.docFrame) dom.docFrame.style.display = 'none';
