@@ -2058,3 +2058,279 @@ html.dark .download-btn-queued:hover {
     color: #fde047 !important;
     border-color: rgba(245, 158, 11, 0.4) !important;
 }
+
+/* ========================================================
+   FORMAT FILTER BUBBLES (PDF / DJVU / DOC) & SORTABLE TH
+   ======================================================== */
+.format-filter-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.format-bubbles-group {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.sort-controls .format-bubble {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-block-size: 36px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    color: #334155;
+    font-size: 0.88rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.18s ease, box-shadow 0.2s ease;
+}
+
+.sort-controls .format-bubble:not(.active):hover {
+    background: #ffffff;
+    border-color: rgba(0, 0, 0, 0.22);
+    color: #0f172a;
+    transform: translateY(-1px);
+    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.08);
+}
+
+.sort-controls .format-bubble.active:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+}
+
+.format-bubble-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.format-bubble-pdf .format-bubble-dot {
+    background: #ff4757;
+}
+
+.format-bubble-djvu .format-bubble-dot {
+    background: #475569;
+}
+
+.format-bubble-doc .format-bubble-dot {
+    background: #2980b9;
+}
+
+.sort-controls .format-bubble.active.format-bubble-pdf {
+    background: #ff4757;
+    border-color: #ff4757;
+    color: #ffffff;
+    box-shadow: 0 6px 16px rgba(255, 71, 87, 0.35);
+}
+
+.sort-controls .format-bubble.active.format-bubble-djvu {
+    background: #2f3542;
+    border-color: #2f3542;
+    color: #ffffff;
+    box-shadow: 0 6px 16px rgba(47, 53, 66, 0.32);
+}
+
+.sort-controls .format-bubble.active.format-bubble-doc {
+    background: #2980b9;
+    border-color: #2980b9;
+    color: #ffffff;
+    box-shadow: 0 6px 16px rgba(41, 128, 185, 0.35);
+}
+
+.sort-controls .format-bubble.active .format-bubble-dot {
+    background: #ffffff;
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.75);
+}
+
+/* Sortable Table Column Headers */
+.books-table thead th {
+    z-index: 2;
+}
+
+.books-table thead th.col-year,
+.books-table thead th.col-pages,
+.books-table thead th.col-format,
+.books-table thead th.col-size,
+.books-table thead th.col-action {
+    text-align: center;
+}
+
+.books-table thead th.sortable-th {
+    padding: 8px 6px;
+    user-select: none;
+}
+
+.books-table thead th.col-author.sortable-th,
+.books-table thead th.col-title.sortable-th {
+    padding-left: 10px;
+}
+
+.th-sort-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-block-size: 32px;
+    padding: 6px 9px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.books-table thead th.col-author .th-sort-btn,
+.books-table thead th.col-title .th-sort-btn {
+    justify-content: flex-start;
+}
+
+.books-table thead th.col-year .th-sort-btn,
+.books-table thead th.col-pages .th-sort-btn,
+.books-table thead th.col-format .th-sort-btn,
+.books-table thead th.col-size .th-sort-btn {
+    justify-content: center;
+}
+
+.th-sort-btn:hover {
+    background: rgba(0, 0, 0, 0.06);
+    color: #111827;
+}
+
+.th-sort-arrow {
+    font-size: 0.85rem;
+    line-height: 1;
+    opacity: 0.48;
+    transition: opacity 0.16s ease, transform 0.16s ease, color 0.16s ease;
+}
+
+.th-sort-btn:hover .th-sort-arrow {
+    opacity: 0.9;
+}
+
+.books-table thead th.is-sorted .th-sort-btn {
+    background: rgba(17, 24, 39, 0.09);
+    border-color: rgba(17, 24, 39, 0.18);
+    color: #0f172a;
+}
+
+.books-table thead th.is-sorted .th-sort-arrow {
+    opacity: 1;
+    color: #0f172a;
+    font-weight: 800;
+}
+
+/* Accessible keyboard focus indicators */
+.format-bubble:focus-visible,
+.th-sort-btn:focus-visible,
+.table-area:focus-visible {
+    outline: 2px solid #d4af37;
+    outline-offset: 2px;
+}
+
+/* Dark theme overrides for Format Bubbles & Sortable Headers */
+html.dark .sort-controls .format-bubble {
+    background: rgba(255, 255, 255, 0.07) !important;
+    border-color: rgba(255, 255, 255, 0.14) !important;
+    color: #e2e8f0 !important;
+    box-shadow: none;
+}
+
+html.dark .sort-controls .format-bubble:not(.active):hover {
+    background: rgba(255, 255, 255, 0.14) !important;
+    border-color: rgba(255, 255, 255, 0.28) !important;
+    color: #ffffff !important;
+}
+
+html.dark .format-bubble-djvu .format-bubble-dot {
+    background: #94a3b8;
+}
+
+html.dark .format-bubble-doc .format-bubble-dot {
+    background: #38bdf8;
+}
+
+html.dark .sort-controls .format-bubble.active.format-bubble-pdf {
+    background: #ff4757 !important;
+    border-color: #ff6b81 !important;
+    color: #ffffff !important;
+    box-shadow: 0 6px 18px rgba(255, 71, 87, 0.4) !important;
+}
+
+html.dark .sort-controls .format-bubble.active.format-bubble-djvu {
+    background: #d4af37 !important;
+    border-color: #facc15 !important;
+    color: #0f172a !important;
+    box-shadow: 0 6px 18px rgba(212, 175, 55, 0.35) !important;
+}
+
+html.dark .sort-controls .format-bubble.active.format-bubble-djvu .format-bubble-dot {
+    background: #0f172a !important;
+    box-shadow: none !important;
+}
+
+html.dark .sort-controls .format-bubble.active.format-bubble-doc {
+    background: #0284c7 !important;
+    border-color: #38bdf8 !important;
+    color: #ffffff !important;
+    box-shadow: 0 6px 18px rgba(56, 189, 248, 0.38) !important;
+}
+
+html.dark .th-sort-btn {
+    color: #cbd5e1;
+}
+
+html.dark .th-sort-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+}
+
+html.dark .books-table thead th.is-sorted .th-sort-btn {
+    background: rgba(212, 175, 55, 0.16);
+    border-color: rgba(212, 175, 55, 0.42);
+    color: #fbbf24;
+}
+
+html.dark .books-table thead th.is-sorted .th-sort-arrow {
+    color: #fbbf24;
+    opacity: 1;
+}
+
+@media (pointer: coarse) {
+    .sort-controls .format-bubble {
+        min-block-size: 40px;
+        padding: 8px 18px;
+    }
+
+    .th-sort-btn {
+        min-block-size: 38px;
+    }
+}
+
+@media (max-width: 768px) {
+    .format-bubbles-group {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .sort-controls .format-bubble {
+        flex: 1 1 auto;
+    }
+}

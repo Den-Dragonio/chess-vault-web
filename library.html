@@ -16,14 +16,14 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Chess Vault">
     <meta name="theme-color" content="#ffffff">
-    <link rel="stylesheet" href="library.css?v=9">
+    <link rel="stylesheet" href="library.css?v=10">
     <link rel="stylesheet" href="book-modal.css?v=8">
     <link rel="stylesheet" href="playlists.css?v=6">
     <link rel="stylesheet" href="collections.css">
     <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
     <script src="dark-mode-init.js"></script>
     <script src="analytics.js?v=1"></script>
-    <script src="i18n.js?v=10"></script>
+    <script src="i18n.js?v=11"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -105,28 +105,70 @@
             <input type="text" id="lib-search-input" placeholder="Шукати за автором, назвою або роком..." data-i18n-placeholder="lib_search_ph">
         </div>
 
-        <div class="sort-controls">
-            <span class="sort-label" data-i18n="lib_sort_label">Упорядкувати:</span>
-            <button class="sort-btn" onclick="sortBooks('author')">🔤 <span data-i18n="lib_sort_author">Автор</span></button>
-            <button class="sort-btn" onclick="sortBooks('year')">📅 <span data-i18n="lib_sort_year">Дата</span></button>
-            <button class="sort-btn" onclick="sortBooks('pages')">📄 <span data-i18n="lib_sort_pages">Стор.</span></button>
-            <button class="sort-btn" onclick="sortBooks('sizeRaw')">⚖️ <span data-i18n="lib_sort_size">Розмір</span></button>
+        <div class="sort-controls format-filter-controls">
+            <span class="sort-label" data-i18n="lib_filter_format_label">Формат:</span>
+            <div class="format-bubbles-group">
+                <button type="button" class="format-bubble format-bubble-pdf" data-format="pdf" aria-pressed="false" onclick="toggleFormatFilter('pdf')">
+                    <span class="format-bubble-dot" aria-hidden="true"></span>
+                    <span>PDF</span>
+                </button>
+                <button type="button" class="format-bubble format-bubble-djvu" data-format="djvu" aria-pressed="false" onclick="toggleFormatFilter('djvu')">
+                    <span class="format-bubble-dot" aria-hidden="true"></span>
+                    <span>DJVU</span>
+                </button>
+                <button type="button" class="format-bubble format-bubble-doc" data-format="doc" aria-pressed="false" onclick="toggleFormatFilter('doc')">
+                    <span class="format-bubble-dot" aria-hidden="true"></span>
+                    <span>DOC</span>
+                </button>
+            </div>
             <span class="lib-stats" id="lib-stats"></span>
         </div>
 
         <!-- Блок зі списком літератури -->
         <div class="books-list-block">
-            <div class="table-area">
+            <div class="table-area" tabindex="0" role="region" aria-label="Каталог книг" data-i18n-aria-label="lib_table_region">
                 <table class="books-table" id="books-table">
                     <thead>
                         <tr>
-                            <th class="col-author" data-i18n="lib_th_author">Автор</th>
-                            <th class="col-title" data-i18n="lib_th_title">Назва книги</th>
-                            <th class="col-year" data-i18n="lib_th_year">Рік</th>
-                            <th class="col-pages" data-i18n="lib_th_pages">Стор.</th>
-                            <th class="col-format" data-i18n="lib_th_format">Вид</th>
-                            <th class="col-size" data-i18n="lib_th_size">Вага</th>
-                            <th class="col-action" data-i18n="lib_th_action">Дія</th>
+                            <th scope="col" class="col-author sortable-th" data-sort-key="author" aria-sort="none">
+                                <button type="button" class="th-sort-btn" onclick="sortBooks('author')">
+                                    <span data-i18n="lib_th_author">Автор</span>
+                                    <span class="th-sort-arrow" aria-hidden="true">⇅</span>
+                                </button>
+                            </th>
+                            <th scope="col" class="col-title sortable-th" data-sort-key="title" aria-sort="none">
+                                <button type="button" class="th-sort-btn" onclick="sortBooks('title')">
+                                    <span data-i18n="lib_th_title">Назва книги</span>
+                                    <span class="th-sort-arrow" aria-hidden="true">⇅</span>
+                                </button>
+                            </th>
+                            <th scope="col" class="col-year sortable-th" data-sort-key="year" aria-sort="none">
+                                <button type="button" class="th-sort-btn" onclick="sortBooks('year')">
+                                    <span data-i18n="lib_th_year">Рік</span>
+                                    <span class="th-sort-arrow" aria-hidden="true">⇅</span>
+                                </button>
+                            </th>
+                            <th scope="col" class="col-pages sortable-th" data-sort-key="pages" aria-sort="none">
+                                <button type="button" class="th-sort-btn" onclick="sortBooks('pages')">
+                                    <span data-i18n="lib_th_pages">Стор.</span>
+                                    <span class="th-sort-arrow" aria-hidden="true">⇅</span>
+                                </button>
+                            </th>
+                            <th scope="col" class="col-format sortable-th" data-sort-key="format" aria-sort="none">
+                                <button type="button" class="th-sort-btn" onclick="sortBooks('format')">
+                                    <span data-i18n="lib_th_format">Вид</span>
+                                    <span class="th-sort-arrow" aria-hidden="true">⇅</span>
+                                </button>
+                            </th>
+                            <th scope="col" class="col-size sortable-th is-sorted" data-sort-key="sizeRaw" aria-sort="descending">
+                                <button type="button" class="th-sort-btn" onclick="sortBooks('sizeRaw')">
+                                    <span data-i18n="lib_th_size">Вага</span>
+                                    <span class="th-sort-arrow" aria-hidden="true">↓</span>
+                                </button>
+                            </th>
+                            <th scope="col" class="col-action">
+                                <span data-i18n="lib_th_action">Дія</span>
+                            </th>
                         </tr>
                     </thead>
                     <tbody id="books-table-body">
@@ -157,9 +199,9 @@
     <script src="playlists.js?v=6"></script>
     <script src="book-modal.js?v=16"></script>
     <script src="collections-data.js?v=6"></script>
-    <script src="collections.js?v=9"></script>
+    <script src="collections.js?v=10"></script>
     <script src="books-cache.js?v=9"></script>
-    <script src="library.js?v=13"></script>
+    <script src="library.js?v=14"></script>
 </body>
 
 </html>

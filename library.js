@@ -1,16 +1,93 @@
 const ARCHIVE_ID = '1971_20260223';
 let allBooks = [];
-let sortDirections = { author: 1, year: 1, pages: 1, sizeRaw: -1 };
+let activeSortKey = 'sizeRaw';
+let activeSortDir = -1; // -1 = за спаданням (↓), 1 = за зростанням (↑)
+window.activeFormatFilter = null; // null | 'pdf' | 'djvu' | 'doc'
 let currentUser = null;
+
+const alphaCollator = new Intl.Collator(['uk', 'ru', 'en'], { sensitivity: 'base', numeric: true });
+
+function cleanAlphaSortText(str) {
+    return String(str || '')
+        .normalize('NFC')
+        .replace(/^[«»"'„“”‘’\(\[\s—–._-]+/, '')
+        .trim();
+}
+
+function isNumericOrMissingLabel(cleaned) {
+    if (!cleaned || cleaned === '---') return true;
+    if (/^\d/.test(cleaned)) return true;
+    if (!/^\p{L}/u.test(cleaned)) return true;
+    if (/^(?:[IVXLCDM]{2,8}|[IVX])(?=[\s\-—–,):]|$)/.test(cleaned)) return true;
+    return false;
+}
+
+function compareBooks(a, b, key = activeSortKey, dir = activeSortDir) {
+    const avA = (a && a.inArchive !== false) ? 1 : 0;
+    const avB = (b && b.inArchive !== false) ? 1 : 0;
+    if (avA !== avB) return avB - avA;
+
+    if (key === 'sizeRaw') {
+        return ((Number(a.sizeRaw) || 0) - (Number(b.sizeRaw) || 0)) * dir;
+    }
+
+    if (key === 'pages') {
+        const pA = Number(a.pages) || 0;
+        const pB = Number(b.pages) || 0;
+        const validA = pA > 0;
+        const validB = pB > 0;
+        if (validA !== validB) return validA ? -1 : 1;
+        if (pA !== pB) return (pA - pB) * dir;
+        return (Number(b.sizeRaw) || 0) - (Number(a.sizeRaw) || 0);
+    }
+
+    if (key === 'year') {
+        const yA = parseInt(a.year, 10);
+        const yB = parseInt(b.year, 10);
+        const validA = !isNaN(yA) && yA > 0;
+        const validB = !isNaN(yB) && yB > 0;
+        if (validA !== validB) return validA ? -1 : 1;
+        if (yA !== yB) return (yA - yB) * dir;
+        return (Number(b.sizeRaw) || 0) - (Number(a.sizeRaw) || 0);
+    }
+
+    if (key === 'format') {
+        const fA = String(a.format || '').toLowerCase().trim();
+        const fB = String(b.format || '').toLowerCase().trim();
+        if (fA !== fB) return fA.localeCompare(fB) * dir;
+        return (Number(b.sizeRaw) || 0) - (Number(a.sizeRaw) || 0);
+    }
+
+    if (key === 'title' || key === 'author') {
+        const rawA = key === 'title' ? a.title : a.author;
+        const rawB = key === 'title' ? b.title : b.author;
+        const cA = cleanAlphaSortText(rawA);
+        const cB = cleanAlphaSortText(rawB);
+        const numA = isNumericOrMissingLabel(cA);
+        const numB = isNumericOrMissingLabel(cB);
+        // Книги з цифрами не враховуються першими ні з початку (↑), ні з кінця (↓)
+        if (numA !== numB) return numA ? 1 : -1;
+        const cmp = alphaCollator.compare(cA, cB);
+        if (cmp !== 0) return cmp * dir;
+        return (Number(b.sizeRaw) || 0) - (Number(a.sizeRaw) || 0);
+    }
+
+    return ((Number(b.sizeRaw) || 0) - (Number(a.sizeRaw) || 0));
+}
+window.compareBooks = compareBooks;
+
+function matchesFormatFilter(book, filterFmt = window.activeFormatFilter) {
+    if (!filterFmt) return true;
+    const raw = String((book && book.format) || '').toLowerCase().trim();
+    if (filterFmt === 'djvu') return raw === 'djvu' || raw === 'djv';
+    if (filterFmt === 'doc') return raw === 'doc' || raw === 'docx';
+    return raw === filterFmt;
+}
+window.matchesFormatFilter = matchesFormatFilter;
 
 function sortBooksBySizeDesc(books) {
     if (!Array.isArray(books)) return books;
-    return books.sort((a, b) => {
-        const avA = (a && a.inArchive !== false) ? 1 : 0;
-        const avB = (b && b.inArchive !== false) ? 1 : 0;
-        if (avA !== avB) return avB - avA;
-        return (Number(b.sizeRaw) || 0) - (Number(a.sizeRaw) || 0);
-    });
+    return books.sort((a, b) => compareBooks(a, b, 'sizeRaw', -1));
 }
 
 // =============================================
@@ -225,7 +302,7 @@ async function fetchArchiveData() {
             }
         });
 
-        const unifiedBooks = sortBooksBySizeDesc(Array.from(booksMap.values()));
+        const unifiedBooks = Array.from(booksMap.values()).sort((a, b) => compareBooks(a, b, activeSortKey, activeSortDir));
 
         if (unifiedBooks.length > 0) {
             // Зберігаємо актуальний об'єднаний каталог
@@ -242,10 +319,13 @@ async function fetchArchiveData() {
                 if (typeof initCollections === 'function') {
                     initCollections(allBooks);
                 } else {
-                    renderTable(allBooks);
+                    renderTable(allBooks.filter(b => matchesFormatFilter(b)));
                 }
-                updateSortButtonsUI('sizeRaw', -1);
-                updateLibraryStats(allBooks);
+                updateSortButtonsUI(activeSortKey, activeSortDir);
+                updateFormatBubblesUI();
+                if (typeof renderFilteredBooks !== 'function') {
+                    updateLibraryStats(allBooks.filter(b => matchesFormatFilter(b)));
+                }
                 applyUrlSearch();
             }
         }
@@ -372,7 +452,7 @@ function showLibToast(msg, type = 'ok', actionText = null, onAction = null) {
 window.showLibToast = showLibToast;
 
 // =============================================
-// ПОШУК ТА СОРТУВАННЯ
+// ПОШУК, СОРТУВАННЯ В ХЕДЕРІ ТАБЛИЦІ ТА ФІЛЬТРАЦІЯ ЗА ФОРМАТОМ
 // =============================================
 document.getElementById('lib-search-input').addEventListener('input', e => {
     if (typeof renderFilteredBooks === 'function') {
@@ -380,74 +460,81 @@ document.getElementById('lib-search-input').addEventListener('input', e => {
     } else {
         const q = e.target.value.toLowerCase();
         renderTable(allBooks.filter(b =>
-            b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q) || b.year.includes(q)
+            matchesFormatFilter(b) &&
+            (b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q) || b.year.includes(q))
         ));
     }
 });
 
-function updateSortButtonsUI(activeKey, dir) {
-    document.querySelectorAll('.sort-controls .sort-btn').forEach(btn => {
-        const onclickAttr = btn.getAttribute('onclick') || '';
-        const isThis = onclickAttr.includes(`'${activeKey}'`) || onclickAttr.includes(`"${activeKey}"`);
-        btn.classList.toggle('active', isThis);
-        const arrowEl = btn.querySelector('.sort-arrow');
-        if (isThis) {
-            const arrow = dir === -1 ? ' ↓' : ' ↑';
-            if (arrowEl) {
-                arrowEl.textContent = arrow;
-            } else {
-                const sp = document.createElement('span');
-                sp.className = 'sort-arrow';
-                sp.textContent = arrow;
-                btn.appendChild(sp);
-            }
-        } else if (arrowEl) {
-            arrowEl.remove();
+function updateSortButtonsUI(activeKey = activeSortKey, dir = activeSortDir) {
+    document.querySelectorAll('.books-table thead th.sortable-th[data-sort-key]').forEach(th => {
+        const isThis = th.dataset.sortKey === activeKey;
+        th.classList.toggle('is-sorted', isThis);
+        th.setAttribute('aria-sort', isThis ? (dir === -1 ? 'descending' : 'ascending') : 'none');
+        const arrowEl = th.querySelector('.th-sort-arrow');
+        if (arrowEl) {
+            arrowEl.textContent = isThis ? (dir === -1 ? '↓' : '↑') : '⇅';
         }
     });
 }
 window.updateSortButtonsUI = updateSortButtonsUI;
 
+function updateFormatBubblesUI() {
+    const activeFmt = window.activeFormatFilter || null;
+    document.querySelectorAll('.format-bubble[data-format]').forEach(btn => {
+        const isActive = btn.dataset.format === activeFmt;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+}
+window.updateFormatBubblesUI = updateFormatBubblesUI;
+
+function toggleFormatFilter(fmt) {
+    const norm = String(fmt || '').toLowerCase().trim();
+    window.activeFormatFilter = (window.activeFormatFilter === norm) ? null : norm;
+    updateFormatBubblesUI();
+    if (typeof renderFilteredBooks === 'function') {
+        renderFilteredBooks();
+    } else {
+        const q = (document.getElementById('lib-search-input')?.value || '').toLowerCase().trim();
+        const filtered = allBooks.filter(b =>
+            matchesFormatFilter(b) &&
+            (!q || b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q) || b.year.includes(q))
+        );
+        renderTable(filtered);
+        updateLibraryStats(filtered);
+    }
+}
+window.toggleFormatFilter = toggleFormatFilter;
+
 function sortBooks(key) {
-    sortDirections[key] *= -1;
-    const dir = sortDirections[key];
-    const sorter = (a, b) => {
-        const avA = (a && a.inArchive !== false) ? 1 : 0;
-        const avB = (b && b.inArchive !== false) ? 1 : 0;
-        if (avA !== avB) return avB - avA;
-        let valA = a[key];
-        let valB = b[key];
-        if (key === 'pages' || key === 'sizeRaw') {
-            valA = Number(valA) || 0;
-            valB = Number(valB) || 0;
-            return (valA - valB) * dir;
-        }
-        if (typeof valA === 'string') valA = valA.toLowerCase();
-        if (typeof valB === 'string') valB = valB.toLowerCase();
-        if (valA < valB) return -1 * dir;
-        if (valA > valB) return 1 * dir;
-        return 0;
-    };
+    if (activeSortKey === key) {
+        activeSortDir = -activeSortDir;
+    } else {
+        activeSortKey = key;
+        activeSortDir = (key === 'sizeRaw') ? -1 : 1;
+    }
+    const sorter = (a, b) => compareBooks(a, b, activeSortKey, activeSortDir);
     allBooks.sort(sorter);
     if (typeof collectionsState !== 'undefined' && collectionsState.allBooks) {
         collectionsState.allBooks.sort(sorter);
     }
-    updateSortButtonsUI(key, dir);
+    updateSortButtonsUI(activeSortKey, activeSortDir);
     if (typeof renderFilteredBooks === 'function') {
         renderFilteredBooks();
     } else {
-        renderTable(allBooks);
+        renderTable(allBooks.filter(b => matchesFormatFilter(b)));
     }
 }
+window.sortBooks = sortBooks;
 
 window.addEventListener('chessVaultLanguageChanged', () => {
     if (typeof renderFilteredBooks === 'function') {
         renderFilteredBooks();
     } else if (allBooks && allBooks.length > 0) {
-        renderTable(allBooks);
-    }
-    if (allBooks && allBooks.length > 0) {
-        updateLibraryStats(allBooks);
+        const filtered = allBooks.filter(b => matchesFormatFilter(b));
+        renderTable(filtered);
+        updateLibraryStats(filtered);
     }
 });
 

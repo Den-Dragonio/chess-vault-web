@@ -84,6 +84,8 @@ const I18N_TRANSLATIONS = {
         lib_search_ph: "Search by author, title or year...",
         lib_authors_search_ph: "Search author across collections...",
         lib_sort_label: "Sort by:",
+        lib_filter_format_label: "Type:",
+        lib_table_region: "Books catalog",
         lib_sort_author: "Author",
         lib_sort_year: "Date",
         lib_sort_pages: "Pages",
@@ -320,6 +322,8 @@ const I18N_TRANSLATIONS = {
         lib_search_ph: "Шукати за автором, назвою або роком...",
         lib_authors_search_ph: "Пошук автора серед колекцій...",
         lib_sort_label: "Упорядкувати:",
+        lib_filter_format_label: "Формат:",
+        lib_table_region: "Каталог книг",
         lib_sort_author: "Автор",
         lib_sort_year: "Дата",
         lib_sort_pages: "Стор.",
@@ -615,6 +619,13 @@ const i18n = {
             const key = el.getAttribute('data-i18n-title');
             if (key) {
                 el.title = this.t(key);
+                el.setAttribute('aria-label', this.t(key));
+            }
+        });
+
+        document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+            const key = el.getAttribute('data-i18n-aria-label');
+            if (key) {
                 el.setAttribute('aria-label', this.t(key));
             }
         });

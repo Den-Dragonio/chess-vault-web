@@ -407,7 +407,9 @@ function getBookAuthorClean(book) {
 
 // --- 4. ІНІЦІАЛІЗАЦІЯ КОЛЕКЦІЙ ---
 function initCollections(books) {
-    const sorted = [...books].sort((a, b) => (Number(b.sizeRaw) || 0) - (Number(a.sizeRaw) || 0));
+    const sorted = typeof window !== 'undefined' && typeof window.compareBooks === 'function'
+        ? [...books].sort((a, b) => window.compareBooks(a, b))
+        : [...books].sort((a, b) => (Number(b.sizeRaw) || 0) - (Number(a.sizeRaw) || 0));
     collectionsState.allBooks = sorted.map(b => ({
         ...b,
         topicId: classifyBookTopic(b),
@@ -978,6 +980,21 @@ function renderFilteredBooks() {
         list = list.filter(b => b.cleanAuthor === collectionsState.activeAuthor);
     }
 
+    // Фільтрація за обраним типом файлу (PDF / DJVU / DOC)
+    if (typeof window !== 'undefined' && window.activeFormatFilter) {
+        if (typeof window.matchesFormatFilter === 'function') {
+            list = list.filter(b => window.matchesFormatFilter(b, window.activeFormatFilter));
+        } else {
+            const af = window.activeFormatFilter;
+            list = list.filter(b => {
+                const raw = String((b && b.format) || '').toLowerCase().trim();
+                if (af === 'djvu') return raw === 'djvu' || raw === 'djv';
+                if (af === 'doc') return raw === 'doc' || raw === 'docx';
+                return raw === af;
+            });
+        }
+    }
+
     // Застосовуємо загальний пошук
     const searchInput = document.getElementById('lib-search-input');
     const query = (searchInput && searchInput.value) ? searchInput.value.toLowerCase().trim() : '';
@@ -999,8 +1016,11 @@ function renderFilteredBooks() {
     if (statsEl) {
         const isEn = window.i18n && window.i18n.currentLang === 'en';
         const totalBytes = list.reduce((sum, b) => sum + (b.sizeRaw || 0), 0);
-        const totalMB = (totalBytes / 1024 / 1024).toFixed(1);
-        statsEl.innerText = isEn ? `Total: ${list.length} books (~${totalMB} MB)` : `Всього: ${list.length} книг (~${totalMB} MB)`;
+        const totalGB = totalBytes / 1024 / 1024 / 1024;
+        const sizeText = totalGB >= 1
+            ? `${totalGB.toFixed(2)} ${isEn ? 'GB' : 'ГБ'}`
+            : `${(totalBytes / 1024 / 1024).toFixed(1)} ${isEn ? 'MB' : 'МБ'}`;
+        statsEl.innerText = isEn ? `Total: ${list.length} books (~${sizeText})` : `Всього: ${list.length} книг (~${sizeText})`;
     }
 }
 
